@@ -49,12 +49,12 @@ import { setMode, setTheme, theme, userPrefersMode } from "mode-watcher";
 import type { PageProps } from "./$types";
 import ForgeIcon from "$lib/components/forge-icon/forge-icon.svelte";
 import SettingsSection from "$lib/components/settings-section/settings-section.svelte";
-import { Checkbox } from "$lib/components/ui/checkbox";
-import { Label } from "$lib/components/ui/label";
 import { can, CAPABILITIES, SESSION_ONLY_CAPABILITIES } from "$lib/utils/auth/capabilities";
 import KeyIcon from "@lucide/svelte/icons/key";
 import { Separator } from "$lib/components/ui/separator";
 import RadicleIdentity from "./radicle-identity.svelte";
+import TokenAccessPicker from "./token-access-picker.svelte";
+import { describeTokenCaps } from "./token-access";
 
 let { data }: PageProps = $props();
 
@@ -133,16 +133,24 @@ const grantable = $derived(
 );
 let createTokenOpen = $state(false);
 let tokenName = $state("");
-let tokenDays = $state(90);
+let tokenDays = $state("90");
 let tokenCaps = $state<string[]>([]);
 let creatingToken = $state(false);
 // The secret exists only here, once: the control plane keeps a digest, never the token.
 let mintedToken = $state<string | null>(null);
 let revokingToken = $state<string | null>(null);
 
-function toggleCap(capability: string, on: boolean) {
-  tokenCaps = on ? [...tokenCaps, capability] : tokenCaps.filter((c) => c !== capability);
-}
+const expiryOptions = [
+  { value: "7", label: "7 days" },
+  { value: "30", label: "30 days" },
+  { value: "90", label: "90 days" },
+  { value: "365", label: "1 year" },
+];
+const tokenExpiresOn = $derived(
+  new Date(Date.now() + Number(tokenDays) * 86_400_000).toLocaleDateString(undefined, {
+    dateStyle: "long",
+  }),
+);
 
 async function submitToken(event: SubmitEvent) {
   event.preventDefault();
@@ -151,12 +159,11 @@ async function submitToken(event: SubmitEvent) {
     const { token } = await createApiToken(fetch, {
       name: tokenName.trim(),
       caps: tokenCaps,
-      expiresInDays: tokenDays,
+      expiresInDays: Number(tokenDays),
     });
     mintedToken = token;
     tokenName = "";
-    tokenCaps = [];
-    tokenDays = 90;
+    tokenDays = "90";
     await invalidate("app:settings");
   } catch (e) {
     toast.error(e instanceof Error ? e.message : "Failed to mint the token");
@@ -655,7 +662,7 @@ function chooseAppearance(value: Appearance) {
             {/if}
           </span>
           <span class="text-muted-foreground">
-            {token.caps.join(", ")} · expires {formatDateTime(token.expiresAt)}
+            <span title={token.caps.join(", ")}>{describeTokenCaps(token.caps)}</span> · expires {formatDateTime(token.expiresAt)}
             {#if token.lastUsedAt}
               · used {formatDateTime(token.lastUsedAt)}
             {/if}
@@ -779,7 +786,7 @@ function chooseAppearance(value: Appearance) {
     if (!open) mintedToken = null;
   }}
 >
-  <Dialog.Content>
+  <Dialog.Content class="sm:max-w-lg">
     {#if mintedToken !== null}
       <Dialog.Header>
         <Dialog.Title>Your new token</Dialog.Title>
@@ -803,38 +810,49 @@ function chooseAppearance(value: Appearance) {
         <Dialog.Header>
           <Dialog.Title>Mint a token</Dialog.Title>
           <Dialog.Description>
-            Name it after what will hold it, and give it only what that needs.
+            Name it after what will hold it.
           </Dialog.Description>
         </Dialog.Header>
         <Field.Field>
           <Field.FieldLabel for="token-name">Name</Field.FieldLabel>
-          <Input id="token-name" required bind:value={tokenName} placeholder="deploy script" />
+          <!-- A label for the token, not a person's name: keep autofill and password managers off it. -->
+          <Input
+            id="token-name"
+            required
+            bind:value={tokenName}
+            placeholder="deploy script"
+            autocomplete="off"
+            data-1p-ignore
+            data-lpignore="true"
+            data-bwignore
+            data-form-type="other"
+          />
         </Field.Field>
         <Field.Field>
-          <Field.FieldLabel for="token-days">Expires in (days)</Field.FieldLabel>
-          <Input id="token-days" type="number" min={1} max={365} bind:value={tokenDays} />
-        </Field.Field>
-        <Field.Field>
-          <Field.FieldLabel>Capabilities</Field.FieldLabel>
-          <div class="scroll-fade-y grid max-h-64 grid-cols-2 gap-2 overflow-y-auto overscroll-contain p-0.5 text-sm">
-            {#each grantable as capability (capability)}
-              <div class="flex items-center gap-2">
-                <Checkbox
-                  id="cap-{capability}"
-                  checked={tokenCaps.includes(capability)}
-                  onCheckedChange={(on) => toggleCap(capability, on === true)}
-                />
-                <Label for="cap-{capability}" class="font-mono text-xs">{capability}</Label>
-              </div>
+          <Field.FieldLabel id="token-expiry-label">Expires</Field.FieldLabel>
+          <ToggleGroup.Root
+            type="single"
+            variant="outline"
+            value={tokenDays}
+            onValueChange={(value) => {
+              if (value) tokenDays = value;
+            }}
+            aria-labelledby="token-expiry-label"
+            class="w-full"
+          >
+            {#each expiryOptions as option (option.value)}
+              <ToggleGroup.Item value={option.value} class="flex-1">{option.label}</ToggleGroup.Item>
             {/each}
-          </div>
+          </ToggleGroup.Root>
+          <Field.FieldDescription>Stops working on {tokenExpiresOn}.</Field.FieldDescription>
         </Field.Field>
+        <TokenAccessPicker grantable={grantable} bind:caps={tokenCaps} />
         <Dialog.Footer>
           <Button type="submit" disabled={creatingToken || tokenCaps.length === 0}>
             {#if creatingToken}
               <Spinner data-icon="inline-start" />
             {/if}
-            Mint
+            Mint token
           </Button>
         </Dialog.Footer>
       </form>
