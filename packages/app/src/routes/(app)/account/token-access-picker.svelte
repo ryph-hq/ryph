@@ -75,8 +75,8 @@ function setGroup(groupCaps: readonly string[], on: boolean) {
 
 {#if preset === "custom"}
   <div
-    class="scroll-fade-y -mt-2 flex max-h-72 flex-col overflow-y-auto overscroll-contain rounded-lg border"
-  >
+  class="scroll-fade-y -mt-2 flex max-h-72 flex-col overflow-y-auto overscroll-contain rounded-lg border"
+>
     {#each groups as group (group.resource)}
       {@const groupCaps = group.caps.map((c) => c.capability)}
       {@const count = groupCaps.filter((c) => selected.has(c)).length}

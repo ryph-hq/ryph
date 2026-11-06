@@ -1,10 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  describeTokenCaps,
-  groupCapabilities,
-  isReadCapability,
-  presetCaps,
-} from "./token-access";
+import { describeTokenCaps, groupCapabilities, isReadCapability, presetCaps } from "./token-access";
 
 const grantable = ["tasks:create", "tasks:read", "tasks:read-all", "repos:read", "usage:read-all"];
 
@@ -39,7 +34,11 @@ describe("token access", () => {
         ],
       },
       { resource: "repos", label: "Repos", caps: [{ capability: "repos:read", verb: "read" }] },
-      { resource: "usage", label: "Usage", caps: [{ capability: "usage:read-all", verb: "read-all" }] },
+      {
+        resource: "usage",
+        label: "Usage",
+        caps: [{ capability: "usage:read-all", verb: "read-all" }],
+      },
     ]);
   });
 
