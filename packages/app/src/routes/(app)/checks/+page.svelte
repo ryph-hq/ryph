@@ -298,7 +298,9 @@ refreshWhileLive(
           suite.generation > 1 && `Run ${suite.generation}`,
         ].filter(Boolean).join(", ")}
         <!-- The whole row opens the suite; the links inside it sit above that. -->
-        <Table.Row class="relative [&>td]:py-3 [&>td]:align-top">
+        <!-- A transform, not `relative`: Safari ignores `position: relative` on a table row, so the
+             link's overlay would cover the whole table and every row would open the last one. -->
+        <Table.Row class="translate-0 [&>td]:py-3 [&>td]:align-top">
           <Table.Cell class={edgeStart}>
             <CheckStateBadge state={suite.state} />
           </Table.Cell>
