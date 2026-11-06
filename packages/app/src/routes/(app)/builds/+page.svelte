@@ -256,7 +256,9 @@ const longest = $derived(Math.max(1, ...[...durations.values()].map((ms) => ms ?
       {#each recent.builds as item (item.build.id)}
         {@const build = item.build}
         <!-- The whole row opens the build. -->
-        <Table.Row class="relative [&>td]:py-3 [&>td]:align-top">
+        <!-- A transform, not `relative`: Safari ignores `position: relative` on a table row, so the
+             link's overlay would cover the whole table and every row would open the last one. -->
+        <Table.Row class="translate-0 [&>td]:py-3 [&>td]:align-top">
           <Table.Cell class={edgeStart}>
             <BuildStatusBadge status={build.status} setupWarnings={build.setupWarnings} />
           </Table.Cell>

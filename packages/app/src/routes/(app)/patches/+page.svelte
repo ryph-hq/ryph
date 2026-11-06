@@ -184,7 +184,9 @@ const setSizes = $derived.by(() => {
       {#each patches as patch (patch.id)}
         {@const setSize = setSizes.get(patch.setId) ?? 1}
         <!-- The whole row opens the patch; the links and buttons inside it sit above that. -->
-        <Table.Row class="relative [&>td]:py-3 [&>td]:align-top">
+        <!-- A transform, not `relative`: Safari ignores `position: relative` on a table row, so the
+             link's overlay would cover the whole table and every row would open the last one. -->
+        <Table.Row class="translate-0 [&>td]:py-3 [&>td]:align-top">
           <Table.Cell class={edgeStart}>
             <span class="flex flex-col items-start gap-1">
               <PatchStateBadge state={patch.state} held={patch.heldReason} />

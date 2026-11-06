@@ -543,7 +543,9 @@ function onready(): void {
           {#if label}
             {label}
           {:else}
-            {call.view.kind === "mcp" ? "Called" : "Used"} <span class="font-mono">{shownName}</span>
+            <!-- One span, so the two fonts share a baseline instead of each being centred as its
+                 own flex item (off by a pixel in Safari). -->
+            <span>{call.view.kind === "mcp" ? "Called" : "Used"} <span class="font-mono">{shownName}</span></span>
           {/if}
         </Badge>
         <ChevronRightIcon
