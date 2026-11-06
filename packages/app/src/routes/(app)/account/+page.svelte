@@ -816,7 +816,7 @@ function chooseAppearance(value: Appearance) {
         </Field.Field>
         <Field.Field>
           <Field.FieldLabel>Capabilities</Field.FieldLabel>
-          <div class="grid max-h-64 grid-cols-2 gap-2 overflow-y-auto text-sm">
+          <div class="scroll-fade-y grid max-h-64 grid-cols-2 gap-2 overflow-y-auto overscroll-contain p-0.5 text-sm">
             {#each grantable as capability (capability)}
               <div class="flex items-center gap-2">
                 <Checkbox
