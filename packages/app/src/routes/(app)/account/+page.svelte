@@ -815,7 +815,18 @@ function chooseAppearance(value: Appearance) {
         </Dialog.Header>
         <Field.Field>
           <Field.FieldLabel for="token-name">Name</Field.FieldLabel>
-          <Input id="token-name" required bind:value={tokenName} placeholder="deploy script" />
+          <!-- A label for the token, not a person's name: keep autofill and password managers off it. -->
+          <Input
+            id="token-name"
+            required
+            bind:value={tokenName}
+            placeholder="deploy script"
+            autocomplete="off"
+            data-1p-ignore
+            data-lpignore="true"
+            data-bwignore
+            data-form-type="other"
+          />
         </Field.Field>
         <Field.Field>
           <Field.FieldLabel id="token-expiry-label">Expires</Field.FieldLabel>
