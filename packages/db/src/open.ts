@@ -424,13 +424,28 @@ async function openPostgres(target: Extract<DbTarget, { kind: "postgres" }>): Pr
         await meta.unlisten();
       };
     },
-    // `reserve()` and not a pooled query: an advisory lock belongs to the SESSION that took it,
-    // and a pooled unlock can land on a different connection, silently leaving the lock held.
-    lockSession: async (options) => {
-      if (options?.selfHealing) return selfHealingLockSession(postgres, target.url);
-      const reserved = await client.reserve();
+    // A one-connection client of its own and not a pooled query: an advisory lock belongs to the
+    // SESSION that took it, and a pooled unlock can land on a different connection, silently
+    // leaving the lock held. Not `reserve()` either: a reserved handle whose connection died (a
+    // database restart, a failover) never answered again, so a tick waiting on its `tryLock`
+    // hung for good and every tick behind it was skipped — a cell's schedules stopped firing
+    // after a Cloud SQL blip until the pod was restarted. This client dials again on the next
+    // call; the locks went with the old backend, which `held` reports as false.
+    lockSession: (options) => {
+      if (options?.selfHealing) {
+        return Promise.resolve(selfHealingLockSession(postgres, target.url));
+      }
+      const reserved = postgres(target.url, {
+        max: 1,
+        // Never idled or aged out: either would drop the locks this connection holds.
+        idle_timeout: 0,
+        max_lifetime: 0,
+        keep_alive: Number(LOCK_SESSION_KEEPALIVE.tcp_keepalives_idle),
+        fetch_types: false,
+        onnotice: () => {},
+      });
       let released = false;
-      return {
+      return Promise.resolve({
         tryLock: async (key) => {
           checkKey(key);
           const rows = await reserved<
@@ -466,11 +481,10 @@ async function openPostgres(target: Extract<DbTarget, { kind: "postgres" }>): Pr
         close: () => {
           if (released) return Promise.resolve();
           released = true;
-          // Back to the pool, which drops every advisory lock the session still held.
-          reserved.release();
-          return Promise.resolve();
+          // Ending the connection drops every advisory lock the session still held.
+          return reserved.end({ timeout: 5 });
         },
-      };
+      });
     },
     scope: (schema) => drizzle(client, { schema }) as unknown as RyphDb<typeof schema>,
     migrate: async (migrationsFolder, migrationsTable) => {
