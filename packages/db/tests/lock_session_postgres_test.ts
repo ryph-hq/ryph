@@ -75,6 +75,41 @@ test.skipIf(!url)(
   },
 );
 
+test.skipIf(!url)(
+  "a plain session whose connection was terminated answers, and the next call reconnects",
+  async () => {
+    // The schedulers' and reapers' session. On a reserved pool connection, every call after its
+    // backend died hung for good — the tick waiting on it never ended, and none ran after it.
+    const cluster = await openDbCluster(url!);
+    const admin = postgres(url!, { max: 1, onnotice: () => {} });
+    const session = await cluster.lockSession();
+    const KEY_PLAIN = KEY + 30;
+    try {
+      expect(await session.tryLock(KEY_PLAIN)).toBe(true);
+      await admin`SELECT pg_terminate_backend(pid) FROM pg_locks
+      WHERE locktype = 'advisory' AND objid = ${KEY_PLAIN} AND pid <> pg_backend_pid()`;
+      await new Promise((resolve) => setTimeout(resolve, 200));
+
+      // The call that meets the dead connection may fail, but it answers.
+      const first = await within(session.tryLock(KEY_PLAIN), 5_000);
+      expect(first).not.toBe("hung");
+      // And the session works again: the lock went with the backend, so the key is free.
+      const retaken = await within(
+        session.held(KEY_PLAIN).then(async (held) => held || await session.tryLock(KEY_PLAIN)),
+        5_000,
+      );
+      expect(retaken).toEqual({ value: true });
+      expect(await within(session.held(KEY_PLAIN), 5_000)).toEqual({ value: true });
+      expect(await within(session.unlock(KEY_PLAIN), 5_000)).toEqual({ value: undefined });
+      expect(uncaught).toEqual([]);
+    } finally {
+      await session.close();
+      await admin.end();
+      await cluster.close();
+    }
+  },
+);
+
 test.skipIf(!url)("a black-holed lock connection answers within the deadline", async () => {
   const target = new URL(url!);
   const proxy = await blackHoleProxy(target.hostname, Number(target.port || 5432));
