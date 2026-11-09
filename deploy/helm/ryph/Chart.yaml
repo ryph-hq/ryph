@@ -9,8 +9,8 @@ type: application
 # version, set together by `bun run release:version --stamp <x.y.z>` before the release is tagged
 # (packages/ryph/scripts/version.ts; the release scripts refuse a tag this file does not match).
 # The chart is not packaged or pushed to a chart repository; it is installed from a checkout.
-version: 0.1.3
-appVersion: "0.1.3"
+version: 0.1.4
+appVersion: "0.1.4"
 # Native sidecars (restartPolicy: Always on an init container) are on by default from 1.29.
 kubeVersion: ">=1.29.0-0"
 home: https://github.com/ryph-hq/ryph
