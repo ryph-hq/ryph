@@ -397,12 +397,26 @@ test("a BYOK call's spend is OpenRouter's fee and the upstream cost, JSON or str
   await (await streamed.call({ model: "openai/gpt-6", stream: true, messages: [] })).text();
   assertAlmostEquals((await streamed.rows())[0].costUsd!, 0.0021);
 
-  // Not BYOK, or no upstream figure that is one: the fee is the whole bill.
+  // Not BYOK: the fee is the whole bill.
+  const plain = await makeSlice({
+    upstream: () =>
+      Response.json({
+        model: "openai/gpt-6",
+        choices: [],
+        usage: { ...usage, is_byok: false },
+      }),
+  });
+  await (await plain.call({ model: "openai/gpt-6", messages: [] })).text();
+  assertEquals((await plain.rows())[0].costUsd, 0.0001);
+
+  // BYOK with no upstream figure that is one: no bill at all, so the row is priced from the
+  // catalogue (1,000 in and 100 out of gpt-6: $0.0035), never at the fee alone.
   for (
     const over of [
-      { is_byok: false },
       { cost_details: { upstream_inference_cost: null } },
       { cost_details: { upstream_inference_cost: -1 } },
+      { cost_details: {} },
+      { cost_details: null },
     ]
   ) {
     const slice = await makeSlice({
@@ -410,7 +424,10 @@ test("a BYOK call's spend is OpenRouter's fee and the upstream cost, JSON or str
         Response.json({ model: "openai/gpt-6", choices: [], usage: { ...usage, ...over } }),
     });
     await (await slice.call({ model: "openai/gpt-6", messages: [] })).text();
-    assertEquals((await slice.rows())[0].costUsd, 0.0001, JSON.stringify(over));
+    const [row] = await slice.rows();
+    assertEquals(row.costUsd, null, JSON.stringify(over));
+    assertEquals(row.estimated, false);
+    assertAlmostEquals((await spendOfRun(slice.store, "r-1")).spentUsd, 0.0035);
   }
 });
 

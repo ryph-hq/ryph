@@ -33,7 +33,8 @@
 // - a COST the response states is read only when the caller says the provider's figure is its
 //   bill (`reportsCost`: OpenRouter's `usage.cost`, plus `cost_details.upstream_inference_cost`
 //   on a BYOK call, off the last usage object in its JSON body or stream); for every other
-//   provider money is the price list's
+//   provider money is the price list's, and so it is for a BYOK call that leaves its upstream
+//   cost out
 
 import type { Dialect } from "./registry.ts";
 import type { TokenCounts } from "./pricing.ts";
@@ -135,10 +136,14 @@ export function makeUsageMeter(
       if (cost !== null) {
         // A call on the account's own provider key (BYOK) is billed twice: `cost` is only
         // OpenRouter's fee, and what the provider charged that key is the upstream cost beside it.
-        const upstream = usage.is_byok === true && isObject(usage.cost_details)
-          ? usd(usage.cost_details.upstream_inference_cost)
-          : null;
-        costUsd = cost + (upstream ?? 0);
+        // A BYOK call that does not say that cost has no bill here at all (null): its fee alone
+        // would price the call at a few percent of what it cost, where the price list is close.
+        if (usage.is_byok === true) {
+          const upstream = isObject(usage.cost_details)
+            ? usd(usage.cost_details.upstream_inference_cost)
+            : null;
+          costUsd = upstream === null ? null : cost + upstream;
+        } else costUsd = cost;
       }
     }
   };
