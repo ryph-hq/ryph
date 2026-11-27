@@ -29,13 +29,18 @@
 //   JSON Schema with a `file_id` or `url` property, or a tool call's arguments, is not judged
 // - unknown is refused: a tool type, a media source type or a URL scheme this does not know
 //   fails closed, and the provider's own refusal is never what is relied on
-// - OpenRouter's parts are found by where they sit, a message's `content` or `images` list, and
-//   held to a closed set: what a message's `content` is (text or a list), which part types, and
-//   which members a part's `file` or `input_audio` carries. Anything else could be read by
-//   OpenRouter beside the inline bytes the rules check
+// - on an OpenRouter body, every value reachable under a message's `content` or `images` has a
+//   shape known here exactly, and anything else is refused. `content` is text, null or a list of
+//   part objects; `images` is null or a list of part objects; each part carries exactly its own
+//   type's members (`OPENROUTER_PARTS`), and each of a part's objects exactly its own
+//   (`OPENROUTER_PART_OBJECTS`), every one of them a string. A shape is a closed allowlist, never
+//   a list of what to refuse: OpenRouter reads members this file has never heard of (a `url`
+//   beside inline bytes, say), and only a closed shape keeps each of them out without first
+//   having to name it. Parts are found by where they sit, so a tool's JSON Schema with a
+//   `content` list of typed objects is not judged
 
 import type { BodyShape } from "./endpoints.ts";
-import { NOT_A_STRING, type ObjectSeen, visitObjects } from "./model_field.ts";
+import { type JsonKind, NOT_A_STRING, type ObjectSeen, visitObjects } from "./model_field.ts";
 
 /** How deep a body may nest. A conversation is a handful of levels and a tool's JSON Schema
  * rarely twenty. */
@@ -102,43 +107,117 @@ const OPENROUTER_REFUSED: Readonly<Record<string, string>> = {
 
 const OPENROUTER_REFUSED_FIELDS: readonly string[] = Object.keys(OPENROUTER_REFUSED);
 
-/**
- * The content parts an OpenRouter message may carry. OpenRouter fetches what a part names by URL
- * (an image, a PDF, a video, audio) from its own side, at an address the run picked; so every
- * part it reads is held to inline bytes below, and a part type not here (`video_url`, and
- * whatever it adds next) is refused rather than trusted to be harmless.
- */
-const OPENROUTER_CONTENT_PARTS = new Set(["text", "image_url", "file", "input_audio"]);
-
-/** Where a message's content part sits: `messages[i].content[j]`, or an image an assistant
- * message carries back (`messages[i].images[j]`), and nowhere else (a tool's JSON Schema can hold
- * a `content` array of typed objects too). */
-const MESSAGE_PART = /^messages\[\d+\]\.(?:content|images)\[\d+\]$/;
-
-/** What a message's `images` may be on OpenRouter: a list of parts. */
-const LIST_OR_NULL = new Set(["array", "null"]);
-
-/** A JSON kind as a refusal names it. */
-function kindName(kind: string): string {
-  return kind === "object" || kind === "array" ? `an ${kind}` : `a ${kind}`;
+/** One member of a closed shape: the kind of value it must hold, and whether it must be there. */
+interface MemberRule {
+  kind: JsonKind;
+  required?: boolean;
 }
+
+/** A closed shape: exactly these members, each of its kind. */
+type Shape = Readonly<Record<string, MemberRule>>;
+
+const TYPE: MemberRule = { kind: "string", required: true };
+
+/**
+ * The content parts an OpenRouter message may carry, by `type`, each with exactly its members.
+ * OpenRouter fetches what a part names by URL (an image, a PDF, a video, audio) from its own
+ * side, at an address the run picked; so each part's payload is held to inline bytes, and a part
+ * type not here (`video_url`, and whatever OpenRouter adds next) is refused rather than trusted to
+ * be harmless. pi sends `text` (with `cache_control` on an Anthropic model's last text) and
+ * `image_url`.
+ */
+const OPENROUTER_PARTS: Readonly<Record<string, Shape>> = {
+  text: { type: TYPE, text: { kind: "string", required: true }, cache_control: { kind: "object" } },
+  image_url: { type: TYPE, image_url: { kind: "object", required: true } },
+  file: { type: TYPE, file: { kind: "object", required: true } },
+  input_audio: { type: TYPE, input_audio: { kind: "object", required: true } },
+};
+
+/**
+ * The objects a part carries, by the member that holds them, each with exactly its members. Every
+ * member is a string, so nothing sits below them. `cache_control` is what pi sends: `{type:
+ * "ephemeral"}`, with `ttl: "1h"` for a long retention.
+ */
+const OPENROUTER_PART_OBJECTS: Readonly<Record<string, Shape>> = {
+  image_url: { url: { kind: "string", required: true }, detail: { kind: "string" } },
+  file: { filename: { kind: "string" }, file_data: { kind: "string", required: true } },
+  input_audio: { data: { kind: "string", required: true }, format: { kind: "string" } },
+  cache_control: { type: { kind: "string", required: true }, ttl: { kind: "string" } },
+};
 
 /** Where a message sits. */
 const MESSAGE = /^messages\[\d+\]$/;
 
-/** What a message's `content` may be on OpenRouter: text, or a list of parts. An object would be
- * one part that no part rule sees, since the rules look at the elements of a list. */
-const OPENROUTER_CONTENT_KINDS = new Set(["string", "array", "null"]);
+/** Where a message's content part sits: `messages[i].content[j]`, or an image an assistant
+ * message carries back (`messages[i].images[j]`). */
+const MESSAGE_PART = /^messages\[\d+\]\.(?:content|images)\[\d+\]$/;
 
-/** The members a part's payload may carry on OpenRouter, by the part's payload: anything else
- * (a `url` beside `file_data`, say) is something OpenRouter may read that no rule here checks. */
-const OPENROUTER_PART_MEMBERS: Readonly<Record<string, ReadonlySet<string>>> = {
-  file: new Set(["filename", "file_data"]),
-  input_audio: new Set(["data", "format"]),
+/** Where an object a part carries sits: `messages[i].content[j].image_url` and the like. */
+const PART_OBJECT = /^messages\[\d+\]\.(?:content|images)\[\d+\]\.[a-z_]+$/;
+
+/** What a message's `content` and `images` may be on OpenRouter. An object would be one part no
+ * part rule sees, since parts are found as the elements of a list. */
+const OPENROUTER_MESSAGE_LISTS: Readonly<Record<string, ReadonlySet<JsonKind>>> = {
+  content: new Set(["string", "array", "null"]),
+  images: new Set(["array", "null"]),
 };
 
-/** Where a part's payload sits: `messages[i].content[j].file` and the like. */
-const PART_PAYLOAD = /^messages\[\d+\]\.(?:content|images)\[\d+\]\.(file|input_audio)$/;
+/** A JSON kind as a refusal names it. */
+function kindName(kind: string): string {
+  if (kind === "null") return kind;
+  return kind === "object" || kind === "array" ? `an ${kind}` : `a ${kind}`;
+}
+
+/** How `members` falls short of `shape`, in words, after `what`: members it does not take,
+ * members of the wrong kind (`null` included), and members it needs that are missing. Null when
+ * it fits. */
+function misfit(members: ReadonlyMap<string, JsonKind>, shape: Shape, what: string): string | null {
+  const problems: string[] = [];
+  const unknown = [...members.keys()].filter((name) => !Object.hasOwn(shape, name));
+  if (unknown.length > 0) {
+    problems.push(`takes no ${unknown.map((name) => JSON.stringify(name)).join(", ")}`);
+  }
+  for (const [name, rule] of Object.entries(shape)) {
+    const kind = members.get(name);
+    if (kind === undefined) {
+      if (rule.required === true) problems.push(`needs ${JSON.stringify(name)}`);
+    } else if (kind !== rule.kind) {
+      problems.push(
+        `${JSON.stringify(name)} must be ${kindName(rule.kind)}, not ${kindName(kind)}`,
+      );
+    }
+  }
+  return problems.length === 0 ? null : `${what}: ${problems.join("; ")}`;
+}
+
+/** Why an OpenRouter part's payload is not inline bytes, or null when it is (or when it is not a
+ * string at all, which the part's shape refuses). `payload` is the payload object's strings. */
+function notInline(type: string, payload: ReadonlyMap<string, string> | undefined): string | null {
+  const value = (name: string) => {
+    const text = payload?.get(name);
+    return text === undefined || text === NOT_A_STRING ? null : text;
+  };
+  switch (type) {
+    case "image_url": {
+      const url = value("url");
+      return url !== null && !isDataUrl(url) ? "an image by URL: send it as a data: URL" : null;
+    }
+    case "file": {
+      // OpenRouter reads `file_data` as a URL to fetch as readily as a data: URL.
+      const data = value("file_data");
+      return data !== null && !isDataUrl(data)
+        ? "a file not sent inline: send it as a data: URL in file_data"
+        : null;
+    }
+    case "input_audio": {
+      const data = value("data");
+      return data !== null && !isBase64(data)
+        ? "audio not sent inline: send it as base64 in data"
+        : null;
+    }
+  }
+  return null;
+}
 
 /**
  * The plugin the proxy itself adds to an OpenRouter body that carries a file: the file parser,
@@ -242,40 +321,52 @@ export function vetBody(
     }
     if (opts.openRouter === true) {
       if (seen.inArray && seen.key === "messages" && MESSAGE.test(seen.path())) {
-        for (const member of ["content", "images"] as const) {
+        for (const [member, allowed] of Object.entries(OPENROUTER_MESSAGE_LISTS)) {
           const kind = seen.members.get(member);
-          const allowed = member === "content" ? OPENROUTER_CONTENT_KINDS : LIST_OR_NULL;
           if (kind !== undefined && !allowed.has(kind)) {
             refuse(seen, `${member} that is ${kindName(kind)}, not one ryph forwards`);
           }
+          // A list holds parts and nothing else: a list in a list, or a bare string, is a part no
+          // rule below would see.
+          const others = [...(seen.elements.get(member) ?? [])].filter((k) => k !== "object");
+          if (kind === "array" && others.length > 0) {
+            refuse(seen, `${member} holding ${others.map(kindName).join(" and ")}, not only parts`);
+          }
         }
+        return;
       }
       if (
         seen.inArray && (seen.key === "content" || seen.key === "images") &&
-        !OPENROUTER_CONTENT_PARTS.has(type ?? ABSENT) && MESSAGE_PART.test(seen.path())
+        MESSAGE_PART.test(seen.path())
       ) {
-        refuse(
-          seen,
-          `a content part of type ${JSON.stringify(type ?? null)}, not one ryph forwards`,
-        );
-        return;
-      }
-      const payload = !seen.inArray && seen.key !== null &&
-          Object.hasOwn(OPENROUTER_PART_MEMBERS, seen.key)
-        ? PART_PAYLOAD.exec(seen.path())?.[1]
-        : undefined;
-      if (payload !== undefined) {
-        const allowed = OPENROUTER_PART_MEMBERS[payload];
-        // A file by id has a refusal of its own, below.
-        const unknown = [...seen.members.keys()]
-          .filter((name) => !allowed.has(name) && !(payload === "file" && name === "file_id"));
-        if (unknown.length > 0) {
+        const shape = type !== undefined && Object.hasOwn(OPENROUTER_PARTS, type)
+          ? OPENROUTER_PARTS[type]
+          : undefined;
+        if (shape === undefined) {
           refuse(
             seen,
-            `${unknown.map((name) => JSON.stringify(name)).join(", ")} in ${payload}, ` +
-              `which takes only ${[...allowed].join(" and ")}`,
+            `a content part of type ${JSON.stringify(type ?? null)}, not one ryph forwards`,
           );
+          return;
         }
+        const wrong = misfit(seen.members, shape, `a part of type ${JSON.stringify(type)}`);
+        if (wrong !== null) refuse(seen, wrong);
+        if (type === "file") carriesFile = true;
+        const inline = notInline(type!, seen.children.get(type!));
+        if (inline !== null) refuse(seen, inline);
+        return;
+      }
+      if (
+        !seen.inArray && seen.key !== null && Object.hasOwn(OPENROUTER_PART_OBJECTS, seen.key) &&
+        PART_OBJECT.test(seen.path())
+      ) {
+        const wrong = misfit(
+          seen.members,
+          OPENROUTER_PART_OBJECTS[seen.key],
+          `a part's ${seen.key}`,
+        );
+        if (wrong !== null) refuse(seen, wrong);
+        return;
       }
     }
     if (type === undefined) return;
@@ -329,25 +420,7 @@ export function vetBody(
       case "file": {
         carriesFile = true;
         const file = seen.children.get("file");
-        if (file?.has("file_id")) {
-          refuse(seen, "a file by file_id: send it as file_data");
-          return;
-        }
-        // OpenRouter reads `file_data` as a URL to fetch as readily as a data: URL.
-        const data = file?.get("file_data");
-        if (opts.openRouter === true && (data === undefined || !isDataUrl(data))) {
-          refuse(seen, "a file not sent inline: send it as a data: URL in file_data");
-        }
-        return;
-      }
-      case "input_audio": {
-        const data = seen.children.get("input_audio")?.get("data");
-        if (
-          opts.openRouter === true &&
-          (data === undefined || data === NOT_A_STRING || !isBase64(data))
-        ) {
-          refuse(seen, "audio not sent inline: send it as base64 in data");
-        }
+        if (file?.has("file_id")) refuse(seen, "a file by file_id: send it as file_data");
         return;
       }
     }
