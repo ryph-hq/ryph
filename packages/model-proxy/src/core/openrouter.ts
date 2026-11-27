@@ -39,6 +39,24 @@ export const OPENROUTER_HEADERS: Readonly<Record<string, string>> = {
 /** The prefix of OpenRouter's own routers, which choose a model per request. */
 const ROUTER_PREFIX = "openrouter/";
 
+/**
+ * The `:suffix` variants that are models of their own in OpenRouter's list: `:free` (a free
+ * endpoint, with its own limits), `:thinking`, `:extended`, `:exacto` and `:beta`. Every other
+ * suffix is a variant OpenRouter applies to any model, some billed per request (`:online` runs a
+ * web search on every call), and an id carrying one, or a preset's `@`, is skipped: a list is
+ * not to make one enableable by carrying it. Kept short on purpose: an unknown suffix costs a
+ * model in the picker, and a wrong guess costs money no cap counted.
+ */
+const MODEL_SUFFIXES = new Set(["free", "thinking", "extended", "exacto", "beta"]);
+
+/** Whether `id` names a model itself, rather than a variant or preset of one. */
+function plainModelId(id: string): boolean {
+  if (id.includes("@")) return false;
+  const name = id.slice(id.lastIndexOf("/") + 1);
+  const colon = name.indexOf(":");
+  return colon < 0 || MODEL_SUFFIXES.has(name.slice(colon + 1));
+}
+
 /** The output cap a model gets when OpenRouter does not say what its top provider allows. */
 const DEFAULT_MAX_OUTPUT_TOKENS = 16_384;
 
@@ -176,6 +194,7 @@ export function catalogueOf(body: unknown): OpenRouterCatalogueEntry[] {
     if (!isObject(entry) || typeof entry.id !== "string") continue;
     const id = entry.id.trim();
     if (id === "" || id.length > 200 || /\s/.test(id) || id.startsWith(ROUTER_PREFIX)) continue;
+    if (!plainModelId(id)) continue;
     if (seen.has(id)) continue;
     const contextLength = positiveInt(entry.context_length, MAX_CONTEXT_TOKENS);
     if (contextLength === null) continue;

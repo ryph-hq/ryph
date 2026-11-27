@@ -104,6 +104,27 @@ test("catalogueOf: skips what it cannot describe instead of failing the sync", (
   assertEquals(rows.map((r) => [r.id, r.label]), [["dup/one", "Model dup/one"]]);
 });
 
+test("catalogueOf: a variant OpenRouter applies to any model, or a preset, is never a row", () => {
+  const ids = [
+    "meta/llama-5:free",
+    "anthropic/claude-sonnet-5:thinking",
+    "openai/gpt-6:exacto",
+    "openai/gpt-6:online",
+    "openai/gpt-6:nitro",
+    "openai/gpt-6:floor",
+    "openai/gpt-6:whatever-comes-next",
+    "openai/gpt-6@preset/cheap",
+    "@preset/cheap",
+    "openai/gpt-6",
+  ];
+  assertEquals(catalogueOf({ data: ids.map((id) => listedModel(id)) }).map((r) => r.id), [
+    "meta/llama-5:free",
+    "anthropic/claude-sonnet-5:thinking",
+    "openai/gpt-6:exacto",
+    "openai/gpt-6",
+  ]);
+});
+
 test("catalogueOf: one absurd figure is clamped, never a row the store cannot hold", () => {
   const [row] = catalogueOf({
     data: [listedModel("x/huge", {
