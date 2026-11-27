@@ -6,6 +6,7 @@ import type { ImageName, ImageStatus } from "#lib/api/images.ts";
 import {
   DEFAULT_MEMORY_BUDGET_TOKENS,
   type Harness,
+  OPENROUTER_PROVIDER,
   type Provider,
   type ProviderKey,
 } from "#lib/api/types.ts";
@@ -155,6 +156,23 @@ export function composeQuickAgent(input: {
       canGrant,
     }),
   };
+}
+
+/**
+ * Why the quick agent can't be created with this model yet, or null. An OpenRouter agent needs a
+ * default model, and it must be one of the models enabled for agents (`models`, the key's list).
+ */
+export function quickAgentModelProblem(
+  provider: string | undefined,
+  model: string,
+  models: readonly { id: string }[],
+): string | null {
+  if (provider !== OPENROUTER_PROVIDER) return null;
+  if (models.length === 0) return "Enable an OpenRouter model first";
+  const picked = model.trim();
+  if (picked === "") return "Pick a default model";
+  if (!models.some((m) => m.id === picked)) return "Pick one of the enabled models";
+  return null;
 }
 
 /** Where the last step sends someone: a new task with the agent and repo already picked. */

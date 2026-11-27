@@ -2,10 +2,17 @@
 import { goto, invalidate } from "$app/navigation";
 import { page } from "$app/state";
 import { createAgent } from "#lib/api/agents.ts";
+import { isOpenRouterKeyRefused } from "#lib/api/openrouter.ts";
 import { createProviderKey, setPlatformModelPolicy } from "#lib/api/provider-keys.ts";
 import { createProvider } from "#lib/api/providers.ts";
 import { connectLocalRepo } from "#lib/api/repos.ts";
-import type { Agent, ConnectedRepo, Provider, ProviderKey } from "#lib/api/types.ts";
+import {
+  type Agent,
+  type ConnectedRepo,
+  OPENROUTER_PROVIDER,
+  type Provider,
+  type ProviderKey,
+} from "#lib/api/types.ts";
 import AgentAvatar from "#lib/components/agent-avatar/agent-avatar.svelte";
 import ForgeIcon from "#lib/components/forge-icon/forge-icon.svelte";
 import ChatgptSignInDialog from "#lib/components/model-keys/chatgpt-sign-in-dialog.svelte";
@@ -16,6 +23,7 @@ import {
 } from "#lib/components/model-keys/custom-endpoint-form.ts";
 import EndpointFields from "#lib/components/model-keys/endpoint-fields.svelte";
 import KeySecretFields from "#lib/components/model-keys/key-secret-fields.svelte";
+import OpenrouterModels from "#lib/components/model-keys/openrouter-models.svelte";
 import { planAccountLine } from "#lib/components/model-keys/plan-key.ts";
 import ProviderMark from "#lib/components/model-keys/provider-mark.svelte";
 import {
@@ -65,6 +73,7 @@ import {
   firstOpenStep,
   newestId,
   newTaskHref,
+  quickAgentModelProblem,
   WELCOME_STEPS,
   type WelcomeStepId,
 } from "./welcome";
@@ -162,6 +171,11 @@ let keyLabel = $state("");
 let keySecret = $state("");
 let endpointForm = $state<EndpointFormState>(newEndpointForm());
 let savingKey = $state(false);
+/** The key a provider refused, and why: said under the field until the secret changes. */
+let keyRefusal = $state<{ secret: string; message: string } | null>(null);
+const keyProblem = $derived(
+  keyRefusal !== null && keyRefusal.secret === keySecret ? keyRefusal.message : null,
+);
 
 function chooseModel(id: string) {
   modelChoice = id;
@@ -172,6 +186,7 @@ function chooseModel(id: string) {
 function secretPlaceholder(provider: Provider | undefined): string {
   if (provider?.id === "anthropic") return "sk-ant-…";
   if (provider?.id === "openai") return "sk-…";
+  if (provider?.id === OPENROUTER_PROVIDER) return "sk-or-…";
   return "Paste the key";
 }
 
@@ -222,16 +237,20 @@ async function addKey() {
     return;
   }
   savingKey = true;
+  keyRefusal = null;
+  const secret = keySecret;
   try {
     const key = await createProviderKey(fetch, {
       provider: chosenProvider.id,
       label: keyLabel.trim(),
-      secret: keySecret,
+      secret,
     });
-    toast.success(`Added "${key.label}"`);
+    if (key.warning) toast.warning(key.warning);
+    else toast.success(`Added "${key.label}"`);
     await keyAdded(key.id);
   } catch (e) {
-    toast.error(e instanceof Error ? e.message : "Couldn't add the key");
+    if (isOpenRouterKeyRefused(e)) keyRefusal = { secret, message: e.message };
+    else toast.error(e instanceof Error ? e.message : "Couldn't add the key");
   } finally {
     savingKey = false;
   }
@@ -280,6 +299,13 @@ const agentKey = $derived(agentKeys.find((key) => key.id === agentKeyId) ?? agen
 let modelPick = $state({ keyId: "", model: "" });
 const agentModel = $derived(modelPick.keyId === agentKey?.id ? modelPick.model : "");
 const agentModels = $derived(modelsForKey(data.providers, agentKey));
+// An OpenRouter agent needs a default model from the ones enabled for agents, so those are
+// picked here first when there are none yet.
+const agentOnOpenRouter = $derived(agentKey?.provider === OPENROUTER_PROVIDER);
+const pickOpenRouterModels = $derived(agentOnOpenRouter && agentModels.length === 0);
+const agentModelProblem = $derived(
+  quickAgentModelProblem(agentKey?.provider, agentModel, agentModels),
+);
 let creatingAgent = $state(false);
 
 function chooseAgentKey(id: string) {
@@ -293,6 +319,10 @@ async function createQuickAgent() {
   }
   if (!agentKey) {
     toast.error("Pick the model key the agent uses");
+    return;
+  }
+  if (agentModelProblem) {
+    toast.error(agentModelProblem);
     return;
   }
   creatingAgent = true;
@@ -670,6 +700,9 @@ function submit(event: SubmitEvent) {
                     secretPlaceholder={secretPlaceholder(chosenProvider)}
                     idPrefix="welcome-key"
                   />
+                  {#if keyProblem}
+                    <Field.FieldError>{keyProblem}</Field.FieldError>
+                  {/if}
                 </Field.FieldGroup>
               {:else if modelChoice === CUSTOM}
                 <EndpointFields bind:form={endpointForm} />
@@ -764,19 +797,34 @@ function submit(event: SubmitEvent) {
                     </Select.Content>
                   </Select.Root>
                 </Field.Field>
-                <Field.Field>
-                  <Field.FieldLabel for="welcome-agent-model">Model</Field.FieldLabel>
-                  <ModelSelect
-                    id="welcome-agent-model"
-                    bind:value={
-                      () => agentModel, (model) => (modelPick = { keyId: agentKey?.id ?? "", model })
-                    }
-                    models={agentModels}
-                    emptyLabel="Default model"
-                  />
-                  <Field.FieldDescription>Used when a task doesn't pick one.</Field.FieldDescription>
-                </Field.Field>
+                {#if !pickOpenRouterModels}
+                  <Field.Field>
+                    <Field.FieldLabel for="welcome-agent-model">Model</Field.FieldLabel>
+                    <ModelSelect
+                      id="welcome-agent-model"
+                      bind:value={
+                        () => agentModel, (model) => (modelPick = { keyId: agentKey?.id ?? "", model })
+                      }
+                      models={agentModels}
+                      emptyLabel={agentOnOpenRouter ? undefined : "Default model"}
+                      allowCustom={!agentOnOpenRouter}
+                      required={agentOnOpenRouter}
+                    />
+                    <Field.FieldDescription>
+                      {agentOnOpenRouter
+                      ? "Used when a task doesn't pick one. Pick from the models you enabled."
+                      : "Used when a task doesn't pick one."}
+                    </Field.FieldDescription>
+                  </Field.Field>
+                {/if}
               </Field.FieldGroup>
+              {#if pickOpenRouterModels && data.openrouter}
+                <OpenrouterModels
+                  read={data.openrouter}
+                  dependency="app:welcome"
+                  description="Pick the models your agents can use. You can change them later in Model keys."
+                />
+              {/if}
             </section>
           {/if}
           <p class="text-muted-foreground text-sm">

@@ -7,6 +7,7 @@ import {
   firstOpenStep,
   newestId,
   newTaskHref,
+  quickAgentModelProblem,
   summarizeImages,
 } from "./welcome";
 
@@ -202,5 +203,22 @@ describe("summarizeImages", () => {
       failed: 1,
       busy: false,
     });
+  });
+});
+
+describe("the quick agent's model", () => {
+  const enabled = [{ id: "anthropic/claude-sonnet-4.5" }, { id: "openai/gpt-5" }];
+
+  it("asks nothing of a provider other than OpenRouter", () => {
+    expect(quickAgentModelProblem("anthropic", "", [])).toBeNull();
+    expect(quickAgentModelProblem(undefined, "", [])).toBeNull();
+  });
+
+  it("needs an enabled OpenRouter model, then a default picked from them", () => {
+    expect(quickAgentModelProblem("openrouter", "", [])).toBe("Enable an OpenRouter model first");
+    expect(quickAgentModelProblem("openrouter", " ", enabled)).toBe("Pick a default model");
+    expect(quickAgentModelProblem("openrouter", "x/other", enabled))
+      .toBe("Pick one of the enabled models");
+    expect(quickAgentModelProblem("openrouter", "openai/gpt-5", enabled)).toBeNull();
   });
 });
