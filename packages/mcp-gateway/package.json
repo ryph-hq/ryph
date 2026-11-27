@@ -22,7 +22,7 @@
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.3.16",
-    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "@ryph/auth": "workspace:*",
     "@ryph/db": "workspace:*",
     "@ryph/logger": "workspace:*",
@@ -33,8 +33,8 @@
     "@std/assert": "npm:@jsr/std__assert@1",
     "@std/path": "npm:@jsr/std__path@1",
     "@zod/zod": "npm:@jsr/zod__zod@^4.4.3",
-    "drizzle-kit": "0.31.10",
-    "drizzle-orm": "^0.44.7",
+    "drizzle-kit": "0.31.11",
+    "drizzle-orm": "^0.45.4",
     "postgres": "^3.4.9"
   }
 }

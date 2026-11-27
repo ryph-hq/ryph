@@ -13,7 +13,7 @@
     "ci": "bun run check && bun run test"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.30.0"
+    "@modelcontextprotocol/sdk": "^1.32.2"
   },
   "devDependencies": {
     "@std/assert": "npm:@jsr/std__assert@1"

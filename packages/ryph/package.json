@@ -31,11 +31,11 @@
     "@std/path": "npm:@jsr/std__path@1",
     "@std/streams": "npm:@jsr/std__streams@1",
     "@zod/zod": "npm:@jsr/zod__zod@^4.4.3",
-    "drizzle-orm": "^0.44.7",
+    "drizzle-orm": "^0.45.4",
     "@ryph/shared": "workspace:*"
   },
   "devDependencies": {
-    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "@ryph/sealed": "workspace:*"
   }
 }

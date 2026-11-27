@@ -1,18 +1,7 @@
-// `Mailer` over SMTP via nodemailer — the one transport every provider offers. The package
-// ships no types this side needs beyond the two calls below, so they are named here rather than
-// pulled in with a whole Node typing surface.
+// `Mailer` over SMTP via nodemailer — the one transport every provider offers.
 
-// @ts-expect-error: nodemailer ships no declaration file; the cast below types what is used.
-import nodemailer from "nodemailer";
-import type { Mail, Mailer } from "../../ports/mailer.ts";
-
-interface Transport {
-  sendMail(mail: Mail & { from: string }): Promise<unknown>;
-}
-
-const { createTransport } = nodemailer as unknown as {
-  createTransport(url: string): Transport;
-};
+import { createTransport } from "nodemailer";
+import type { Mailer } from "../../ports/mailer.ts";
 
 export interface SmtpMailerOptions {
   /** `smtp://user:pass@host:587` or `smtps://…` — nodemailer's connection URL shape. */

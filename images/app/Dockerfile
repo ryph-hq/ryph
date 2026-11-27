@@ -10,7 +10,7 @@
 # Built from the workspace root (the lockfile lives there):
 #   docker build -f images/app/Dockerfile -t ryph-app .
 
-FROM oven/bun:1.4.4-slim@sha256:1846adf22496bd711036aae8be147e57bdebbaea2e5264e3e0b5af1db187d9a4 AS build
+FROM oven/bun:1.4.5-slim@sha256:b780593f3e10918cbdaec3d5a08d52224b9198069a65eb47812085c2ec007643 AS build
 WORKDIR /build
 COPY package.json bun.lock bunfig.toml ./
 # Every member's manifest, since bun wants each workspace a package names on disk; only the app's
@@ -26,7 +26,7 @@ COPY packages/shared/src/ packages/shared/src/
 WORKDIR /build/packages/app
 RUN bun run build
 
-FROM node:26-slim
+FROM node:26-slim@sha256:abe7e5a82b61a8ef67b315b85497c9e65173387ccf2f4a029248184b8e020be5
 WORKDIR /app
 # adapter-node emits a self-contained server. The app carries no production dependencies — every
 # package is a devDependency, so vite bundles it into the server output rather than leaving it
