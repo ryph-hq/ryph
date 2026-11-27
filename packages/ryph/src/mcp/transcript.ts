@@ -181,8 +181,16 @@ export function summarize(events: readonly HistoryEvent[], opts: SummaryOptions 
         );
         continue;
       }
-      default:
-        push(`${head} ${e.kind}: ${clip(e.text, 300)}`);
+      default: {
+        // A system row that failed says why in its payload: a model call's error (`model_error`),
+        // a compaction's (`compaction_end`).
+        const failure = e.kind === "system" ? s(obj(e.payload)?.errorMessage) : null;
+        push(
+          `${head} ${failure ? "⚠ " : ""}${e.kind}: ${clip(e.text, 300)}${
+            failure ? `: ${clip(failure, resultChars)}` : ""
+          }`,
+        );
+      }
     }
   }
   return { lines, hidden };

@@ -974,6 +974,27 @@ describe("routine machine notes", () => {
     },
   );
 
+  it("gives a failed model call its own row, with the provider's message, never folded", () => {
+    const history = new RunHistory("run-1");
+    history.absorb(event(0, { kind: "system", text: "agent_start" }));
+    history.absorb(
+      event(1, {
+        kind: "system",
+        text: "model_error",
+        payload: { type: "model_error", errorMessage: "402 Insufficient credits." },
+      }),
+    );
+    for (const showDiag of [false, true]) {
+      history.showDiag = showDiag;
+      const errors = history.rows.filter((row) => row.kind === "model_error");
+      expect(errors).toHaveLength(1);
+      expect(errors[0].kind === "model_error" && errors[0].detail).toBe(
+        "402 Insufficient credits.",
+      );
+      expect(machines(history)).not.toContain("model_error");
+    }
+  });
+
   it("keeps warnings, work milestones and unknown machine notes with either toggle setting", () => {
     const history = new RunHistory("run-1");
     const milestones = ["provisioning", "cancel-requested", "patch-created", "future-event"];

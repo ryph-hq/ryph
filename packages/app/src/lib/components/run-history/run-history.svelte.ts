@@ -51,6 +51,10 @@ export type TranscriptRow =
   | { key: string; kind: "message"; at: string; message: RunMessage }
   /** The run reached one of its limits and was asked to stop; `detail` names which. */
   | { key: string; kind: "limit"; at: string; detail: string }
+  /** A model call failed (the provider refused it, the account ran out of credits, it was rate
+   * limited); `detail` is the error the harness was given. Its own row, never folded among the
+   * grey run events: otherwise the run reads as an agent that silently did nothing. */
+  | { key: string; kind: "model_error"; at: string; detail: string }
   /** A repo's base came from the forge's cache while the upstream could not be reached, so
    * the run may have started behind it; `detail` names the repo, the base and since when. */
   | { key: string; kind: "stale"; at: string; detail: string }
@@ -1003,6 +1007,19 @@ export class RunHistory {
       if (event.kind === "system") {
         // Context snapshots update the masthead, not the conversation or activity indicator.
         if (event.text === "context_usage") continue;
+        if (event.text === "model_error") {
+          const detail = field(event.payload, "errorMessage");
+          items.push({
+            at: event.at,
+            row: {
+              key: `h${event.seq}`,
+              kind: "model_error",
+              at: event.at,
+              detail: typeof detail === "string" ? detail : "",
+            },
+          });
+          continue;
+        }
         if (!this.showDiag && event.voice === "transcript") {
           if (ROUTINE_SYSTEM.has(event.text ?? "")) continue;
           if (
