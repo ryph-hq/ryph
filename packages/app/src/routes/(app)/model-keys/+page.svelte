@@ -16,7 +16,13 @@ import {
   updateProvider,
 } from "#lib/api/providers.ts";
 import { CHATGPT_MANAGE_USAGE_URL, refreshPlanModels } from "#lib/api/chatgpt-plan.ts";
-import type { Provider, ProviderDetail, ProviderKey } from "#lib/api/types.ts";
+import { isOpenRouterKeyRefused } from "#lib/api/openrouter.ts";
+import {
+  OPENROUTER_PROVIDER,
+  type Provider,
+  type ProviderDetail,
+  type ProviderKey,
+} from "#lib/api/types.ts";
 import * as Alert from "#lib/components/ui/alert/index.ts";
 import * as AlertDialog from "#lib/components/ui/alert-dialog/index.ts";
 import { pageHeader } from "#lib/components/page-header/page-header.svelte.ts";
@@ -34,6 +40,8 @@ import ProviderMark from "#lib/components/model-keys/provider-mark.svelte";
 import ChatgptSignInDialog from "#lib/components/model-keys/chatgpt-sign-in-dialog.svelte";
 import EndpointFields from "#lib/components/model-keys/endpoint-fields.svelte";
 import KeySecretFields from "#lib/components/model-keys/key-secret-fields.svelte";
+import OpenrouterCredit from "#lib/components/model-keys/openrouter-credit.svelte";
+import OpenrouterModels from "#lib/components/model-keys/openrouter-models.svelte";
 import { planAccountLine, planStatusBadge } from "#lib/components/model-keys/plan-key.ts";
 import {
   keyProviderOptions,
@@ -104,6 +112,11 @@ $effect(() => {
     pageHeader.controls = null;
   };
 });
+
+// An admin picks OpenRouter's models once the deployment holds a live OpenRouter key.
+const hasOpenRouterKey = $derived(
+  data.providerKeys.some((k) => k.provider === OPENROUTER_PROVIDER && k.archivedAt === null),
+);
 
 // ── custom endpoints ────────────────────────────────────────────────────────────────────────
 //
@@ -253,7 +266,8 @@ async function submitAdd(event: SubmitEvent) {
       label: addLabel,
       secret: addSecret,
     });
-    toast.success(`Registered "${key.label}"`);
+    if (key.warning) toast.warning(key.warning);
+    else toast.success(`Registered "${key.label}"`);
     addOpen = false;
     addProvider = "";
     addLabel = "";
@@ -263,6 +277,10 @@ async function submitAdd(event: SubmitEvent) {
     if (isSecretRequired(e)) {
       addSecretError = e.message;
       await invalidate("app:model-keys");
+      return;
+    }
+    if (isOpenRouterKeyRefused(e)) {
+      addSecretError = e.message;
       return;
     }
     toast.error(e instanceof Error ? e.message : "Failed to register key");
@@ -290,11 +308,14 @@ async function submitRotate(event: SubmitEvent) {
   try {
     const fixing = rotateTarget.needsSecret === true;
     const key = await updateProviderKey(fetch, rotateTarget.id, { secret: rotateSecret });
-    toast.success(
-      fixing
-        ? `Saved the key for "${key.label}"`
-        : `Rotated "${key.label}" — same key id, new secret`,
-    );
+    if (key.warning) toast.warning(key.warning);
+    else {
+      toast.success(
+        fixing
+          ? `Saved the key for "${key.label}"`
+          : `Rotated "${key.label}" — same key id, new secret`,
+      );
+    }
     rotateTarget = null;
     rotateSecret = "";
     await invalidate("app:model-keys");
@@ -302,6 +323,10 @@ async function submitRotate(event: SubmitEvent) {
     if (isSecretRequired(e) || isProviderMissing(e)) {
       rotateSecretError = e.message;
       await invalidate("app:model-keys");
+      return;
+    }
+    if (isOpenRouterKeyRefused(e)) {
+      rotateSecretError = e.message;
       return;
     }
     toast.error(e instanceof Error ? e.message : "Failed to rotate key");
@@ -623,6 +648,12 @@ async function submitArchive() {
                 {/if}
               {:else}
                 <Card.Description class="font-mono text-xs">····{key.last4}</Card.Description>
+                {#if key.provider === OPENROUTER_PROVIDER && !key.archivedAt}
+                  <!-- Read again when the key changes, a new secret included. -->
+                  {#key key.updatedAt}
+                    <OpenrouterCredit keyId={key.id} />
+                  {/key}
+                {/if}
               {/if}
               <Card.Description class="truncate text-xs" title={users.join(", ")}>
                 {users.length === 0
@@ -647,6 +678,10 @@ async function submitArchive() {
       </div>
     {/if}
 
+    {#if canManage && hasOpenRouterKey}
+      <OpenrouterModels />
+    {/if}
+
     <!-- The ChatGPT plan: a sign-in rather than a pasted key. Once signed in, the plan is a key
          card above like any other. -->
     {#if canManage && planAvailable}
@@ -668,7 +703,7 @@ async function submitArchive() {
         <div class="flex flex-col gap-1">
           <h2 class="text-base font-medium">Custom providers</h2>
           <p class="text-muted-foreground text-sm">
-            Any OpenAI-compatible endpoint, like Groq, OpenRouter or a self-hosted vLLM.
+            Any OpenAI-compatible endpoint, like Groq or a self-hosted vLLM.
           </p>
         </div>
         {#if canManage}
@@ -790,11 +825,15 @@ async function submitArchive() {
             </Field.FieldDescription>
           {/if}
           <Field.FieldDescription>
-            The two built-ins and every custom endpoint registered above. Register the endpoint
-            first; the key is what authenticates to it.
+            The built-in providers and every custom endpoint registered above. Register the
+            endpoint first; the key is what authenticates to it.
           </Field.FieldDescription>
         </Field.Field>
-        <KeySecretFields bind:label={addLabel} bind:secret={addSecret} />
+        <KeySecretFields
+          bind:label={addLabel}
+          bind:secret={addSecret}
+          secretPlaceholder={addProvider === OPENROUTER_PROVIDER ? "sk-or-…" : undefined}
+        />
         {#if addSecretError}
           <Field.FieldError>{addSecretError}</Field.FieldError>
         {/if}
