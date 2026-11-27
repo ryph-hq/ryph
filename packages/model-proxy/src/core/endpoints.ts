@@ -65,16 +65,18 @@ interface RouteEntry extends ProviderRoute {
 
 const MODEL_ID_PATH = /^\/v1\/models\/[A-Za-z0-9._:@-]+$/;
 
+const MODELS_LIST: RouteEntry = {
+  method: "GET",
+  path: "/v1/models",
+  label: "GET /v1/models",
+  spends: false,
+  responses: false,
+  shape: null,
+  billed: false,
+};
+
 const MODELS: RouteEntry[] = [
-  {
-    method: "GET",
-    path: "/v1/models",
-    label: "GET /v1/models",
-    spends: false,
-    responses: false,
-    shape: null,
-    billed: false,
-  },
+  MODELS_LIST,
   {
     method: "GET",
     path: MODEL_ID_PATH,
@@ -133,9 +135,12 @@ const ROUTES: Record<string, RouteEntry[]> = {
     ...MODELS,
   ],
   openai: [RESPONSES, CHAT_COMPLETIONS, ...MODELS],
-  // The model call pi makes and the models list. Everything else an OpenRouter key reaches —
-  // its credits, its key management, generation lookups — is refused like any other route.
-  [OPENROUTER]: [CHAT_COMPLETIONS, ...MODELS],
+  // The model call pi makes and the models list, which the proxy answers itself from the models
+  // the run may use (see the proxy). Never `/v1/models/{id}`: OpenRouter's ids carry a slash, so
+  // that pattern only ever matched `/v1/models/user`, which tells the account's routing and
+  // privacy filters, and `/v1/models/count`. Everything else an OpenRouter key reaches — its
+  // credits, its key management, generation lookups — is refused like any other route.
+  [OPENROUTER]: [CHAT_COMPLETIONS, MODELS_LIST],
 };
 
 /**

@@ -219,10 +219,15 @@ test("an OpenRouter body may not route around the allowlist or the meter", async
 test("an OpenRouter key serves only the model call and the models list", async () => {
   const { handler, env, seen } = await makeSlice();
   for (
-    const [method, path] of [["GET", "/v1/credits"], ["GET", "/v1/key"], [
-      "POST",
-      "/v1/completions",
-    ]]
+    const [method, path] of [
+      ["GET", "/v1/credits"],
+      ["GET", "/v1/key"],
+      ["POST", "/v1/completions"],
+      // The account's routing and privacy filters, and a count: never a model.
+      ["GET", "/v1/models/user"],
+      ["GET", "/v1/models/count"],
+      ["GET", "/v1/models/openai"],
+    ]
   ) {
     const res = await handler(
       new Request(`http://proxy.test${path}`, {
@@ -233,14 +238,33 @@ test("an OpenRouter key serves only the model call and the models list", async (
     assertEquals(res.status, 404, `${method} ${path}`);
     assertEquals((await res.json()).code, "endpoint_not_allowed");
   }
-  const models = await handler(
+  assertEquals(seen, [], "nothing reached OpenRouter");
+});
+
+test("an OpenRouter models list is answered by the proxy: the models this run may use", async () => {
+  const { handler, env, seen, store } = await makeSlice({
+    allowedModels: ["openai/gpt-6", "mystery/unpriced", "acme/no-tools"],
+    model: "openai/gpt-6",
+  });
+  // Turned off after the credential was issued: no longer listed for the run.
+  await store.setOpenRouterEnabled(["openai/gpt-6", "anthropic/claude-sonnet-5"], T0);
+  const res = await handler(
     new Request("http://proxy.test/v1/models", {
       headers: { authorization: `Bearer ${env.RYPH_MODEL_API_KEY}` },
     }),
   );
-  assertEquals(models.status, 200);
-  await models.body?.cancel();
-  assertEquals(seen.map((s) => s.url), ["https://openrouter.ai/api/v1/models"]);
+  assertEquals(res.status, 200);
+  assertEquals(await res.json(), {
+    object: "list",
+    data: [{
+      id: "openai/gpt-6",
+      object: "model",
+      owned_by: "openai",
+      name: "Model openai/gpt-6",
+      context_length: 200_000,
+    }],
+  });
+  assertEquals(seen, [], "OpenRouter was never asked");
 });
 
 test("OpenRouter's stated cost is the row's spend, JSON or streamed", async () => {

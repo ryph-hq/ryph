@@ -878,6 +878,24 @@ export function makeProxyHandler(deps: ProxyHandlerDeps): (req: Request) => Prom
       deps.diag.debug("proxy.denied", { runId: decision.virtualKey.runId, status: 403 });
       return final(403, { error: "the model endpoint backing this run was archived" });
     }
+    // OpenRouter's models list is answered here, never asked of OpenRouter: what a run may call
+    // is the usable set within its credential's allowlist, and OpenRouter's own list is every
+    // model it serves, which nothing here lets the run use.
+    if (provider.id === OPENROUTER && route !== null && !route.spends) {
+      const allowed = decision.virtualKey.allowedModels;
+      const models = (await openRouterModels.get())
+        .filter((model) => allowed === "*" || allowed.includes(model.id));
+      return json(200, {
+        object: "list",
+        data: models.map((model) => ({
+          id: model.id,
+          object: "model",
+          owned_by: model.id.split("/", 1)[0],
+          name: model.label,
+          context_length: model.contextLength,
+        })),
+      });
+    }
     // OpenRouter's usable set as it stands, beside the allowlist frozen when the credential was
     // issued: a model an admin turned off, or that a sync unlisted, is refused from the next call
     // on (give or take the cache's minute), platform credentials included. The same answer as
