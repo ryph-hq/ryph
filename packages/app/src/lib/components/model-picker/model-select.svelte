@@ -18,6 +18,7 @@ let {
   emptyLabel,
   allowCustom = true,
   required = false,
+  invalidMessage = "Not one of the allowed models.",
   class: className,
 }: {
   value: string;
@@ -28,6 +29,8 @@ let {
   /** False keeps the choice to the list, for a pick bounded by an allowlist. */
   allowCustom?: boolean;
   required?: boolean;
+  /** Said under a value outside the list where the list is all there is. */
+  invalidMessage?: string;
   class?: string;
 } = $props();
 
@@ -127,7 +130,7 @@ async function choose(next: string) {
       />
     {/if}
     {#if invalid}
-      <Field.FieldError>Not one of the allowed models.</Field.FieldError>
+      <Field.FieldError>{invalidMessage}</Field.FieldError>
     {/if}
   </div>
 {/if}

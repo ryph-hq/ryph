@@ -5,6 +5,7 @@ import {
   defaultModelThinkingLevels,
   editedDefaultThinking,
   modelPolicyProblem,
+  openRouterChoices,
   policyToFields,
   usableProviderKeys,
 } from "./model-policy";
@@ -205,5 +206,61 @@ describe("editedDefaultThinking", () => {
     expect(editedDefaultThinking(seeded, "key-1", "other", "high", ["off"])).toBeNull();
     expect(editedDefaultThinking(seeded, "key-2", "plain", "high", ["off"])).toBeNull();
     expect(editedDefaultThinking(seeded, "key-1", "other", "high", ["off", "high"])).toBe("high");
+  });
+});
+
+describe("OpenRouter model fields", () => {
+  const OR_KEY: ProviderKey = { ...KEY, id: "or-1", provider: "openrouter" };
+  const openrouter = (ids: string[]): Provider => ({
+    id: "openrouter",
+    label: "OpenRouter",
+    dialect: "openai-completions",
+    builtin: true,
+    baseUrl: "https://openrouter.ai/api/v1",
+    authHeader: "authorization",
+    authScheme: "Bearer",
+    models: ids.map((id) => ({ id })),
+    archivedAt: null,
+  });
+
+  it("reads the enabled models for an OpenRouter key only", () => {
+    const providers = [openrouter(["a/x", "b/y"])];
+    expect(openRouterChoices(providers, [KEY, OR_KEY], "key-1")).toBeNull();
+    expect(openRouterChoices(providers, [KEY, OR_KEY], "")).toBeNull();
+    expect(openRouterChoices(providers, [KEY, OR_KEY], "or-1")).toEqual({
+      enabled: ["a/x", "b/y"],
+    });
+    // The list came back without OpenRouter: the models are not known.
+    expect(openRouterChoices([], [OR_KEY], "or-1")).toEqual({ enabled: null });
+  });
+
+  it("goes by the stored policy for a key the list cannot resolve", () => {
+    const stored = {
+      providerKeyId: "or-1",
+      provider: "openrouter",
+      allowedModels: "*" as const,
+      defaultModel: "a/x",
+      defaultThinking: null,
+    };
+    expect(openRouterChoices([openrouter(["a/x"])], [], "or-1", stored)).toEqual({
+      enabled: ["a/x"],
+    });
+  });
+
+  it("needs an enabled model, and a default picked from them", () => {
+    const choices = { enabled: ["a/x", "b/y"] };
+    expect(modelPolicyProblem("or-1", "*", "", { enabled: [] })).toMatch(/Enable an OpenRouter/);
+    expect(modelPolicyProblem("or-1", "*", "", choices)).toBe("Pick a default model.");
+    expect(modelPolicyProblem("or-1", "*", " ", choices)).toBe("Pick a default model.");
+    expect(modelPolicyProblem("or-1", "*", "c/z", choices)).toMatch(/enabled OpenRouter/);
+    expect(modelPolicyProblem("or-1", "*", "a/x", choices)).toBeNull();
+    expect(modelPolicyProblem("or-1", ["a/x"], "a/x", choices)).toBeNull();
+    expect(modelPolicyProblem("or-1", ["a/x"], "b/y", choices)).toMatch(/allowed models/);
+    expect(modelPolicyProblem("or-1", [], "", choices)).toMatch(/at least one/);
+  });
+
+  it("still needs a default when the enabled models are not known", () => {
+    expect(modelPolicyProblem("or-1", "*", "", { enabled: null })).toBe("Pick a default model.");
+    expect(modelPolicyProblem("or-1", "*", "c/z", { enabled: null })).toBeNull();
   });
 });

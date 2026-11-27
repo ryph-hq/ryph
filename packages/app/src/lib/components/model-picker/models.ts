@@ -75,11 +75,20 @@ export function thinkingLevelsForKey(
 /**
  * What a single pick may choose from under an allowlist: every known model for "*", else the
  * listed ids in order, once each, with an id the provider does not list kept as a bare entry so
- * a stored value still shows.
+ * a stored value still shows. `knownOnly` drops those bare entries instead, for a provider that
+ * serves its list and nothing else.
  */
-export function choicesFor(models: DeclaredModel[], allowed: "*" | string[]): DeclaredModel[] {
+export function choicesFor(
+  models: DeclaredModel[],
+  allowed: "*" | string[],
+  knownOnly = false,
+): DeclaredModel[] {
   if (allowed === "*") return models;
-  return [...new Set(allowed)].map((id) => models.find((m) => m.id === id) ?? { id });
+  return [...new Set(allowed)].flatMap((id) => {
+    const model = models.find((m) => m.id === id);
+    if (model) return [model];
+    return knownOnly ? [] : [{ id }];
+  });
 }
 
 const usd = new Intl.NumberFormat("en-US", {

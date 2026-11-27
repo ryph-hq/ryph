@@ -46,6 +46,7 @@ import {
   defaultModelThinkingLevels,
   editedDefaultThinking,
   modelPolicyProblem,
+  openRouterChoices,
   policyToFields,
 } from "../../shared/model-policy";
 import LimitPolicyFields from "../../shared/limit-policy-fields.svelte";
@@ -204,7 +205,12 @@ const index = $derived(STEPS.findIndex((step) => step.id === current));
 const problems = $derived<Record<AgentStepId, string | null>>({
   identity: identityProblem(name, handle, email, page.url.hostname),
   model: data.modelAccessEnabled
-    ? modelPolicyProblem(providerKeyId, allowedModels, defaultModel)
+    ? modelPolicyProblem(
+      providerKeyId,
+      allowedModels,
+      defaultModel,
+      openRouterChoices(data.providers, data.providerKeys, providerKeyId, data.agent.modelPolicy),
+    )
     : null,
   instructions: null,
   tools: data.toolAccessEnabled ? toolPolicyProblem(toolGrants, data.mcpServers) : null,

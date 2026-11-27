@@ -1,7 +1,14 @@
 // The bridge between the form's model-access fields and the API's ModelPolicy shape, shared by
 // the create and edit flows so both compose and seed identically.
 
-import type { Harness, ModelPolicy, Provider, ProviderKey, ThinkingLevel } from "#lib/api/types.ts";
+import {
+  type Harness,
+  type ModelPolicy,
+  OPENROUTER_PROVIDER,
+  type Provider,
+  type ProviderKey,
+  type ThinkingLevel,
+} from "#lib/api/types.ts";
 import { thinkingLevelsForKey } from "#lib/components/model-picker/models.ts";
 import { thinkingToSend } from "#lib/components/model-picker/thinking.ts";
 
@@ -92,18 +99,58 @@ export function editedDefaultThinking(
   return unmoved ? defaultThinking : thinkingToSend(defaultThinking, levels);
 }
 
-/** Why the model fields cannot be saved as they stand, or null — the server's two rules. */
+/**
+ * What an OpenRouter key's agent may pick from: the ids enabled for agents, or null when the
+ * provider list did not come back with OpenRouter in it and they are not known.
+ */
+export type OpenRouterChoices = { enabled: readonly string[] | null };
+
+/**
+ * The OpenRouter choices for the selected key, or null when the key is on another provider. A
+ * key the list cannot resolve goes by the stored policy's provider (`storedProvider`).
+ */
+export function openRouterChoices(
+  providers: readonly Provider[],
+  providerKeys: readonly ProviderKey[],
+  providerKeyId: string,
+  storedPolicy: ModelPolicy | null = null,
+): OpenRouterChoices | null {
+  if (!providerKeyId) return null;
+  const provider = providerKeys.find((k) => k.id === providerKeyId)?.provider ??
+    storedProvider(storedPolicy, providerKeyId);
+  if (provider !== OPENROUTER_PROVIDER) return null;
+  const entry = providers.find((p) => p.id === OPENROUTER_PROVIDER);
+  return { enabled: entry ? entry.models.map((m) => m.id) : null };
+}
+
+/**
+ * Why the model fields cannot be saved as they stand, or null: the server's rules. Any key with
+ * an allowlist needs a model on it, and a default from it. An OpenRouter key (`openRouter`) also
+ * needs a default model, one of the models enabled for agents where those are known.
+ */
 export function modelPolicyProblem(
   providerKeyId: string,
   allowedModels: ModelPolicy["allowedModels"],
   defaultModel: string,
+  openRouter: OpenRouterChoices | null = null,
 ): string | null {
-  if (!providerKeyId || allowedModels === "*") return null;
-  const list = cleanList(allowedModels);
-  if (list.length === 0) return "Pick at least one allowed model.";
+  if (!providerKeyId) return null;
   const model = defaultModel.trim();
-  if (model !== "" && !list.includes(model)) {
-    return "The default model must be one of the allowed models.";
+  const enabled = openRouter?.enabled ?? null;
+  if (enabled !== null && enabled.length === 0) {
+    return "Enable an OpenRouter model under Model keys first.";
+  }
+  if (allowedModels !== "*") {
+    const list = cleanList(allowedModels);
+    if (list.length === 0) return "Pick at least one allowed model.";
+    if (model !== "" && !list.includes(model)) {
+      return "The default model must be one of the allowed models.";
+    }
+  }
+  if (openRouter === null) return null;
+  if (model === "") return "Pick a default model.";
+  if (enabled !== null && !enabled.includes(model)) {
+    return "Pick one of the enabled OpenRouter models as the default.";
   }
   return null;
 }

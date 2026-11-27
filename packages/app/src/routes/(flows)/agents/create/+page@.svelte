@@ -40,6 +40,7 @@ import {
   composeModelPolicy,
   defaultModelThinkingLevels,
   modelPolicyProblem,
+  openRouterChoices,
 } from "../shared/model-policy";
 import {
   offersThinking,
@@ -178,7 +179,12 @@ let attempted = $state(false);
 // policy checks are the ones the submit ran before; here they also drive the marks in the list.
 const problems = $derived<Record<AgentStepId, string | null>>({
   identity: identityProblem(name, handle, email, page.url.hostname),
-  model: modelPolicyProblem(providerKeyId, allowedModels, defaultModel),
+  model: modelPolicyProblem(
+    providerKeyId,
+    allowedModels,
+    defaultModel,
+    openRouterChoices(data.providers, data.providerKeys, providerKeyId, null),
+  ),
   instructions: null,
   tools: toolPolicyProblem(toolGrants, data.mcpServers),
   skills: null,

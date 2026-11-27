@@ -44,6 +44,11 @@ describe("choicesFor", () => {
       { id: "mine" },
     ]);
   });
+
+  it("drops ids the provider does not list when only its list counts", () => {
+    expect(choicesFor([SONNET, HAIKU], ["claude-haiku-4-5", "mine"], true)).toEqual([HAIKU]);
+    expect(choicesFor([SONNET, HAIKU], "*", true)).toEqual([SONNET, HAIKU]);
+  });
 });
 
 describe("priceLabel", () => {
