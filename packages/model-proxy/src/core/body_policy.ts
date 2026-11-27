@@ -15,7 +15,7 @@
 // stripped: a run whose tool or image silently vanished would only find out from the model's
 // confusion.
 //
-// What pi 1.5.0 sends, which this must keep passing (pi-ai's anthropic-messages,
+// What pi 1.6.1 sends, which this must keep passing (pi-ai's anthropic-messages,
 // openai-responses-shared and openai-completions): Anthropic tools with no `type` (client tools),
 // `tool_addition` blocks carrying the same, images as `source: {type: "base64"}`; OpenAI
 // Responses `function`/`custom` tools, top-level and in `additional_tools` and client
@@ -56,12 +56,15 @@ const CLIENT_TOOL_TYPES: Record<BodyShape, ReadonlySet<string>> = {
  *   `store: false` and carries its history in `input`, so it never uses either, and an id from
  *   another run (or another person's session on the same key) would hand its whole context over
  * - `prompt`: a prompt template the organization stored on OpenAI's side, the same kind of data
+ * - `thread` (Anthropic): a message thread, continued from a stored reply by id — the same kind
+ *   of handle as `previous_response_id`. pi only sends it to `api.anthropic.com` directly
+ *   (`compat.supportsMessageThreads` defaults off for any other baseUrl), so never through here
  * - `mcp_servers` (Anthropic): servers the provider dials on the run's behalf
  * - `container` (Anthropic): a code-execution container, billed by the hour
  * - `web_search_options` (Chat Completions): the search models' built-in web search
  */
 const REFUSED_TOP_LEVEL: Record<BodyShape, readonly string[]> = {
-  "anthropic-messages": ["mcp_servers", "container"],
+  "anthropic-messages": ["thread", "mcp_servers", "container"],
   "openai-responses": ["previous_response_id", "conversation", "prompt"],
   "openai-chat": ["web_search_options"],
 };

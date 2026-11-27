@@ -46,7 +46,7 @@ What that file says depends on whether pi has ever heard of the provider. One ru
 cases, and it is pi's, not ours: a provider's `apiKey` is read as a shell command when it starts
 with `!`, as an **environment variable when a variable of that name is set**, and otherwise as the
 literal key (pi's `docs/models.md`, "Value Resolution" — checked against 0.67.6, while the image
-pins `@earendil-works/pi-coding-agent@1.5.0`, so read it as indicative rather than as the pinned
+pins `@earendil-works/pi-coding-agent@1.6.1`, so read it as indicative rather than as the pinned
 build's contract). A bare name is therefore never a secret in a file, which is the whole reason the
 adapter can write one at all.
 
