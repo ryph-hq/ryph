@@ -1,7 +1,7 @@
 <script lang="ts">
-import { getImages, type ImageStatus, pullImages } from "$lib/api/images";
-import { Button } from "$lib/components/ui/button";
-import { Spinner } from "$lib/components/ui/spinner";
+import { getImages, type ImageStatus, pullImages } from "#lib/api/images.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
 import CheckIcon from "@lucide/svelte/icons/check";
 import CircleAlertIcon from "@lucide/svelte/icons/circle-alert";
 import CircleDashedIcon from "@lucide/svelte/icons/circle-dashed";

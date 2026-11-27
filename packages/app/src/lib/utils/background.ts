@@ -1,6 +1,6 @@
 import { z } from "zod";
-import type { BackgroundJob, BackgroundReason } from "$lib/api/background";
-import type { ToolCall } from "$lib/api/tools";
+import type { BackgroundJob, BackgroundReason } from "#lib/api/background.ts";
+import type { ToolCall } from "#lib/api/tools.ts";
 import { formatElapsed } from "./format";
 
 // Background commands as a reader meets them: a job's status in words, the runner's notice that

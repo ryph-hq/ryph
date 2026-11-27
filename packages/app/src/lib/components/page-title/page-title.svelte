@@ -1,5 +1,5 @@
 <script lang="ts">
-import { pageHeader } from "$lib/components/page-header/page-header.svelte";
+import { pageHeader } from "#lib/components/page-header/page-header.svelte.ts";
 import type { Snippet } from "svelte";
 import type { Attachment } from "svelte/attachments";
 

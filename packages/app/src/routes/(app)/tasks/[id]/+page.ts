@@ -1,16 +1,16 @@
 import type { PageLoad } from "./$types";
-import { browser } from "$app/environment";
-import { getTask } from "$lib/api/tasks";
+import { browser } from "$app/env";
+import { getTask } from "#lib/api/tasks.ts";
 import {
   getRunEventsAfter,
   getRunHead,
   getRunTail,
   type HistoryPage,
   type HistoryWindow,
-} from "$lib/api/history";
-import { getRunUsageState } from "$lib/api/model-usage";
-import { type TaskDetail, TERMINAL_RUN_STATES } from "$lib/api/types";
-import { taskName } from "$lib/utils/task-prompt";
+} from "#lib/api/history.ts";
+import { getRunUsageState } from "#lib/api/model-usage.ts";
+import { type TaskDetail, TERMINAL_RUN_STATES } from "#lib/api/types.ts";
+import { taskName } from "#lib/utils/task-prompt.ts";
 import { type HistoryRead, historyRead, holding, readsBill } from "./holding";
 
 /** The newest events, which is where the page opens. */

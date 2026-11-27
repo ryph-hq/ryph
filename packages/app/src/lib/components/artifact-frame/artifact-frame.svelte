@@ -1,16 +1,16 @@
 <script lang="ts">
-import { Button } from "$lib/components/ui/button";
-import { Skeleton } from "$lib/components/ui/skeleton";
-import { Spinner } from "$lib/components/ui/spinner";
+import { Button } from "#lib/components/ui/button/index.ts";
+import { Skeleton } from "#lib/components/ui/skeleton/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
 import {
   ARTIFACT_SANDBOX,
   artifactContentHref,
   type FrameSession,
   FrameStage,
   type StageView,
-} from "$lib/utils/artifacts";
-import { ensureFreshSession, renewSession } from "$lib/utils/auth/auth";
-import { cn } from "$lib/utils";
+} from "#lib/utils/artifacts.ts";
+import { ensureFreshSession, renewSession } from "#lib/utils/auth/auth.ts";
+import { cn } from "#lib/utils.ts";
 import RotateCwIcon from "@lucide/svelte/icons/rotate-cw";
 import ShieldAlertIcon from "@lucide/svelte/icons/shield-alert";
 import TriangleAlertIcon from "@lucide/svelte/icons/triangle-alert";

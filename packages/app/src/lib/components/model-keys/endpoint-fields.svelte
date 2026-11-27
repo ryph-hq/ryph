@@ -1,13 +1,13 @@
 <script lang="ts">
-import { Button } from "$lib/components/ui/button";
-import { Checkbox } from "$lib/components/ui/checkbox";
-import * as Field from "$lib/components/ui/field";
-import { Input } from "$lib/components/ui/input";
-import { Label } from "$lib/components/ui/label";
-import * as Select from "$lib/components/ui/select";
-import * as ToggleGroup from "$lib/components/ui/toggle-group";
-import { THINKING_LEVELS, type ThinkingLevel } from "$lib/api/types";
-import { THINKING_LABELS } from "$lib/components/model-picker/thinking";
+import { Button } from "#lib/components/ui/button/index.ts";
+import { Checkbox } from "#lib/components/ui/checkbox/index.ts";
+import * as Field from "#lib/components/ui/field/index.ts";
+import { Input } from "#lib/components/ui/input/index.ts";
+import { Label } from "#lib/components/ui/label/index.ts";
+import * as Select from "#lib/components/ui/select/index.ts";
+import * as ToggleGroup from "#lib/components/ui/toggle-group/index.ts";
+import { THINKING_LEVELS, type ThinkingLevel } from "#lib/api/types.ts";
+import { THINKING_LABELS } from "#lib/components/model-picker/thinking.ts";
 import PlusIcon from "@lucide/svelte/icons/plus";
 import Trash2Icon from "@lucide/svelte/icons/trash-2";
 import { emptyModelRow, type EndpointFormState, withReasoning } from "./custom-endpoint-form";

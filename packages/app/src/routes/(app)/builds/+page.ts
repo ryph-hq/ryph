@@ -1,9 +1,9 @@
 import type { PageLoad } from "./$types";
-import { browser } from "$app/environment";
-import { ApiError } from "$lib/api/call";
-import { listBuilds } from "$lib/api/environments";
-import { getConnectedRepos } from "$lib/api/repos";
-import { getWorkspaces } from "$lib/api/workspaces";
+import { browser } from "$app/env";
+import { ApiError } from "#lib/api/call.ts";
+import { listBuilds } from "#lib/api/environments.ts";
+import { getConnectedRepos } from "#lib/api/repos.ts";
+import { getWorkspaces } from "#lib/api/workspaces.ts";
 import { STATE_FILTERS, type StateFilter } from "./filters";
 
 /**

@@ -4,7 +4,7 @@
 // Held rows are snapshots and are never read again: one still running when 50 newer suites push
 // it below the head keeps showing "running" until the page reloads. Accepted, as it is rare.
 
-import type { CheckSuiteListItem } from "$lib/api/types";
+import type { CheckSuiteListItem } from "#lib/api/types.ts";
 
 /** A page of the list, as `GET /v1/check-suites` answers it. */
 export interface SuitePageLike {

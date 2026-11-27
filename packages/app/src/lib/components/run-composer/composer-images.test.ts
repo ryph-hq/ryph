@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { UploadedAttachment } from "$lib/api/attachments";
+import type { UploadedAttachment } from "#lib/api/attachments.ts";
 import { ComposerImages, type Uploader } from "./composer-images.svelte";
 
 // The images in the message box: each uploads as it is added, the message waits for all of them,

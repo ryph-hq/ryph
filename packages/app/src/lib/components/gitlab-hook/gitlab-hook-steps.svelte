@@ -1,6 +1,6 @@
 <script lang="ts">
-import type { GitlabHook } from "$lib/api/repos";
-import CopyButton from "$lib/components/copy-button/copy-button.svelte";
+import type { GitlabHook } from "#lib/api/repos.ts";
+import CopyButton from "#lib/components/copy-button/copy-button.svelte";
 import CheckIcon from "@lucide/svelte/icons/check";
 import ChevronRightIcon from "@lucide/svelte/icons/chevron-right";
 import ExternalLinkIcon from "@lucide/svelte/icons/external-link";

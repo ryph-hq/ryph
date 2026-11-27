@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { PatchWithContext } from "$lib/api/types";
+import type { PatchWithContext } from "#lib/api/types.ts";
 import { appendPatchPage, type DeeperPatches, mergePatchHead } from "./patch-queue";
 
 const AT = (n: number) => `2026-09-${String(n).padStart(2, "0")}T00:00:00.000Z`;

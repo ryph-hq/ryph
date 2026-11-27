@@ -1,5 +1,5 @@
-import { getRunUsageState, type RunUsageState } from "$lib/api/model-usage";
-import { deferredResults } from "$lib/utils/deferred-results";
+import { getRunUsageState, type RunUsageState } from "#lib/api/model-usage.ts";
+import { deferredResults } from "#lib/utils/deferred-results.ts";
 
 /** How often a live run's bill is read again. One aggregate per model, however long the run. */
 export const USAGE_POLL_MS = 5_000;

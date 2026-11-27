@@ -12,14 +12,14 @@
 // nothing filled in — so what an admin left unsaid (a model's thinking levels) loads unsaid and
 // saves back unsaid, rather than as the levels pi happens to give it today.
 
-import type { CreateProviderInput, UpdateProviderInput } from "$lib/api/providers";
+import type { CreateProviderInput, UpdateProviderInput } from "#lib/api/providers.ts";
 import {
   type DeclaredModel,
   type Provider,
   type ProviderDetail,
   THINKING_LEVELS,
   type ThinkingLevel,
-} from "$lib/api/types";
+} from "#lib/api/types.ts";
 
 /** One declared model as the operator types it — every number and price is a string until it
  * composes, so a half-typed "12" never reads as a context window of twelve. */

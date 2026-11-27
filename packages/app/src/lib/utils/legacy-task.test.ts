@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { repoEntrySchema, runnerResultSchema } from "$lib/api/types";
+import { repoEntrySchema, runnerResultSchema } from "#lib/api/types.ts";
 import { isLegacyTask } from "./legacy-task";
 
 const LEGACY_ENTRY = {

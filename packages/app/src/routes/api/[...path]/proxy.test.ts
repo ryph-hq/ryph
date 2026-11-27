@@ -3,11 +3,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 // The proxy itself, against a stubbed upstream: whose bearer goes upstream, and that a request
 // body travels as a stream rather than being read into memory first.
 
-vi.mock("$env/dynamic/private", () => ({ env: { RYPH_PROXY_SECRET: "hop" } }));
-vi.mock("$app/environment", () => ({ dev: true }));
+vi.mock(
+  "$app/env/private",
+  async () => (await import("#lib/testing/env-mock.ts")).envMock({ RYPH_PROXY_SECRET: "hop" }),
+);
+vi.mock("$app/env", () => ({ dev: true }));
 // The real header helpers, with the upstreams pointed at test origins.
-vi.mock("$lib/server/auth", async (importOriginal) => ({
-  ...await importOriginal<typeof import("$lib/server/auth")>(),
+vi.mock("#lib/server/auth.ts", async (importOriginal) => ({
+  ...await importOriginal<typeof import("#lib/server/auth.ts")>(),
   RYPH_API_URL: "http://api.test",
   RYPH_AUTOMATIONS_URL: "http://api.test",
   RYPH_CHAT_URL: "http://api.test",

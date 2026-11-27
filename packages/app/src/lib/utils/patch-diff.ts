@@ -1,6 +1,6 @@
 // What a patch's diff is measured from, as its page names it.
 
-import type { Basis } from "$lib/api/patches";
+import type { Basis } from "#lib/api/patches.ts";
 import { branchName } from "./format";
 
 /**

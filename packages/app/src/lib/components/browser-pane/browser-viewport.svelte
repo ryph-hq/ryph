@@ -1,6 +1,6 @@
 <script lang="ts">
-import type { LiveFrame } from "$lib/api/browser-live";
-import { Skeleton } from "$lib/components/ui/skeleton";
+import type { LiveFrame } from "#lib/api/browser-live.ts";
+import { Skeleton } from "#lib/components/ui/skeleton/index.ts";
 import { FramePainter } from "./frame-painter";
 import { type Chip, highlightBox, type LiveView, viewportOf } from "./live-view";
 

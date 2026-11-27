@@ -1,9 +1,9 @@
 // The bridge between the form's model-access fields and the API's ModelPolicy shape, shared by
 // the create and edit flows so both compose and seed identically.
 
-import type { Harness, ModelPolicy, Provider, ProviderKey, ThinkingLevel } from "$lib/api/types";
-import { thinkingLevelsForKey } from "$lib/components/model-picker/models";
-import { thinkingToSend } from "$lib/components/model-picker/thinking";
+import type { Harness, ModelPolicy, Provider, ProviderKey, ThinkingLevel } from "#lib/api/types.ts";
+import { thinkingLevelsForKey } from "#lib/components/model-picker/models.ts";
+import { thinkingToSend } from "#lib/components/model-picker/thinking.ts";
 
 /** Builds the policy from the form fields; "" as the key id means no model access (null). */
 export function composeModelPolicy(

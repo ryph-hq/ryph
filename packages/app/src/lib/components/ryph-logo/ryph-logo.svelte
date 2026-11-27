@@ -12,11 +12,11 @@ export function excite(strength = 1) {
 </script>
 
 <script lang="ts">
-import { blobPath } from "$lib/brand/blob";
-import BlobFill from "$lib/brand/blob-fill.svelte";
-import { BlobMotion } from "$lib/brand/blob-motion";
-import { CIRCLE, LETTER_R, LETTERS, R_MIDDLE, WORDMARK_BOX } from "$lib/brand/logo";
-import { cn } from "$lib/utils";
+import { blobPath } from "#lib/brand/blob.ts";
+import BlobFill from "#lib/brand/blob-fill.svelte";
+import { BlobMotion } from "#lib/brand/blob-motion.ts";
+import { CIRCLE, LETTER_R, LETTERS, R_MIDDLE, WORDMARK_BOX } from "#lib/brand/logo.ts";
+import { cn } from "#lib/utils.ts";
 
 let {
   mark = false,

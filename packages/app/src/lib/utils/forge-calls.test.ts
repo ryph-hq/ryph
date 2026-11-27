@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { ToolCall } from "$lib/api/tools";
-import type { ForgeToolAction } from "$lib/api/types";
+import type { ToolCall } from "#lib/api/tools.ts";
+import type { ForgeToolAction } from "#lib/api/types.ts";
 import { closingNotes, type ForgeCall, forgeCallOf, matchForgeWrites } from "./forge-calls";
 
 function call(tool: string, args: unknown, at: string, server = "forge"): ToolCall {

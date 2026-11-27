@@ -1,8 +1,8 @@
 <script lang="ts">
-import PageTitle from "$lib/components/page-title/page-title.svelte";
-import { Badge } from "$lib/components/ui/badge";
-import { Button } from "$lib/components/ui/button";
-import * as ToggleGroup from "$lib/components/ui/toggle-group";
+import PageTitle from "#lib/components/page-title/page-title.svelte";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import * as ToggleGroup from "#lib/components/ui/toggle-group/index.ts";
 import { invalidate } from "$app/navigation";
 import { goto } from "$app/navigation";
 import {
@@ -14,24 +14,24 @@ import {
   revokeApiToken,
   revokeSession,
   updateProfile,
-} from "$lib/api/account";
-import { unlinkIdentity } from "$lib/api/identities";
-import { logOut, refreshSession } from "$lib/utils/auth/auth";
-import * as AlertDialog from "$lib/components/ui/alert-dialog";
+} from "#lib/api/account.ts";
+import { unlinkIdentity } from "#lib/api/identities.ts";
+import { logOut, refreshSession } from "#lib/utils/auth/auth.ts";
+import * as AlertDialog from "#lib/components/ui/alert-dialog/index.ts";
 import {
   deletePasskey,
   passkeyRegistrationOptions,
   registerPasskey,
   renamePasskey,
-} from "$lib/api/passkeys";
-import type { Passkey } from "$lib/api/types";
-import * as Dialog from "$lib/components/ui/dialog";
-import * as Field from "$lib/components/ui/field";
-import { Input } from "$lib/components/ui/input";
-import { Spinner } from "$lib/components/ui/spinner";
+} from "#lib/api/passkeys.ts";
+import type { Passkey } from "#lib/api/types.ts";
+import * as Dialog from "#lib/components/ui/dialog/index.ts";
+import * as Field from "#lib/components/ui/field/index.ts";
+import { Input } from "#lib/components/ui/input/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
 import { startRegistration } from "@simplewebauthn/browser";
-import { formatDateTime } from "$lib/utils/format";
-import { providerLabel } from "$lib/utils/providers";
+import { formatDateTime } from "#lib/utils/format.ts";
+import { providerLabel } from "#lib/utils/providers.ts";
 import KeyRoundIcon from "@lucide/svelte/icons/key-round";
 import Link2Icon from "@lucide/svelte/icons/link-2";
 import LogOutIcon from "@lucide/svelte/icons/log-out";
@@ -47,11 +47,11 @@ import TerminalIcon from "@lucide/svelte/icons/terminal";
 import SunIcon from "@lucide/svelte/icons/sun";
 import { setMode, setTheme, theme, userPrefersMode } from "mode-watcher";
 import type { PageProps } from "./$types";
-import ForgeIcon from "$lib/components/forge-icon/forge-icon.svelte";
-import SettingsSection from "$lib/components/settings-section/settings-section.svelte";
-import { can, CAPABILITIES, SESSION_ONLY_CAPABILITIES } from "$lib/utils/auth/capabilities";
+import ForgeIcon from "#lib/components/forge-icon/forge-icon.svelte";
+import SettingsSection from "#lib/components/settings-section/settings-section.svelte";
+import { can, CAPABILITIES, SESSION_ONLY_CAPABILITIES } from "#lib/utils/auth/capabilities.ts";
 import KeyIcon from "@lucide/svelte/icons/key";
-import { Separator } from "$lib/components/ui/separator";
+import { Separator } from "#lib/components/ui/separator/index.ts";
 import RadicleIdentity from "./radicle-identity.svelte";
 import TokenAccessPicker from "./token-access-picker.svelte";
 import { describeTokenCaps } from "./token-access";
@@ -113,7 +113,7 @@ async function submitPassword(event: SubmitEvent) {
     // Every session died with the change, this one included: sign in again with the new one.
     toast.success("Password set — sign in with it");
     await logOut();
-    await goto("/login", { invalidateAll: true });
+    await goto("/login", { refreshAll: true });
   } catch (e) {
     toast.error(e instanceof Error ? e.message : "Failed to set the password");
   } finally {
@@ -208,7 +208,7 @@ async function signOutEverywhere() {
     return;
   }
   await logOut();
-  await goto("/login", { invalidateAll: true });
+  await goto("/login", { refreshAll: true });
 }
 
 // ── the way out ─────────────────────────────────────────────────────────────────────────────
@@ -221,7 +221,7 @@ async function deleteAccount() {
   try {
     await deleteOwnAccount(fetch, data.user.id);
     await logOut();
-    await goto("/login", { invalidateAll: true });
+    await goto("/login", { refreshAll: true });
   } catch (e) {
     toast.error(e instanceof Error ? e.message : "Failed to delete the account");
     deleting = false;

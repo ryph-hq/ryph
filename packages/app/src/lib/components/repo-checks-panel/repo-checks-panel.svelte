@@ -1,13 +1,13 @@
 <script lang="ts">
-import type { RepoChecks } from "$lib/api/types";
-import CheckStateIcon from "$lib/components/check-state-icon/check-state-icon.svelte";
-import * as Alert from "$lib/components/ui/alert";
-import { Button } from "$lib/components/ui/button";
-import { Skeleton } from "$lib/components/ui/skeleton";
-import * as Table from "$lib/components/ui/table";
-import { checkStateLabel, timeoutLabel } from "$lib/utils/checks";
-import { shortCommit } from "$lib/utils/environments";
-import { formatDateTime, formatRelativeTime } from "$lib/utils/format";
+import type { RepoChecks } from "#lib/api/types.ts";
+import CheckStateIcon from "#lib/components/check-state-icon/check-state-icon.svelte";
+import * as Alert from "#lib/components/ui/alert/index.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import { Skeleton } from "#lib/components/ui/skeleton/index.ts";
+import * as Table from "#lib/components/ui/table/index.ts";
+import { checkStateLabel, timeoutLabel } from "#lib/utils/checks.ts";
+import { shortCommit } from "#lib/utils/environments.ts";
+import { formatDateTime, formatRelativeTime } from "#lib/utils/format.ts";
 import TriangleAlertIcon from "@lucide/svelte/icons/triangle-alert";
 
 let {

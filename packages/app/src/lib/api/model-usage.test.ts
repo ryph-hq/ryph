@@ -7,7 +7,7 @@ import {
   modelUsageSchema,
   usageTotalsSchema,
 } from "./model-usage";
-import { formatCount, formatUsd } from "$lib/utils/format";
+import { formatCount, formatUsd } from "#lib/utils/format.ts";
 
 // A run page must open whether or not the deployment meters model calls, and whether or not the
 // model proxy is answering right now: the bill is a detail of that page, the run is the page.

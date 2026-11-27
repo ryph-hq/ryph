@@ -1,41 +1,44 @@
 <script lang="ts">
-import { goto, invalidate, pushState } from "$app/navigation";
+import { goto, invalidate } from "$app/navigation";
 import { page } from "$app/state";
-import { createAgent } from "$lib/api/agents";
-import { createProviderKey, setPlatformModelPolicy } from "$lib/api/provider-keys";
-import { createProvider } from "$lib/api/providers";
-import { connectLocalRepo } from "$lib/api/repos";
-import type { Agent, ConnectedRepo, Provider, ProviderKey } from "$lib/api/types";
-import AgentAvatar from "$lib/components/agent-avatar/agent-avatar.svelte";
-import ForgeIcon from "$lib/components/forge-icon/forge-icon.svelte";
-import ChatgptSignInDialog from "$lib/components/model-keys/chatgpt-sign-in-dialog.svelte";
+import { createAgent } from "#lib/api/agents.ts";
+import { createProviderKey, setPlatformModelPolicy } from "#lib/api/provider-keys.ts";
+import { createProvider } from "#lib/api/providers.ts";
+import { connectLocalRepo } from "#lib/api/repos.ts";
+import type { Agent, ConnectedRepo, Provider, ProviderKey } from "#lib/api/types.ts";
+import AgentAvatar from "#lib/components/agent-avatar/agent-avatar.svelte";
+import ForgeIcon from "#lib/components/forge-icon/forge-icon.svelte";
+import ChatgptSignInDialog from "#lib/components/model-keys/chatgpt-sign-in-dialog.svelte";
 import {
   composeCreateBody,
   type EndpointFormState,
   newEndpointForm,
-} from "$lib/components/model-keys/custom-endpoint-form";
-import EndpointFields from "$lib/components/model-keys/endpoint-fields.svelte";
-import KeySecretFields from "$lib/components/model-keys/key-secret-fields.svelte";
-import { planAccountLine } from "$lib/components/model-keys/plan-key";
-import ProviderMark from "$lib/components/model-keys/provider-mark.svelte";
-import { keyProviderOptions, planSignInOffered } from "$lib/components/model-keys/provider-options";
-import ModelSelect from "$lib/components/model-picker/model-select.svelte";
-import { modelsForKey } from "$lib/components/model-picker/models";
-import PickCard from "$lib/components/pick-card/pick-card.svelte";
-import PickGrid from "$lib/components/pick-card/pick-grid.svelte";
-import RyphBlob from "$lib/components/ryph-blob/ryph-blob.svelte";
-import SteppedFlow, { type FlowStepItem } from "$lib/components/stepped-flow/stepped-flow.svelte";
-import { stepOf } from "$lib/components/stepped-flow/steps";
-import * as Alert from "$lib/components/ui/alert";
-import { Button } from "$lib/components/ui/button";
-import * as Field from "$lib/components/ui/field";
-import { Input } from "$lib/components/ui/input";
-import * as Select from "$lib/components/ui/select";
-import { Spinner } from "$lib/components/ui/spinner";
-import { agentAvatar } from "$lib/utils/avatar";
-import { localRepoName, shortenRid } from "$lib/utils/forge";
-import { withBackTo } from "$lib/utils/safe-path";
-import { markWelcomeDone } from "$lib/utils/welcome";
+} from "#lib/components/model-keys/custom-endpoint-form.ts";
+import EndpointFields from "#lib/components/model-keys/endpoint-fields.svelte";
+import KeySecretFields from "#lib/components/model-keys/key-secret-fields.svelte";
+import { planAccountLine } from "#lib/components/model-keys/plan-key.ts";
+import ProviderMark from "#lib/components/model-keys/provider-mark.svelte";
+import {
+  keyProviderOptions,
+  planSignInOffered,
+} from "#lib/components/model-keys/provider-options.ts";
+import ModelSelect from "#lib/components/model-picker/model-select.svelte";
+import { modelsForKey } from "#lib/components/model-picker/models.ts";
+import PickCard from "#lib/components/pick-card/pick-card.svelte";
+import PickGrid from "#lib/components/pick-card/pick-grid.svelte";
+import RyphBlob from "#lib/components/ryph-blob/ryph-blob.svelte";
+import SteppedFlow, { type FlowStepItem } from "#lib/components/stepped-flow/stepped-flow.svelte";
+import { stepOf } from "#lib/components/stepped-flow/steps.ts";
+import * as Alert from "#lib/components/ui/alert/index.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import * as Field from "#lib/components/ui/field/index.ts";
+import { Input } from "#lib/components/ui/input/index.ts";
+import * as Select from "#lib/components/ui/select/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
+import { agentAvatar } from "#lib/utils/avatar.ts";
+import { localRepoName, shortenRid } from "#lib/utils/forge.ts";
+import { withBackTo } from "#lib/utils/safe-path.ts";
+import { markWelcomeDone } from "#lib/utils/welcome.ts";
 import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
 import ArrowRightIcon from "@lucide/svelte/icons/arrow-right";
 import ChevronRightIcon from "@lucide/svelte/icons/chevron-right";
@@ -99,7 +102,7 @@ const steps = $derived<FlowStepItem[]>(WELCOME_STEPS.map((step) => ({
 })));
 
 function go(id: WelcomeStepId) {
-  if (id !== current) pushState("", { step: id });
+  if (id !== current) void goto("", { shallow: true, state: { step: id } });
 }
 
 function next() {

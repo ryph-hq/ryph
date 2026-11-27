@@ -1,5 +1,5 @@
 import { isJsonContentType } from "@ryph/shared/http";
-import { ATTACHMENT_MIMES } from "$lib/api/attachments";
+import { ATTACHMENT_MIMES } from "#lib/api/attachments.ts";
 
 /**
  * The guard on every request that changes something, in front of every route: the `/api` proxy,

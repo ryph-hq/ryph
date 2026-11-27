@@ -1,23 +1,29 @@
 <script lang="ts">
-import { can, type Capability } from "$lib/utils/auth/capabilities";
-import { browser } from "$app/environment";
+import { can, type Capability } from "#lib/utils/auth/capabilities.ts";
+import { browser } from "$app/env";
 import { afterNavigate, goto, onNavigate } from "$app/navigation";
 import { page } from "$app/state";
-import type { TaskPage } from "$lib/api/types";
-import { LiveTaskList, setTaskListContext } from "$lib/components/task-list/live-task-list.svelte";
-import * as Avatar from "$lib/components/ui/avatar";
-import { personInitials } from "$lib/utils/avatar";
-import TaskListPane from "$lib/components/task-list-pane/task-list-pane.svelte";
-import * as Breadcrumb from "$lib/components/ui/breadcrumb";
-import * as Collapsible from "$lib/components/ui/collapsible";
-import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
-import { Separator } from "$lib/components/ui/separator";
-import * as Sidebar from "$lib/components/ui/sidebar";
-import { SIDEBAR_COOKIE_MAX_AGE, SIDEBAR_COOKIE_NAME } from "$lib/components/ui/sidebar/constants";
-import { IsMobile } from "$lib/hooks/is-mobile.svelte.js";
-import { pageHeader } from "$lib/components/page-header/page-header.svelte";
-import { logOut } from "$lib/utils/auth/auth";
-import RyphLogo, { excite } from "$lib/components/ryph-logo/ryph-logo.svelte";
+import type { TaskPage } from "#lib/api/types.ts";
+import {
+  LiveTaskList,
+  setTaskListContext,
+} from "#lib/components/task-list/live-task-list.svelte.ts";
+import * as Avatar from "#lib/components/ui/avatar/index.ts";
+import { personInitials } from "#lib/utils/avatar.ts";
+import TaskListPane from "#lib/components/task-list-pane/task-list-pane.svelte";
+import * as Breadcrumb from "#lib/components/ui/breadcrumb/index.ts";
+import * as Collapsible from "#lib/components/ui/collapsible/index.ts";
+import * as DropdownMenu from "#lib/components/ui/dropdown-menu/index.ts";
+import { Separator } from "#lib/components/ui/separator/index.ts";
+import * as Sidebar from "#lib/components/ui/sidebar/index.ts";
+import {
+  SIDEBAR_COOKIE_MAX_AGE,
+  SIDEBAR_COOKIE_NAME,
+} from "#lib/components/ui/sidebar/constants.ts";
+import { IsMobile } from "#lib/hooks/is-mobile.svelte.ts";
+import { pageHeader } from "#lib/components/page-header/page-header.svelte.ts";
+import { logOut } from "#lib/utils/auth/auth.ts";
+import RyphLogo, { excite } from "#lib/components/ryph-logo/ryph-logo.svelte";
 import AppWindowIcon from "@lucide/svelte/icons/app-window";
 import BookOpenTextIcon from "@lucide/svelte/icons/book-open-text";
 import BotIcon from "@lucide/svelte/icons/bot";
@@ -41,16 +47,16 @@ import SettingsIcon from "@lucide/svelte/icons/settings";
 import ShieldIcon from "@lucide/svelte/icons/shield";
 import UsersIcon from "@lucide/svelte/icons/users";
 import ZapIcon from "@lucide/svelte/icons/zap";
-import DetailsPaneHost from "$lib/components/details-pane/details-pane-host.svelte";
+import DetailsPaneHost from "#lib/components/details-pane/details-pane-host.svelte";
 import {
   DETAILS_PANE_INITIAL,
   DETAILS_PANE_MAX,
   DETAILS_PANE_MIN,
   detailsPane,
-} from "$lib/components/details-pane/details-pane.svelte";
-import RailFlyoutCard from "$lib/components/rail-flyout/rail-flyout.svelte";
-import { RailFlyout } from "$lib/components/rail-flyout/flyout-state.svelte";
-import { viewTransitionFinished } from "$lib/utils/view-transition";
+} from "#lib/components/details-pane/details-pane.svelte.ts";
+import RailFlyoutCard from "#lib/components/rail-flyout/rail-flyout.svelte";
+import { RailFlyout } from "#lib/components/rail-flyout/flyout-state.svelte.ts";
+import { viewTransitionFinished } from "#lib/utils/view-transition.ts";
 import { untrack } from "svelte";
 import type { LayoutProps } from "./$types";
 
@@ -89,6 +95,7 @@ $effect(() => {
 // A click on the rail navigates with the card still out: it stays through the page transition,
 // then closes unless the pointer is still on the rail or the card.
 onNavigate((navigation) => {
+  if (navigation.shallow && navigation.type === "goto") return;
   flyout.hold();
   void navigation.complete
     .then(viewTransitionFinished)
@@ -381,7 +388,8 @@ $effect(() => {
 const initials = $derived(personInitials(data.user.name));
 
 // The logo perks up at every new page, as it does on the landing page.
-afterNavigate(({ type, from, to }) => {
+afterNavigate(({ type, from, to, shallow }) => {
+  if (shallow && type === "goto") return;
   if (type !== "enter" && from?.url.pathname !== to?.url.pathname) excite();
 });
 
@@ -389,7 +397,7 @@ async function handleLogOut() {
   await logOut();
   // Re-run all loads so the login page sees the cleared session — otherwise
   // its guard reads the stale `user` and bounces straight back here.
-  await goto("/login", { invalidateAll: true });
+  await goto("/login", { refreshAll: true });
 }
 </script>
 

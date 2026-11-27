@@ -1,8 +1,8 @@
 <script lang="ts">
-import type { RunArtifact } from "$lib/api/types";
-import ArtifactFrame from "$lib/components/artifact-frame/artifact-frame.svelte";
-import { Button } from "$lib/components/ui/button";
-import { artifactHref } from "$lib/utils/artifacts";
+import type { RunArtifact } from "#lib/api/types.ts";
+import ArtifactFrame from "#lib/components/artifact-frame/artifact-frame.svelte";
+import { Button } from "#lib/components/ui/button/index.ts";
+import { artifactHref } from "#lib/utils/artifacts.ts";
 import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
 import ExternalLinkIcon from "@lucide/svelte/icons/external-link";
 

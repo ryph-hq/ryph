@@ -1,16 +1,16 @@
 <script lang="ts">
 import { page } from "$app/state";
-import { type LiveSource, liveStreamSource } from "$lib/api/browser-live";
-import { mergeToolCalls, type ToolCall } from "$lib/api/tools";
-import type { HistoryEvent, RunnerResult } from "$lib/api/types";
-import { setAttachmentUrlContext } from "$lib/components/attachment-images/attachment-url-context";
-import BrowserPane from "$lib/components/browser-pane/browser-pane.svelte";
-import RunResult from "$lib/components/run-result/run-result.svelte";
-import type { TranscriptAction } from "$lib/components/browser-pane/live-view";
-import { createMockBrowser, type MockBrowser } from "$lib/components/browser-pane/mock-source";
-import ToolCallView from "$lib/components/tool-call/tool-call.svelte";
-import { Button } from "$lib/components/ui/button";
-import { describeBrowserCall } from "$lib/utils/browser-tools";
+import { type LiveSource, liveStreamSource } from "#lib/api/browser-live.ts";
+import { mergeToolCalls, type ToolCall } from "#lib/api/tools.ts";
+import type { HistoryEvent, RunnerResult } from "#lib/api/types.ts";
+import { setAttachmentUrlContext } from "#lib/components/attachment-images/attachment-url-context.ts";
+import BrowserPane from "#lib/components/browser-pane/browser-pane.svelte";
+import RunResult from "#lib/components/run-result/run-result.svelte";
+import type { TranscriptAction } from "#lib/components/browser-pane/live-view.ts";
+import { createMockBrowser, type MockBrowser } from "#lib/components/browser-pane/mock-source.ts";
+import ToolCallView from "#lib/components/tool-call/tool-call.svelte";
+import { Button } from "#lib/components/ui/button/index.ts";
+import { describeBrowserCall } from "#lib/utils/browser-tools.ts";
 import { SvelteSet } from "svelte/reactivity";
 
 // The pane against a pretend browser (mock-source.ts), and the transcript's browser rows from made-up

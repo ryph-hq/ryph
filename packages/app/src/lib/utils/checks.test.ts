@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { checkSuiteViewSchema } from "$lib/api/types";
-import { suite as raw } from "$lib/api/checks.test-fixture";
+import { checkSuiteViewSchema } from "#lib/api/types.ts";
+import { suite as raw } from "#lib/api/checks.test-fixture.ts";
 import {
   canRerunSuite,
   checkDurationMs,

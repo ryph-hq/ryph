@@ -1,4 +1,4 @@
-import type { Handle, HandleServerError, ServerInit } from "@sveltejs/kit";
+import type { Handle, HandleServerError, ServerInit } from "@sveltejs/kit/hooks";
 import {
   checkProxySecret,
   clearAuthCookies,
@@ -7,23 +7,22 @@ import {
   sessionAlive,
   sessionHeaders,
   setAuthCookies,
-} from "$lib/server/auth";
-import { getUserData, isSessionToken } from "$lib/utils/auth/jwt";
-import { isImmutableAsset, serveAssetFromFallback } from "$lib/server/asset-fallback";
-import { env } from "$env/dynamic/private";
-import { describeError } from "$lib/utils/page-error";
-import { crossOriginWriteRefusal } from "$lib/server/csrf";
+} from "#lib/server/auth.ts";
+import { getUserData, isSessionToken } from "#lib/utils/auth/jwt.ts";
+import { isImmutableAsset, serveAssetFromFallback } from "#lib/server/asset-fallback.ts";
+import * as env from "$app/env/private";
+import { describeError } from "#lib/utils/page-error.ts";
+import { crossOriginWriteRefusal } from "#lib/server/csrf.ts";
 import {
   ARTIFACT_CONTENT_PATH,
   ARTIFACT_THUMBNAIL_PATH,
   withAppGuards,
-} from "$lib/server/app-guards";
+} from "#lib/server/app-guards.ts";
 
 // Before the first request: a server without the proxy secret should not come up at all.
 export const init: ServerInit = () => checkProxySecret();
 
-export const handleError: HandleServerError = ({ error, status, message }) =>
-  describeError(error, status, message);
+export const handleError: HandleServerError = ({ kind, error }) => describeError(kind, error);
 
 export const handle: Handle = async ({ event, resolve }) => {
   // Before anything reads a cookie: a write that cannot show it comes from this app's own pages

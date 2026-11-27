@@ -1,11 +1,11 @@
 <script lang="ts">
 import { goto } from "$app/navigation";
-import { ApiError } from "$lib/api/call";
-import { registerInstallation } from "$lib/api/repos";
-import { withBackTo } from "$lib/utils/safe-path";
-import FlowStep from "$lib/components/flow-step/flow-step.svelte";
-import { Button } from "$lib/components/ui/button";
-import { Spinner } from "$lib/components/ui/spinner";
+import { ApiError } from "#lib/api/call.ts";
+import { registerInstallation } from "#lib/api/repos.ts";
+import { withBackTo } from "#lib/utils/safe-path.ts";
+import FlowStep from "#lib/components/flow-step/flow-step.svelte";
+import { Button } from "#lib/components/ui/button/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
 import RotateCwIcon from "@lucide/svelte/icons/rotate-cw";
 import { onMount } from "svelte";
 import type { PageProps } from "./$types";
@@ -43,7 +43,7 @@ async function register() {
       `/repos/connect?installationId=${encodeURIComponent(data.installationId)}`,
       data.backTo,
     ),
-    { replaceState: true },
+    { replace: true },
   );
 }
 

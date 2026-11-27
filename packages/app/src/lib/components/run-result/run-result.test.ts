@@ -1,6 +1,6 @@
 import { render } from "svelte/server";
 import { describe, expect, it } from "vitest";
-import type { BranchOutcome } from "$lib/api/types";
+import type { BranchOutcome } from "#lib/api/types.ts";
 import RunResult from "./run-result.svelte";
 
 function branch(line: string, name: string): BranchOutcome {

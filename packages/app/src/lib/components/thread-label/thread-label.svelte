@@ -1,6 +1,6 @@
 <script lang="ts">
-import type { ForgeProvider, ThreadKind } from "$lib/api/types";
-import { providerOfRepoRef, providerOfThread, threadLabel } from "$lib/utils/forge";
+import type { ForgeProvider, ThreadKind } from "#lib/api/types.ts";
+import { providerOfRepoRef, providerOfThread, threadLabel } from "#lib/utils/forge.ts";
 import ExternalLinkIcon from "@lucide/svelte/icons/external-link";
 
 let {

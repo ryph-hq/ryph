@@ -5,8 +5,8 @@ import {
   sessionHeaders,
   setAuthCookies,
   UpstreamAuthError,
-} from "$lib/server/auth";
-import type { LinkProblem } from "$lib/utils/auth/link-problems";
+} from "#lib/server/auth.ts";
+import type { LinkProblem } from "#lib/utils/auth/link-problems.ts";
 
 // A single-user login link, as `ryph up` and `ryph login` open it. Opening it only shows a button:
 // a link preview, a mail scanner or a prefetch would otherwise spend the single-use token before

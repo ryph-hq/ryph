@@ -1,8 +1,8 @@
 import { error } from "@sveltejs/kit";
 import type { PageLoad } from "./$types";
-import { browser } from "$app/environment";
-import { ApiError } from "$lib/api/call";
-import { getPatch, type PatchDetail } from "$lib/api/patches";
+import { browser } from "$app/env";
+import { ApiError } from "#lib/api/call.ts";
+import { getPatch, type PatchDetail } from "#lib/api/patches.ts";
 
 /**
  * The patch this browser last showed. As on the check suite page: a first look that cannot read

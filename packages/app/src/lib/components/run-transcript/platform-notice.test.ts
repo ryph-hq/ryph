@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { render } from "svelte/server";
-import { runMessageSchema, systemPayloadSchema } from "$lib/api/types";
+import { runMessageSchema, systemPayloadSchema } from "#lib/api/types.ts";
 import PlatformNotice from "./platform-notice.svelte";
 import {
   inboxNoticeActions,

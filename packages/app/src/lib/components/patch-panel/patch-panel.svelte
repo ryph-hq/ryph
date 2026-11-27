@@ -1,21 +1,21 @@
 <script lang="ts">
-import type { Patch } from "$lib/api/types";
-import HookWarning from "$lib/components/hook-warning/hook-warning.svelte";
-import ExpandableText from "$lib/components/expandable-text/expandable-text.svelte";
-import Markdown from "$lib/components/markdown/markdown.svelte";
-import PatchStateBadge from "$lib/components/patch-state-badge/patch-state-badge.svelte";
-import LandedBadge from "$lib/components/patch-state-badge/landed-badge.svelte";
-import ThreadLabel from "$lib/components/thread-label/thread-label.svelte";
-import { Badge } from "$lib/components/ui/badge";
-import { Button } from "$lib/components/ui/button";
-import { Spinner } from "$lib/components/ui/spinner";
-import { shortCommit } from "$lib/utils/environments";
+import type { Patch } from "#lib/api/types.ts";
+import HookWarning from "#lib/components/hook-warning/hook-warning.svelte";
+import ExpandableText from "#lib/components/expandable-text/expandable-text.svelte";
+import Markdown from "#lib/components/markdown/markdown.svelte";
+import PatchStateBadge from "#lib/components/patch-state-badge/patch-state-badge.svelte";
+import LandedBadge from "#lib/components/patch-state-badge/landed-badge.svelte";
+import ThreadLabel from "#lib/components/thread-label/thread-label.svelte";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
+import { shortCommit } from "#lib/utils/environments.ts";
 import {
   HOOK_CHECKING_LABEL,
   hookCheckNotice,
   isCheckingHooks,
   isHeld,
-} from "$lib/utils/hook-check";
+} from "#lib/utils/hook-check.ts";
 import CircleAlertIcon from "@lucide/svelte/icons/circle-alert";
 import FileDiffIcon from "@lucide/svelte/icons/file-diff";
 

@@ -1,6 +1,6 @@
 import { error, redirect, type RequestHandler } from "@sveltejs/kit";
-import { RYPH_API_URL, sessionHeaders } from "$lib/server/auth";
-import { getUserData } from "$lib/utils/auth/jwt";
+import { RYPH_API_URL, sessionHeaders } from "#lib/server/auth.ts";
+import { getUserData } from "#lib/utils/auth/jwt.ts";
 
 /**
  * "Manage installation" on a GitHub repo's page: a redirect to where its App installation is
@@ -30,7 +30,7 @@ export const GET: RequestHandler = async (event) => {
   // not become a way to send a browser anywhere else.
   if (res.status === 302 && location !== null && URL.canParse(location)) {
     const settings = new URL(location);
-    if (settings.protocol === "https:") redirect(302, settings.href);
+    if (settings.protocol === "https:") redirect(302, settings.href, { external: true });
   }
   // The session ended between the hook's check and this read.
   if (res.status === 401) redirect(302, backTo);

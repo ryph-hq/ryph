@@ -1,6 +1,6 @@
 <script lang="ts">
-import { buttonVariants } from "$lib/components/ui/button";
-import * as Popover from "$lib/components/ui/popover";
+import { buttonVariants } from "#lib/components/ui/button/index.ts";
+import * as Popover from "#lib/components/ui/popover/index.ts";
 import type { ContextUsage } from "./context-usage";
 
 let { usage }: { usage: ContextUsage | null } = $props();

@@ -1,5 +1,5 @@
 <script lang="ts">
-import { Button } from "$lib/components/ui/button";
+import { Button } from "#lib/components/ui/button/index.ts";
 import ArrowDownIcon from "@lucide/svelte/icons/arrow-down";
 import { cubicOut } from "svelte/easing";
 import { prefersReducedMotion } from "svelte/motion";

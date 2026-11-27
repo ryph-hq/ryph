@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { ApiError } from "$lib/api/call";
+import { ApiError } from "#lib/api/call.ts";
 import { describeError, scopeFor } from "./page-error";
 
 describe("describeError", () => {
   it("passes a control-plane refusal's own status and words through", () => {
     const e = new ApiError(404, { error: "no such task" }, "no such task");
-    expect(describeError(e, 500, "Internal Error")).toEqual({
+    expect(describeError("unknown", e)).toEqual({
       message: "no such task",
       status: 404,
     });
@@ -13,7 +13,7 @@ describe("describeError", () => {
 
   it("keeps SvelteKit's placeholder for our own exceptions, and logs them", () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
-    expect(describeError(new TypeError("x is undefined"), 500, "Internal Error")).toEqual({
+    expect(describeError("unknown", new TypeError("x is undefined"))).toEqual({
       message: "Internal Error",
       status: 500,
     });
@@ -21,9 +21,23 @@ describe("describeError", () => {
     log.mockRestore();
   });
 
+  it("passes our own error() and SvelteKit's 404s through as they are, unlogged", () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(describeError("app", { status: 404, message: "no such run" })).toEqual({
+      status: 404,
+      message: "no such run",
+    });
+    expect(describeError("framework", { status: 404, message: "Not Found" })).toEqual({
+      status: 404,
+      message: "Not Found",
+    });
+    expect(log).not.toHaveBeenCalled();
+    log.mockRestore();
+  });
+
   it("does not log a 4xx", () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
-    describeError(new ApiError(403, null, "forbidden"), 500, "Internal Error");
+    describeError("unknown", new ApiError(403, null, "forbidden"));
     expect(log).not.toHaveBeenCalled();
     log.mockRestore();
   });

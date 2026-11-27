@@ -1,16 +1,16 @@
 <script lang="ts">
-import type { Harness, ModelPolicy, Provider, ProviderKey } from "$lib/api/types";
-import * as Alert from "$lib/components/ui/alert";
+import type { Harness, ModelPolicy, Provider, ProviderKey } from "#lib/api/types.ts";
+import * as Alert from "#lib/components/ui/alert/index.ts";
 import InfoIcon from "@lucide/svelte/icons/info";
-import { Button } from "$lib/components/ui/button";
-import * as Field from "$lib/components/ui/field";
-import * as Select from "$lib/components/ui/select";
-import ModelAllowlist from "$lib/components/model-picker/model-allowlist.svelte";
-import ModelSelect from "$lib/components/model-picker/model-select.svelte";
-import { choicesFor, modelsForKey } from "$lib/components/model-picker/models";
-import ThinkingSelect from "$lib/components/model-picker/thinking-select.svelte";
-import { offersThinking, thinkingInvalid } from "$lib/components/model-picker/thinking";
-import { CHATGPT_MANAGE_USAGE_URL } from "$lib/api/chatgpt-plan";
+import { Button } from "#lib/components/ui/button/index.ts";
+import * as Field from "#lib/components/ui/field/index.ts";
+import * as Select from "#lib/components/ui/select/index.ts";
+import ModelAllowlist from "#lib/components/model-picker/model-allowlist.svelte";
+import ModelSelect from "#lib/components/model-picker/model-select.svelte";
+import { choicesFor, modelsForKey } from "#lib/components/model-picker/models.ts";
+import ThinkingSelect from "#lib/components/model-picker/thinking-select.svelte";
+import { offersThinking, thinkingInvalid } from "#lib/components/model-picker/thinking.ts";
+import { CHATGPT_MANAGE_USAGE_URL } from "#lib/api/chatgpt-plan.ts";
 import { defaultModelThinkingLevels, storedProvider, usableProviderKeys } from "./model-policy";
 
 let {

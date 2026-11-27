@@ -47,7 +47,7 @@ export function artifactContentHeaders(contentType = "text/html; charset=utf-8")
  * The handshake a document in an artifact frame answers its parent with, the same script the
  * control plane puts first in every artifact: it takes the nonce the parent named the frame with,
  * clears the name so nothing after it can read it, posts the nonce back once its own `load`
- * fires, and posts it again on `pagehide`. See `FrameGuard` in $lib/utils/artifacts.
+ * fires, and posts it again on `pagehide`. See `FrameGuard` in #lib/utils/artifacts.
  */
 export const ARTIFACT_HANDSHAKE = handshake("");
 

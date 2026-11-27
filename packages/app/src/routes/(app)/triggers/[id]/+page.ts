@@ -1,11 +1,11 @@
 import type { PageLoad } from "./$types";
-import { getAgents } from "$lib/api/agents";
-import { getAutomation, getAutomationFires } from "$lib/api/automations";
-import { getChatrooms } from "$lib/api/chatrooms";
-import { getConnectedRepos } from "$lib/api/repos";
-import { getResponses } from "$lib/api/responses";
-import { getTask } from "$lib/api/tasks";
-import { getWorkspaces } from "$lib/api/workspaces";
+import { getAgents } from "#lib/api/agents.ts";
+import { getAutomation, getAutomationFires } from "#lib/api/automations.ts";
+import { getChatrooms } from "#lib/api/chatrooms.ts";
+import { getConnectedRepos } from "#lib/api/repos.ts";
+import { getResponses } from "#lib/api/responses.ts";
+import { getTask } from "#lib/api/tasks.ts";
+import { getWorkspaces } from "#lib/api/workspaces.ts";
 
 export const load: PageLoad = async ({ fetch, params, depends }) => {
   depends("app:automation");

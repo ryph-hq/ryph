@@ -1,17 +1,17 @@
 <script lang="ts">
-import PageTitle from "$lib/components/page-title/page-title.svelte";
+import PageTitle from "#lib/components/page-title/page-title.svelte";
 import { goto } from "$app/navigation";
-import { createWorkspace } from "$lib/api/workspaces";
-import ForgeIcon from "$lib/components/forge-icon/forge-icon.svelte";
-import { Badge } from "$lib/components/ui/badge";
-import { Button } from "$lib/components/ui/button";
-import * as Card from "$lib/components/ui/card";
-import * as Dialog from "$lib/components/ui/dialog";
-import * as Empty from "$lib/components/ui/empty";
-import * as Field from "$lib/components/ui/field";
-import { Input } from "$lib/components/ui/input";
-import { Spinner } from "$lib/components/ui/spinner";
-import { Textarea } from "$lib/components/ui/textarea";
+import { createWorkspace } from "#lib/api/workspaces.ts";
+import ForgeIcon from "#lib/components/forge-icon/forge-icon.svelte";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import * as Card from "#lib/components/ui/card/index.ts";
+import * as Dialog from "#lib/components/ui/dialog/index.ts";
+import * as Empty from "#lib/components/ui/empty/index.ts";
+import * as Field from "#lib/components/ui/field/index.ts";
+import { Input } from "#lib/components/ui/input/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
+import { Textarea } from "#lib/components/ui/textarea/index.ts";
 import LayersIcon from "@lucide/svelte/icons/layers";
 import PlusIcon from "@lucide/svelte/icons/plus";
 import { toast } from "svelte-sonner";
@@ -39,7 +39,7 @@ async function submitCreate(event: SubmitEvent) {
     newDescription = "";
     // Straight into it: an empty workspace's next step is adding its repositories, which is
     // what its page is for.
-    await goto(`/workspaces/${created.workspace.id}`, { invalidateAll: true });
+    await goto(`/workspaces/${created.workspace.id}`, { refreshAll: true });
   } catch (e) {
     toast.error(e instanceof Error ? e.message : "Failed to create the workspace");
   } finally {

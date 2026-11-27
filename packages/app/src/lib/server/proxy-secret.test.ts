@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("$env/dynamic/private", () => ({ env: {} }));
+vi.mock("$app/env/private", async () => (await import("#lib/testing/env-mock.ts")).envMock({}));
 
 import { checkProxySecret, PROXY_SECRET_HEADER } from "./auth";
 

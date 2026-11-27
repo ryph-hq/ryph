@@ -1,5 +1,5 @@
 <script lang="ts">
-import { formatDateTime } from "$lib/utils/format";
+import { formatDateTime } from "#lib/utils/format.ts";
 import CircleCheckIcon from "@lucide/svelte/icons/circle-check";
 import CircleDashedIcon from "@lucide/svelte/icons/circle-dashed";
 import TriangleAlertIcon from "@lucide/svelte/icons/triangle-alert";

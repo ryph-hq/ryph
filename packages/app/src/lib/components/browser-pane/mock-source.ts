@@ -8,7 +8,7 @@ import type {
   LiveStatus,
   LiveTab,
   LiveTarget,
-} from "$lib/api/browser-live";
+} from "#lib/api/browser-live.ts";
 
 // A pretend browser, for looking at the pane without a run, a sidecar or a historian. Dev only:
 // imported by the dev page and, behind `?browser=mock`, lazily by the run page in dev. It draws a

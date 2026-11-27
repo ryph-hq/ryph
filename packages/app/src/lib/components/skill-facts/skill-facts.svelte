@@ -4,11 +4,11 @@ export type ExtraFact = { term: string; value: string; href?: string | null; mon
 </script>
 
 <script lang="ts">
-import type { SkillFrontmatter } from "$lib/api/types";
-import CopyButton from "$lib/components/copy-button/copy-button.svelte";
-import { Badge } from "$lib/components/ui/badge";
-import { formatBytes } from "$lib/utils/environments";
-import { shortDigest } from "$lib/utils/skills";
+import type { SkillFrontmatter } from "#lib/api/types.ts";
+import CopyButton from "#lib/components/copy-button/copy-button.svelte";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import { formatBytes } from "#lib/utils/environments.ts";
+import { shortDigest } from "#lib/utils/skills.ts";
 import type { Snippet } from "svelte";
 
 let {

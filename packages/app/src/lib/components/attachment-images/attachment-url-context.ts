@@ -1,5 +1,5 @@
 import { getContext, setContext } from "svelte";
-import { attachmentUrl } from "$lib/api/attachments";
+import { attachmentUrl } from "#lib/api/attachments.ts";
 
 // Where a page's attachment thumbnails read their bytes from. Every real page leaves this unset
 // and gets the control plane's proxy. A dev preview, which has no run behind it, sets it to hand

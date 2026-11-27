@@ -1,5 +1,5 @@
 <script lang="ts">
-import AgentAvatar from "$lib/components/agent-avatar/agent-avatar.svelte";
+import AgentAvatar from "#lib/components/agent-avatar/agent-avatar.svelte";
 import type { Snippet } from "svelte";
 
 let {

@@ -1,6 +1,6 @@
 import { getContext, setContext } from "svelte";
-import type { Patch } from "$lib/api/types";
-import { ID_BODY } from "$lib/utils/ids";
+import type { Patch } from "#lib/api/types.ts";
+import { ID_BODY } from "#lib/utils/ids.ts";
 
 // The patches a page already holds, kept live as they move: a submit_patch call in the transcript
 // shows the patch it opened from here, its state as it is now rather than as the reply said. A

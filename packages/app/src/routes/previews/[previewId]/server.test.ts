@@ -3,11 +3,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 // The open by preview id alone, against a stubbed control plane: where the previews service sends
 // a page load that came without the preview's cookie.
 
-vi.mock("$lib/server/auth", () => ({
+vi.mock("#lib/server/auth.ts", () => ({
   RYPH_API_URL: "http://api.test",
   sessionHeaders: () => ({ "x-client-ip": "203.0.113.7" }),
 }));
-vi.mock("$lib/utils/auth/jwt", () => ({
+vi.mock("#lib/utils/auth/jwt.ts", () => ({
   getUserData: (token: string | undefined) => token === "good-jwt" ? { id: "u-1" } : null,
 }));
 

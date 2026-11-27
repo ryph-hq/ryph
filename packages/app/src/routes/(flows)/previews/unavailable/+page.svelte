@@ -1,6 +1,6 @@
 <script lang="ts">
-import FlowStep from "$lib/components/flow-step/flow-step.svelte";
-import { Button } from "$lib/components/ui/button";
+import FlowStep from "#lib/components/flow-step/flow-step.svelte";
+import { Button } from "#lib/components/ui/button/index.ts";
 import RotateCwIcon from "@lucide/svelte/icons/rotate-cw";
 
 let { data } = $props();

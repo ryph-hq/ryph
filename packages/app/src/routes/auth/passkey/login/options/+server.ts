@@ -1,5 +1,5 @@
 import { error, json, type RequestHandler } from "@sveltejs/kit";
-import { passkeyLoginOptions, UpstreamAuthError } from "$lib/server/auth";
+import { passkeyLoginOptions, UpstreamAuthError } from "#lib/server/auth.ts";
 
 export const POST: RequestHandler = async () => {
   try {

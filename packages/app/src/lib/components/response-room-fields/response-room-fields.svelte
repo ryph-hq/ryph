@@ -1,16 +1,16 @@
 <script lang="ts">
-import { ApiError } from "$lib/api/call";
-import { getChatroomChannels } from "$lib/api/chatrooms";
-import { isPublicChannel, VISIBILITY_LABEL } from "$lib/api/command-rooms";
+import { ApiError } from "#lib/api/call.ts";
+import { getChatroomChannels } from "#lib/api/chatrooms.ts";
+import { isPublicChannel, VISIBILITY_LABEL } from "#lib/api/command-rooms.ts";
 import {
   type ChatChannel,
   type Chatroom,
   CHATROOM_KIND_LABEL,
   isOneConversation,
-} from "$lib/api/types";
-import { Badge } from "$lib/components/ui/badge";
-import * as Field from "$lib/components/ui/field";
-import * as Select from "$lib/components/ui/select";
+} from "#lib/api/types.ts";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import * as Field from "#lib/components/ui/field/index.ts";
+import * as Select from "#lib/components/ui/select/index.ts";
 
 /**
  * Where a response reports: a room, or none (the run page is then the only room); and, for a room

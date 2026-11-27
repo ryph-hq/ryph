@@ -1,10 +1,10 @@
 <script lang="ts">
-import { ApiError } from "$lib/api/call";
-import { type GitlabHookStatus, rotateRepoGitlabHook } from "$lib/api/repos";
-import * as Alert from "$lib/components/ui/alert";
-import * as AlertDialog from "$lib/components/ui/alert-dialog";
-import { Button } from "$lib/components/ui/button";
-import { Spinner } from "$lib/components/ui/spinner";
+import { ApiError } from "#lib/api/call.ts";
+import { type GitlabHookStatus, rotateRepoGitlabHook } from "#lib/api/repos.ts";
+import * as Alert from "#lib/components/ui/alert/index.ts";
+import * as AlertDialog from "#lib/components/ui/alert-dialog/index.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
 import RotateCcwKeyIcon from "@lucide/svelte/icons/rotate-ccw-key";
 import GitlabHookHealth from "./gitlab-hook-health.svelte";
 import GitlabHookSteps from "./gitlab-hook-steps.svelte";

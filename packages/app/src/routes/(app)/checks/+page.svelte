@@ -1,33 +1,33 @@
 <script lang="ts">
 import { goto } from "$app/navigation";
 import { page } from "$app/state";
-import { listCheckSuites } from "$lib/api/checks";
-import type { CheckSuiteListItem } from "$lib/api/types";
-import CheckStateBadge from "$lib/components/check-state-badge/check-state-badge.svelte";
-import CheckStateIcon from "$lib/components/check-state-icon/check-state-icon.svelte";
-import ForgeIcon from "$lib/components/forge-icon/forge-icon.svelte";
-import ForgeRepoLabel from "$lib/components/forge-repo-label/forge-repo-label.svelte";
-import { providerOfRepoRef } from "$lib/utils/forge";
-import PageTable, { edgeEnd, edgeStart } from "$lib/components/page-table/page-table.svelte";
-import PageTitle from "$lib/components/page-title/page-title.svelte";
-import { Button } from "$lib/components/ui/button";
-import * as Empty from "$lib/components/ui/empty";
-import * as Select from "$lib/components/ui/select";
-import { Spinner } from "$lib/components/ui/spinner";
-import * as Table from "$lib/components/ui/table";
-import * as Tooltip from "$lib/components/ui/tooltip";
+import { listCheckSuites } from "#lib/api/checks.ts";
+import type { CheckSuiteListItem } from "#lib/api/types.ts";
+import CheckStateBadge from "#lib/components/check-state-badge/check-state-badge.svelte";
+import CheckStateIcon from "#lib/components/check-state-icon/check-state-icon.svelte";
+import ForgeIcon from "#lib/components/forge-icon/forge-icon.svelte";
+import ForgeRepoLabel from "#lib/components/forge-repo-label/forge-repo-label.svelte";
+import { providerOfRepoRef } from "#lib/utils/forge.ts";
+import PageTable, { edgeEnd, edgeStart } from "#lib/components/page-table/page-table.svelte";
+import PageTitle from "#lib/components/page-title/page-title.svelte";
+import { Button } from "#lib/components/ui/button/index.ts";
+import * as Empty from "#lib/components/ui/empty/index.ts";
+import * as Select from "#lib/components/ui/select/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
+import * as Table from "#lib/components/ui/table/index.ts";
+import * as Tooltip from "#lib/components/ui/tooltip/index.ts";
 import {
   checkDurationMs,
   checkStateLabel,
   isSuiteSettled,
   progressLabel,
   suiteDurationMs,
-} from "$lib/utils/checks";
-import { can } from "$lib/utils/auth/capabilities";
-import { shortCommit } from "$lib/utils/environments";
-import { formatDateTime, formatElapsed, formatRelativeTime } from "$lib/utils/format";
-import { liveClock } from "$lib/utils/live-clock.svelte";
-import { refreshWhileLive } from "$lib/utils/live-refresh.svelte.js";
+} from "#lib/utils/checks.ts";
+import { can } from "#lib/utils/auth/capabilities.ts";
+import { shortCommit } from "#lib/utils/environments.ts";
+import { formatDateTime, formatElapsed, formatRelativeTime } from "#lib/utils/format.ts";
+import { liveClock } from "#lib/utils/live-clock.svelte.ts";
+import { refreshWhileLive } from "#lib/utils/live-refresh.svelte.ts";
 import CircleCheckBigIcon from "@lucide/svelte/icons/circle-check-big";
 import ExternalLinkIcon from "@lucide/svelte/icons/external-link";
 import GitBranchIcon from "@lucide/svelte/icons/git-branch";
@@ -69,10 +69,10 @@ const multiForge = $derived(new Set(data.repos.map((r) => r.provider)).size > 1)
 
 /** Narrows the list: the filter lands in the address, and the load reads it from there. */
 function setFilter(key: "repo" | "state" | "asked", value: string, fallback: string) {
-  const url = new URL(page.url);
+  const url = new URL(page.url.href);
   if (value === fallback) url.searchParams.delete(key);
   else url.searchParams.set(key, value);
-  void goto(url, { keepFocus: true, noScroll: true, replaceState: true });
+  void goto(url, { reset: false, replace: true });
 }
 
 const filtered = $derived(

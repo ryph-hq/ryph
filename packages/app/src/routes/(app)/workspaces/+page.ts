@@ -1,6 +1,6 @@
 import type { PageLoad } from "./$types";
-import { getConnectedRepos } from "$lib/api/repos";
-import { getWorkspaces } from "$lib/api/workspaces";
+import { getConnectedRepos } from "#lib/api/repos.ts";
+import { getWorkspaces } from "#lib/api/workspaces.ts";
 
 export const load: PageLoad = async ({ fetch, depends }) => {
   depends("app:workspaces");

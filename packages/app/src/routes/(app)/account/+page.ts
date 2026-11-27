@@ -1,9 +1,9 @@
 import type { PageLoad } from "./$types";
-import { listIdentities, listProviders } from "$lib/api/identities";
-import { listPasskeys } from "$lib/api/passkeys";
-import { listApiTokens, listSessions } from "$lib/api/account";
-import { getAuthSettings, getMe } from "$lib/api/auth";
-import { getForges, githubUserLogin } from "$lib/api/forge";
+import { listIdentities, listProviders } from "#lib/api/identities.ts";
+import { listPasskeys } from "#lib/api/passkeys.ts";
+import { listApiTokens, listSessions } from "#lib/api/account.ts";
+import { getAuthSettings, getMe } from "#lib/api/auth.ts";
+import { getForges, githubUserLogin } from "#lib/api/forge.ts";
 
 export const load: PageLoad = async ({ fetch, depends }) => {
   depends("app:settings");

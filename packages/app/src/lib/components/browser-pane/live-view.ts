@@ -7,8 +7,8 @@ import type {
   LiveStatus,
   LiveTab,
   LiveTarget,
-} from "$lib/api/browser-live";
-import { bareBrowserTool } from "$lib/utils/browser-tools";
+} from "#lib/api/browser-live.ts";
+import { bareBrowserTool } from "#lib/utils/browser-tools.ts";
 
 // What a viewer of a run's browser holds, and how each message off the stream moves it. Pure, so
 // the pane's state class is a thin shell around it and every rule here is tested on its own.

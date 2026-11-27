@@ -1,24 +1,24 @@
 <script lang="ts">
 import { goto } from "$app/navigation";
-import { getAgents } from "$lib/api/agents";
+import { getAgents } from "#lib/api/agents.ts";
 import {
   type EnvironmentDefinitionRead,
   type EnvironmentSubject,
   getEnvironment,
   rebuildEnvironment,
   setupEnvironment,
-} from "$lib/api/environments";
-import type { Agent, SubjectEnvironment } from "$lib/api/types";
-import * as Dialog from "$lib/components/ui/dialog";
-import * as Field from "$lib/components/ui/field";
-import * as Select from "$lib/components/ui/select";
-import Markdown from "$lib/components/markdown/markdown.svelte";
+} from "#lib/api/environments.ts";
+import type { Agent, SubjectEnvironment } from "#lib/api/types.ts";
+import * as Dialog from "#lib/components/ui/dialog/index.ts";
+import * as Field from "#lib/components/ui/field/index.ts";
+import * as Select from "#lib/components/ui/select/index.ts";
+import Markdown from "#lib/components/markdown/markdown.svelte";
 import SetupWarnings from "./setup-warnings.svelte";
-import * as Alert from "$lib/components/ui/alert";
-import { Badge } from "$lib/components/ui/badge";
-import { Button } from "$lib/components/ui/button";
-import { Spinner } from "$lib/components/ui/spinner";
-import { Skeleton } from "$lib/components/ui/skeleton";
+import * as Alert from "#lib/components/ui/alert/index.ts";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
+import { Skeleton } from "#lib/components/ui/skeleton/index.ts";
 import {
   buildKindLabel,
   buildProgress,
@@ -28,8 +28,8 @@ import {
   latestBuild,
   setupAction,
   toolchainEntries,
-} from "$lib/utils/environments";
-import { formatDateTime, formatRelativeTime } from "$lib/utils/format";
+} from "#lib/utils/environments.ts";
+import { formatDateTime, formatRelativeTime } from "#lib/utils/format.ts";
 import ChevronRightIcon from "@lucide/svelte/icons/chevron-right";
 import HammerIcon from "@lucide/svelte/icons/hammer";
 import SparklesIcon from "@lucide/svelte/icons/sparkles";

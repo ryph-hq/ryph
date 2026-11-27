@@ -1,9 +1,9 @@
 <script lang="ts">
 import { MediaQuery } from "svelte/reactivity";
-import type { TaskStreamState } from "$lib/api/tasks";
-import { Button } from "$lib/components/ui/button";
-import { Spinner } from "$lib/components/ui/spinner";
-import * as Tooltip from "$lib/components/ui/tooltip";
+import type { TaskStreamState } from "#lib/api/tasks.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
+import * as Tooltip from "#lib/components/ui/tooltip/index.ts";
 import CircleAlertIcon from "@lucide/svelte/icons/circle-alert";
 
 let { state: connectionState, retry, backTo, viewport }: {

@@ -1,6 +1,6 @@
-import { ApiError } from "$lib/api/call";
-import type { GitlabProject } from "$lib/api/repos";
-import type { GitlabMode } from "$lib/api/types";
+import { ApiError } from "#lib/api/call.ts";
+import type { GitlabProject } from "#lib/api/repos.ts";
+import type { GitlabMode } from "#lib/api/types.ts";
 
 /** How many rows the list draws at once; a search narrows the rest down. */
 export const SHOWN = 50;

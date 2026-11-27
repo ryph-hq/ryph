@@ -1,5 +1,5 @@
-import { ApiError } from "$lib/api/call";
-import { LOCAL_REPO_REFUSALS, type LocalRepoRefusal } from "$lib/api/repos";
+import { ApiError } from "#lib/api/call.ts";
+import { LOCAL_REPO_REFUSALS, type LocalRepoRefusal } from "#lib/api/repos.ts";
 
 const messages: Record<LocalRepoRefusal, string> = {
   not_absolute: "Use the full path, starting with /.",

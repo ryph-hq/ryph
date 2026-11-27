@@ -1,9 +1,9 @@
 <script lang="ts">
-import type { RunnerResult } from "$lib/api/types";
-import ExpandableText from "$lib/components/expandable-text/expandable-text.svelte";
-import Markdown from "$lib/components/markdown/markdown.svelte";
-import * as Alert from "$lib/components/ui/alert";
-import { describeLimit } from "$lib/utils/limits";
+import type { RunnerResult } from "#lib/api/types.ts";
+import ExpandableText from "#lib/components/expandable-text/expandable-text.svelte";
+import Markdown from "#lib/components/markdown/markdown.svelte";
+import * as Alert from "#lib/components/ui/alert/index.ts";
+import { describeLimit } from "#lib/utils/limits.ts";
 
 let {
   runId,

@@ -1,13 +1,13 @@
 <script lang="ts">
 import { goto } from "$app/navigation";
-import { connectLocalRepo } from "$lib/api/repos";
-import FlowStep from "$lib/components/flow-step/flow-step.svelte";
-import { Button } from "$lib/components/ui/button";
-import * as Field from "$lib/components/ui/field";
-import { Input } from "$lib/components/ui/input";
-import { Spinner } from "$lib/components/ui/spinner";
-import { localRepoName } from "$lib/utils/forge";
-import { withBackTo } from "$lib/utils/safe-path";
+import { connectLocalRepo } from "#lib/api/repos.ts";
+import FlowStep from "#lib/components/flow-step/flow-step.svelte";
+import { Button } from "#lib/components/ui/button/index.ts";
+import * as Field from "#lib/components/ui/field/index.ts";
+import { Input } from "#lib/components/ui/input/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
+import { localRepoName } from "#lib/utils/forge.ts";
+import { withBackTo } from "#lib/utils/safe-path.ts";
 import LinkIcon from "@lucide/svelte/icons/link-2";
 import { toast } from "svelte-sonner";
 import UnavailableStep from "../unavailable-step.svelte";

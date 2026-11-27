@@ -1,8 +1,8 @@
 import type { RequestHandler } from "@sveltejs/kit";
-import { RYPH_API_URL, sessionHeaders } from "$lib/server/auth";
-import { artifactContentHeaders, artifactNotice } from "$lib/server/artifact-content";
-import { getUserData } from "$lib/utils/auth/jwt";
-import { artifactHref, parseVersion } from "$lib/utils/artifacts";
+import { RYPH_API_URL, sessionHeaders } from "#lib/server/auth.ts";
+import { artifactContentHeaders, artifactNotice } from "#lib/server/artifact-content.ts";
+import { getUserData } from "#lib/utils/auth/jwt.ts";
+import { artifactHref, parseVersion } from "#lib/utils/artifacts.ts";
 
 /** A notice in place of the page, under the same guards as the page itself. */
 function refuse(status: number, message: string): Response {

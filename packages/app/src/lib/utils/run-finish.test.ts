@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { taskRunSchema } from "$lib/api/types";
+import { taskRunSchema } from "#lib/api/types.ts";
 import { canFinish, finishButton, finishRequested } from "./run-finish";
 
 const run = (over: Partial<Parameters<typeof canFinish>[0]> = {}) => ({

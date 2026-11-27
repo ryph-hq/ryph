@@ -1,8 +1,8 @@
 <script lang="ts">
-import { invalidateAll } from "$app/navigation";
-import FlowStep from "$lib/components/flow-step/flow-step.svelte";
-import { Button } from "$lib/components/ui/button";
-import { Spinner } from "$lib/components/ui/spinner";
+import { refreshAll } from "$app/navigation";
+import FlowStep from "#lib/components/flow-step/flow-step.svelte";
+import { Button } from "#lib/components/ui/button/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
 import RotateCwIcon from "@lucide/svelte/icons/rotate-cw";
 
 let {
@@ -19,7 +19,7 @@ let retrying = $state(false);
 async function retry() {
   retrying = true;
   try {
-    await invalidateAll();
+    await refreshAll();
   } finally {
     retrying = false;
   }

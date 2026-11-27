@@ -8,8 +8,8 @@
 // "whatever this deployment allows" (null) and "only these" (a narrowing), and the second can be
 // narrowed all the way to nothing — which is a real, expressible answer rather than a null.
 
-import type { EgressCeiling, NetworkPolicy } from "$lib/api/types";
-import { hostGrammarProblem, parseHosts } from "$lib/utils/egress-hosts";
+import type { EgressCeiling, NetworkPolicy } from "#lib/api/types.ts";
+import { hostGrammarProblem, parseHosts } from "#lib/utils/egress-hosts.ts";
 
 /** The orchestrator's ceilings on a policy's two lists. */
 export const MAX_NETWORK_BUNDLES = 32;

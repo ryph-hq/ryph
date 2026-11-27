@@ -3,11 +3,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 // Registration carries the browser's facts upstream, vouched for, so each caller spends its own
 // sign-up budget there instead of one that every caller shares.
 
-vi.mock("$env/dynamic/private", () => ({ env: { RYPH_PROXY_SECRET: "hop" } }));
-vi.mock("$app/environment", () => ({ dev: true }));
+vi.mock(
+  "$app/env/private",
+  async () => (await import("#lib/testing/env-mock.ts")).envMock({ RYPH_PROXY_SECRET: "hop" }),
+);
+vi.mock("$app/env", () => ({ dev: true }));
 
 import { POST } from "./+server";
-import { MAX_AUTH_BODY_BYTES } from "$lib/server/request-body";
+import { MAX_AUTH_BODY_BYTES } from "#lib/server/request-body.ts";
 
 type Sent = { url: string; headers: Headers };
 

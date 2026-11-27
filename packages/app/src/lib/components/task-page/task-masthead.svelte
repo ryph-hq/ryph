@@ -1,5 +1,5 @@
 <script lang="ts">
-import TaskTitle from "$lib/components/task-title/task-title.svelte";
+import TaskTitle from "#lib/components/task-title/task-title.svelte";
 import type { Snippet } from "svelte";
 import { prefersReducedMotion } from "svelte/motion";
 import { fade } from "svelte/transition";

@@ -1,7 +1,7 @@
 import { untrack } from "svelte";
-import { subscribeRunEvents } from "$lib/api/history";
-import type { RunHistory } from "$lib/components/run-history/run-history.svelte";
-import { DetailCues } from "$lib/utils/run-refresh";
+import { subscribeRunEvents } from "#lib/api/history.ts";
+import type { RunHistory } from "#lib/components/run-history/run-history.svelte.ts";
+import { DetailCues } from "#lib/utils/run-refresh.ts";
 
 /** How long a burst of cues is let settle before the load is asked for once. */
 export const CUE_SETTLE_MS = 300;

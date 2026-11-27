@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { CommandsState } from "$lib/components/commands-pane/commands-state.svelte";
+import { CommandsState } from "#lib/components/commands-pane/commands-state.svelte.ts";
 import { commandsLiveSource, type CommandsMessage, PROBE_TIMEOUT_MS } from "./background";
 import { RETRY_DELAYS } from "./browser-live";
 

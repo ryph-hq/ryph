@@ -2,9 +2,9 @@
 // edit flows so both compose, seed and validate identically — the forge-policy bridge, for three
 // numbers under the operator's ceiling.
 
-import type { DeploymentLimits, RunLimits } from "$lib/api/types";
-import { HOUR_MS, parseTyped, RUN_LIMIT_BOUNDS } from "$lib/utils/limits";
-import { formatElapsed } from "$lib/utils/format";
+import type { DeploymentLimits, RunLimits } from "#lib/api/types.ts";
+import { HOUR_MS, parseTyped, RUN_LIMIT_BOUNDS } from "#lib/utils/limits.ts";
+import { formatElapsed } from "#lib/utils/format.ts";
 
 /** The form's working shape: each limit's tick and its value as typed. */
 export interface LimitFields {

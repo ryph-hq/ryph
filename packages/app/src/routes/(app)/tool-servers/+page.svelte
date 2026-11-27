@@ -1,8 +1,8 @@
 <script lang="ts">
-import { can } from "$lib/utils/auth/capabilities";
-import PageTitle from "$lib/components/page-title/page-title.svelte";
+import { can } from "#lib/utils/auth/capabilities.ts";
+import PageTitle from "#lib/components/page-title/page-title.svelte";
 import { invalidate } from "$app/navigation";
-import { ApiError } from "$lib/api/call";
+import { ApiError } from "#lib/api/call.ts";
 import {
   archiveMcpServer,
   createMcpServer,
@@ -13,28 +13,28 @@ import {
   probeMcpServer,
   restartMcpServer,
   updateMcpServer,
-} from "$lib/api/mcp-servers";
-import type { CatalogueEntry, McpAuthKind, McpServer, ProbeResult } from "$lib/api/types";
-import * as Alert from "$lib/components/ui/alert";
-import * as AlertDialog from "$lib/components/ui/alert-dialog";
-import { Badge } from "$lib/components/ui/badge";
-import { Button } from "$lib/components/ui/button";
-import * as Card from "$lib/components/ui/card";
-import { Checkbox } from "$lib/components/ui/checkbox";
-import * as Dialog from "$lib/components/ui/dialog";
-import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
-import * as Empty from "$lib/components/ui/empty";
-import * as Field from "$lib/components/ui/field";
-import { Input } from "$lib/components/ui/input";
-import { Label } from "$lib/components/ui/label";
-import * as Select from "$lib/components/ui/select";
-import * as Sheet from "$lib/components/ui/sheet";
-import { Spinner } from "$lib/components/ui/spinner";
-import { Switch } from "$lib/components/ui/switch";
-import * as Tabs from "$lib/components/ui/tabs";
-import { Textarea } from "$lib/components/ui/textarea";
-import { pageHeader } from "$lib/components/page-header/page-header.svelte";
-import { cn } from "$lib/utils";
+} from "#lib/api/mcp-servers.ts";
+import type { CatalogueEntry, McpAuthKind, McpServer, ProbeResult } from "#lib/api/types.ts";
+import * as Alert from "#lib/components/ui/alert/index.ts";
+import * as AlertDialog from "#lib/components/ui/alert-dialog/index.ts";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import * as Card from "#lib/components/ui/card/index.ts";
+import { Checkbox } from "#lib/components/ui/checkbox/index.ts";
+import * as Dialog from "#lib/components/ui/dialog/index.ts";
+import * as DropdownMenu from "#lib/components/ui/dropdown-menu/index.ts";
+import * as Empty from "#lib/components/ui/empty/index.ts";
+import * as Field from "#lib/components/ui/field/index.ts";
+import { Input } from "#lib/components/ui/input/index.ts";
+import { Label } from "#lib/components/ui/label/index.ts";
+import * as Select from "#lib/components/ui/select/index.ts";
+import * as Sheet from "#lib/components/ui/sheet/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
+import { Switch } from "#lib/components/ui/switch/index.ts";
+import * as Tabs from "#lib/components/ui/tabs/index.ts";
+import { Textarea } from "#lib/components/ui/textarea/index.ts";
+import { pageHeader } from "#lib/components/page-header/page-header.svelte.ts";
+import { cn } from "#lib/utils.ts";
 import ArchiveIcon from "@lucide/svelte/icons/archive";
 import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
 import BoxIcon from "@lucide/svelte/icons/box";

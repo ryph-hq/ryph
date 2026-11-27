@@ -1,4 +1,4 @@
-import type { CheckApproval } from "$lib/api/types";
+import type { CheckApproval } from "#lib/api/types.ts";
 
 /**
  * Where approving sends the approver back to: the change request on its forge, which is where

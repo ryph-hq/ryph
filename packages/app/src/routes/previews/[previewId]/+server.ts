@@ -1,6 +1,6 @@
 import type { RequestHandler } from "@sveltejs/kit";
-import { go, openPreview } from "$lib/server/preview-open";
-import { PREVIEW_ID, previewUnavailableHref } from "$lib/utils/previews";
+import { go, openPreview } from "#lib/server/preview-open.ts";
+import { PREVIEW_ID, previewUnavailableHref } from "#lib/utils/previews.ts";
 
 /**
  * Opens a preview by its id alone: `/previews/<previewId>?path=`, where the previews service sends

@@ -1,8 +1,8 @@
 <script lang="ts">
 import AgentThrobber, {
   type ThrobberMood,
-} from "$lib/components/agent-throbber/agent-throbber.svelte";
-import RyphBlob from "$lib/components/ryph-blob/ryph-blob.svelte";
+} from "#lib/components/agent-throbber/agent-throbber.svelte";
+import RyphBlob from "#lib/components/ryph-blob/ryph-blob.svelte";
 
 const moods: ThrobberMood[] = ["sleepy", "working", "thinking", "happy", "evil"];
 let agentId = $state("agent-demo");

@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getModelAccess, getPlatformModelPolicyOrNull } from "$lib/api/provider-keys";
+import { getModelAccess, getPlatformModelPolicyOrNull } from "#lib/api/provider-keys.ts";
 import { load } from "./+page";
 
-vi.mock("$lib/api/agents", () => ({ getAgents: vi.fn().mockResolvedValue([]) }));
-vi.mock("$lib/api/forge", () => ({ getForges: vi.fn().mockResolvedValue(null) }));
-vi.mock("$lib/api/harnesses", () => ({ getHarnesses: vi.fn().mockResolvedValue([]) }));
-vi.mock("$lib/api/providers", () => ({ getProvidersOrEmpty: vi.fn().mockResolvedValue([]) }));
-vi.mock("$lib/api/repos", () => ({ getConnectedRepos: vi.fn().mockResolvedValue([]) }));
-vi.mock("$lib/api/provider-keys", () => ({
+vi.mock("#lib/api/agents.ts", () => ({ getAgents: vi.fn().mockResolvedValue([]) }));
+vi.mock("#lib/api/forge.ts", () => ({ getForges: vi.fn().mockResolvedValue(null) }));
+vi.mock("#lib/api/harnesses.ts", () => ({ getHarnesses: vi.fn().mockResolvedValue([]) }));
+vi.mock("#lib/api/providers.ts", () => ({ getProvidersOrEmpty: vi.fn().mockResolvedValue([]) }));
+vi.mock("#lib/api/repos.ts", () => ({ getConnectedRepos: vi.fn().mockResolvedValue([]) }));
+vi.mock("#lib/api/provider-keys.ts", () => ({
   getModelAccess: vi.fn(),
   getPlatformModelPolicyOrNull: vi.fn(),
 }));

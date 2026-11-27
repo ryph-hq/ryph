@@ -1,8 +1,8 @@
 <script lang="ts">
-import { costLabel, isIncluded, type RunUsageState } from "$lib/api/model-usage";
-import * as Card from "$lib/components/ui/card";
-import { Badge } from "$lib/components/ui/badge";
-import { formatCount, formatElapsed, formatUsd } from "$lib/utils/format";
+import { costLabel, isIncluded, type RunUsageState } from "#lib/api/model-usage.ts";
+import * as Card from "#lib/components/ui/card/index.ts";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import { formatCount, formatElapsed, formatUsd } from "#lib/utils/format.ts";
 
 let {
   usage,

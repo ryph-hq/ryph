@@ -1,12 +1,12 @@
 <script lang="ts">
-import PageTitle from "$lib/components/page-title/page-title.svelte";
-import ArtifactThumbnail from "$lib/components/artifact-thumbnail/artifact-thumbnail.svelte";
-import { type ArtifactSummary, getArtifacts } from "$lib/api/artifacts";
-import { Button } from "$lib/components/ui/button";
-import * as Empty from "$lib/components/ui/empty";
-import { Spinner } from "$lib/components/ui/spinner";
-import { artifactHref } from "$lib/utils/artifacts";
-import { formatDateTime, formatRelativeTime } from "$lib/utils/format";
+import PageTitle from "#lib/components/page-title/page-title.svelte";
+import ArtifactThumbnail from "#lib/components/artifact-thumbnail/artifact-thumbnail.svelte";
+import { type ArtifactSummary, getArtifacts } from "#lib/api/artifacts.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import * as Empty from "#lib/components/ui/empty/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
+import { artifactHref } from "#lib/utils/artifacts.ts";
+import { formatDateTime, formatRelativeTime } from "#lib/utils/format.ts";
 import AppWindowIcon from "@lucide/svelte/icons/app-window";
 import { toast } from "svelte-sonner";
 import type { PageProps } from "./$types";

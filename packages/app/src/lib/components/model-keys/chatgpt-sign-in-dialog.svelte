@@ -4,12 +4,12 @@ import {
   getSignInStatus,
   type SignIn,
   startSignIn,
-} from "$lib/api/chatgpt-plan";
-import { Button } from "$lib/components/ui/button";
-import * as Dialog from "$lib/components/ui/dialog";
-import * as Field from "$lib/components/ui/field";
-import { Input } from "$lib/components/ui/input";
-import { Spinner } from "$lib/components/ui/spinner";
+} from "#lib/api/chatgpt-plan.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import * as Dialog from "#lib/components/ui/dialog/index.ts";
+import * as Field from "#lib/components/ui/field/index.ts";
+import { Input } from "#lib/components/ui/input/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
 import ExternalLinkIcon from "@lucide/svelte/icons/external-link";
 import { SIGN_IN_POLL_MS } from "./plan-key";
 

@@ -1,8 +1,8 @@
 import type { PageLoad } from "./$types";
-import { getEnvironmentOrError, streamEnvironmentDefinition } from "$lib/api/environments";
-import { getConnectedRepos } from "$lib/api/repos";
-import { getRunSizesOrNull } from "$lib/api/run-sizes";
-import { getWorkspace, getWorkspaces } from "$lib/api/workspaces";
+import { getEnvironmentOrError, streamEnvironmentDefinition } from "#lib/api/environments.ts";
+import { getConnectedRepos } from "#lib/api/repos.ts";
+import { getRunSizesOrNull } from "#lib/api/run-sizes.ts";
+import { getWorkspace, getWorkspaces } from "#lib/api/workspaces.ts";
 
 export const load: PageLoad = async ({ fetch, params, depends }) => {
   depends("app:workspace");

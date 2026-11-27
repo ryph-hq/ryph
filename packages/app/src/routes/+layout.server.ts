@@ -1,13 +1,13 @@
 import type { LayoutServerLoad } from "./$types";
-import { env } from "$env/dynamic/public";
-import { RYPH_AUTOMATIONS_URL } from "$lib/server/auth";
-import { getUserData, sessionSecondsLeft } from "$lib/utils/auth/jwt";
-import { SIDEBAR_COOKIE_NAME } from "$lib/components/ui/sidebar/constants";
+import * as env from "$app/env/public";
+import { RYPH_AUTOMATIONS_URL } from "#lib/server/auth.ts";
+import { getUserData, sessionSecondsLeft } from "#lib/utils/auth/jwt.ts";
+import { SIDEBAR_COOKIE_NAME } from "#lib/components/ui/sidebar/constants.ts";
 import {
   DETAILS_PANE_OPEN_COOKIE,
   DETAILS_PANE_WIDTH_COOKIE,
-} from "$lib/components/details-pane/details-pane.svelte";
-import { WELCOME_COOKIE } from "$lib/utils/welcome";
+} from "#lib/components/details-pane/details-pane.svelte.ts";
+import { WELCOME_COOKIE } from "#lib/utils/welcome.ts";
 
 // The one place the webhook ingestion origin is resolved, server-side: the deploy's explicit
 // browser-facing override first, else the automations backend itself — which in the

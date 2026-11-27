@@ -7,7 +7,7 @@ import type {
   CheckSuiteView,
   CheckView,
   Patch,
-} from "$lib/api/types";
+} from "#lib/api/types.ts";
 import { shortCommit, shortImage } from "./environments";
 import { branchName } from "./format";
 

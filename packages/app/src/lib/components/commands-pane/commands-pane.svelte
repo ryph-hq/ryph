@@ -4,17 +4,17 @@ import {
   backgroundLogHref,
   type CommandsSource,
   getBackgroundLog,
-} from "$lib/api/background";
-import LiveChip from "$lib/components/browser-pane/live-chip.svelte";
-import type { Chip } from "$lib/components/browser-pane/live-view";
-import CopyButton from "$lib/components/copy-button/copy-button.svelte";
-import { Badge } from "$lib/components/ui/badge";
-import { Button } from "$lib/components/ui/button";
-import * as Empty from "$lib/components/ui/empty";
-import { Spinner } from "$lib/components/ui/spinner";
-import { Toggle } from "$lib/components/ui/toggle";
-import { jobStatus } from "$lib/utils/background";
-import { formatDateTime, formatTime } from "$lib/utils/format";
+} from "#lib/api/background.ts";
+import LiveChip from "#lib/components/browser-pane/live-chip.svelte";
+import type { Chip } from "#lib/components/browser-pane/live-view.ts";
+import CopyButton from "#lib/components/copy-button/copy-button.svelte";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import * as Empty from "#lib/components/ui/empty/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
+import { Toggle } from "#lib/components/ui/toggle/index.ts";
+import { jobStatus } from "#lib/utils/background.ts";
+import { formatDateTime, formatTime } from "#lib/utils/format.ts";
 import BanIcon from "@lucide/svelte/icons/ban";
 import CircleCheckIcon from "@lucide/svelte/icons/circle-check";
 import CircleStopIcon from "@lucide/svelte/icons/circle-stop";
@@ -29,8 +29,8 @@ import { SvelteMap } from "svelte/reactivity";
 import type { CommandsState } from "./commands-state.svelte";
 import { OutputBuffer, pickJob } from "./commands-view";
 import CommandOutput from "./command-output.svelte";
-import RunPreviews from "$lib/components/run-previews.svelte";
-import type { RunPreview } from "$lib/api/previews";
+import RunPreviews from "#lib/components/run-previews.svelte";
+import type { RunPreview } from "#lib/api/previews.ts";
 
 let {
   state: commands,

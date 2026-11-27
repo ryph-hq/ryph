@@ -1,7 +1,7 @@
 // The bridge between the form's two memory fields and the API's MemoryPolicy, shared by the create
 // and edit flows so both parse and seed identically.
 
-import { DEFAULT_MEMORY_BUDGET_TOKENS, type MemoryPolicy } from "$lib/api/types";
+import { DEFAULT_MEMORY_BUDGET_TOKENS, type MemoryPolicy } from "#lib/api/types.ts";
 
 /** The policy from the form: off is null, on is the budget as typed (or the default when blank). */
 export function composeMemoryPolicy(

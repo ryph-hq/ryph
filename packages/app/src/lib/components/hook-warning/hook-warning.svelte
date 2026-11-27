@@ -1,17 +1,17 @@
 <script lang="ts">
 import PatchActions, {
   type ActionablePatch,
-} from "$lib/components/patch-actions/patch-actions.svelte";
-import type { PatchesRefresh } from "$lib/components/tool-call/patches-context";
-import * as Alert from "$lib/components/ui/alert";
-import { Button } from "$lib/components/ui/button";
+} from "#lib/components/patch-actions/patch-actions.svelte";
+import type { PatchesRefresh } from "#lib/components/tool-call/patches-context.ts";
+import * as Alert from "#lib/components/ui/alert/index.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
 import {
   heldFiles,
   HOOK_TOO_MANY,
   HOOK_WARNING_BODY,
   HOOK_WARNING_SCOPE,
   HOOK_WARNING_TITLE,
-} from "$lib/utils/hook-check";
+} from "#lib/utils/hook-check.ts";
 import FileDiffIcon from "@lucide/svelte/icons/file-diff";
 import TriangleAlertIcon from "@lucide/svelte/icons/triangle-alert";
 

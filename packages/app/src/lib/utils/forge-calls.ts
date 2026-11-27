@@ -2,8 +2,8 @@
 // went and how it ended, not what it said; that is in the agent's call, so each ledger entry is
 // paired with the call that made it.
 
-import type { ToolCall } from "$lib/api/tools";
-import type { ForgeToolAction } from "$lib/api/types";
+import type { ToolCall } from "#lib/api/tools.ts";
+import type { ForgeToolAction } from "#lib/api/types.ts";
 
 /** A remark a review anchored to a line of the diff. */
 export interface ReviewRemark {

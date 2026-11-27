@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Provider } from "$lib/api/types";
+import type { Provider } from "#lib/api/types.ts";
 import { keyProviderOptions, planSignInOffered, providerOptionLabel } from "./provider-options";
 
 const provider = (id: string, dialect: string, archivedAt: string | null = null): Provider => ({

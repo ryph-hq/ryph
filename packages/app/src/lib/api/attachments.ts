@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { refreshSession } from "$lib/utils/auth/auth";
+import { refreshSession } from "#lib/utils/auth/auth.ts";
 import { apiCall, apiError } from "./call";
 import { type AttachmentMime, attachmentMimeSchema } from "./types";
 

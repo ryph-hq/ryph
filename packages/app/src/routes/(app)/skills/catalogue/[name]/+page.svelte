@@ -1,10 +1,10 @@
 <script lang="ts">
-import SkillFacts from "$lib/components/skill-facts/skill-facts.svelte";
-import SkillFiles from "$lib/components/skill-files/skill-files.svelte";
-import SkillExamplePrompt from "$lib/components/skill-header/skill-example-prompt.svelte";
-import SkillHeader from "$lib/components/skill-header/skill-header.svelte";
-import { Badge } from "$lib/components/ui/badge";
-import { presentationFacts, skillTitle } from "$lib/utils/skill-presentation";
+import SkillFacts from "#lib/components/skill-facts/skill-facts.svelte";
+import SkillFiles from "#lib/components/skill-files/skill-files.svelte";
+import SkillExamplePrompt from "#lib/components/skill-header/skill-example-prompt.svelte";
+import SkillHeader from "#lib/components/skill-header/skill-header.svelte";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import { presentationFacts, skillTitle } from "#lib/utils/skill-presentation.ts";
 import type { PageProps } from "./$types";
 
 let { data }: PageProps = $props();

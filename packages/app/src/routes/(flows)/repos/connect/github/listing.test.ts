@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { ApiError } from "$lib/api/call";
-import type { GithubRepo } from "$lib/api/types";
+import { ApiError } from "#lib/api/call.ts";
+import type { GithubRepo } from "#lib/api/types.ts";
 import { filterGithubRepos, githubConnectFailure, githubListFailure } from "./listing";
 
 const repo = (fullName: string): GithubRepo => ({

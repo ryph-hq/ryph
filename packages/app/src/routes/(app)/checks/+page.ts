@@ -1,8 +1,8 @@
 import type { PageLoad } from "./$types";
-import { browser } from "$app/environment";
-import { ApiError } from "$lib/api/call";
-import { getActiveChecks, listCheckSuites } from "$lib/api/checks";
-import { getConnectedRepos } from "$lib/api/repos";
+import { browser } from "$app/env";
+import { ApiError } from "#lib/api/call.ts";
+import { getActiveChecks, listCheckSuites } from "#lib/api/checks.ts";
+import { getConnectedRepos } from "#lib/api/repos.ts";
 import { ASKER_FILTERS, STATE_FILTERS } from "./filters";
 
 const pick = <T extends string>(all: readonly T[], value: string | null): T =>

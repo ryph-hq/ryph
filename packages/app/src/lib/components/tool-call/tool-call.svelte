@@ -43,10 +43,14 @@ import SquareTerminalIcon from "@lucide/svelte/icons/square-terminal";
 import TagIcon from "@lucide/svelte/icons/tag";
 import TerminalIcon from "@lucide/svelte/icons/terminal";
 import WrenchIcon from "@lucide/svelte/icons/wrench";
-import type { ToolCall } from "$lib/api/tools";
-import type { SkillRead } from "$lib/utils/skills";
-import { describeBrowserCall } from "$lib/utils/browser-tools";
-import { outcomeCallLabel, type ReportedOutcome, reportedOutcome } from "$lib/utils/outcome-report";
+import type { ToolCall } from "#lib/api/tools.ts";
+import type { SkillRead } from "#lib/utils/skills.ts";
+import { describeBrowserCall } from "#lib/utils/browser-tools.ts";
+import {
+  outcomeCallLabel,
+  type ReportedOutcome,
+  reportedOutcome,
+} from "#lib/utils/outcome-report.ts";
 import { browserToolIcon } from "./browser-icons";
 
 // The platform's own tools said the way a person would say them. Every one of these goes through
@@ -171,32 +175,32 @@ export function presentationFor(
 </script>
 
 <script lang="ts">
-import AttachmentImages from "$lib/components/attachment-images/attachment-images.svelte";
-import CheckStateIcon from "$lib/components/check-state-icon/check-state-icon.svelte";
-import CheckSuitePanel from "$lib/components/check-suite-panel/check-suite-panel.svelte";
-import { Badge } from "$lib/components/ui/badge";
-import * as Card from "$lib/components/ui/card";
-import CodeView from "$lib/components/code-view/code-view.svelte";
-import { Spinner } from "$lib/components/ui/spinner";
-import { formatTime } from "$lib/utils/format";
+import AttachmentImages from "#lib/components/attachment-images/attachment-images.svelte";
+import CheckStateIcon from "#lib/components/check-state-icon/check-state-icon.svelte";
+import CheckSuitePanel from "#lib/components/check-suite-panel/check-suite-panel.svelte";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import * as Card from "#lib/components/ui/card/index.ts";
+import CodeView from "#lib/components/code-view/code-view.svelte";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
+import { formatTime } from "#lib/utils/format.ts";
 import { tick, untrack } from "svelte";
-import { countsLabel, suiteCounts } from "$lib/utils/checks";
+import { countsLabel, suiteCounts } from "#lib/utils/checks.ts";
 import { getCheckSuitesContext, suitesInReply } from "./check-suites-context";
 import { getRunSkillsContext } from "./run-skills-context";
-import { skillRead } from "$lib/utils/skills";
-import { HOOK_HELD_LABEL, isHeld } from "$lib/utils/hook-check";
+import { skillRead } from "#lib/utils/skills.ts";
+import { HOOK_HELD_LABEL, isHeld } from "#lib/utils/hook-check.ts";
 import TriangleAlertIcon from "@lucide/svelte/icons/triangle-alert";
 import FileDiffView from "./file-diff-view.svelte";
-import PatchPanel from "$lib/components/patch-panel/patch-panel.svelte";
+import PatchPanel from "#lib/components/patch-panel/patch-panel.svelte";
 import { getPatchesContext, submittedInReply } from "./patches-context";
 import { getBackgroundJobsContext } from "./background-jobs-context";
-import { backgroundCallOf, endedPhrase } from "$lib/utils/background";
+import { backgroundCallOf, endedPhrase } from "#lib/utils/background.ts";
 import { getSubagentsContext } from "./subagents-context";
-import { subagentCallOf, subagentStatus } from "$lib/utils/subagents";
-import { Button } from "$lib/components/ui/button";
+import { subagentCallOf, subagentStatus } from "#lib/utils/subagents.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
 import ExternalLinkIcon from "@lucide/svelte/icons/external-link";
 import { getPreviewsContext } from "./previews-context.svelte";
-import { previewCallOf } from "$lib/utils/previews";
+import { previewCallOf } from "#lib/utils/previews.ts";
 
 let { call, open = false, ontoggle }: {
   call: ToolCall;

@@ -1,11 +1,11 @@
-import { browser } from "$app/environment";
+import { browser } from "$app/env";
 import { redirect } from "@sveltejs/kit";
 import type { PageLoad } from "./$types";
-import { getForges, githubUserLogin } from "$lib/api/forge";
-import { getGithubRepos } from "$lib/api/repos";
-import type { GithubRepo } from "$lib/api/types";
-import { can } from "$lib/utils/auth/capabilities";
-import { safeBackTo, withBackTo } from "$lib/utils/safe-path";
+import { getForges, githubUserLogin } from "#lib/api/forge.ts";
+import { getGithubRepos } from "#lib/api/repos.ts";
+import type { GithubRepo } from "#lib/api/types.ts";
+import { can } from "#lib/utils/auth/capabilities.ts";
+import { safeBackTo, withBackTo } from "#lib/utils/safe-path.ts";
 
 export const load: PageLoad = async ({ parent, url, fetch }) => {
   const { user } = await parent();

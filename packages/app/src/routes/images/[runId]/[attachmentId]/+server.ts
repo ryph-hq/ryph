@@ -1,6 +1,6 @@
 import { error, redirect, type RequestHandler } from "@sveltejs/kit";
-import { RYPH_API_URL, sessionHeaders } from "$lib/server/auth";
-import { getUserData } from "$lib/utils/auth/jwt";
+import { RYPH_API_URL, sessionHeaders } from "#lib/server/auth.ts";
+import { getUserData } from "#lib/utils/auth/jwt.ts";
 import { forwardedResponseHeaders } from "../../../api/[...path]/path";
 
 /**

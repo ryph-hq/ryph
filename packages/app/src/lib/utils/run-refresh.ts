@@ -1,5 +1,5 @@
-import type { HistoryEvent } from "$lib/api/types";
-import { BROWSER_SERVER } from "$lib/utils/browser-tools";
+import type { HistoryEvent } from "#lib/api/types.ts";
+import { BROWSER_SERVER } from "#lib/utils/browser-tools.ts";
 
 /**
  * How often a live run's page re-reads its whole load when nothing in the stream asked it to.

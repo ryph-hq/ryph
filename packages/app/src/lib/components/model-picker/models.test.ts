@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { DeclaredModel, Provider, ProviderKey } from "$lib/api/types";
+import type { DeclaredModel, Provider, ProviderKey } from "#lib/api/types.ts";
 import {
   choicesFor,
   INCLUDED_LABEL,

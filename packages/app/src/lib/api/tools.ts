@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { type AttachmentRef, attachmentRefSchema, type HistoryEvent } from "./types";
-import { BROWSER_SERVER } from "$lib/utils/browser-tools";
+import { BROWSER_SERVER } from "#lib/utils/browser-tools.ts";
 
 // A tool call reaches us as two transcript events — the invocation and its outcome — whose
 // structured detail rides in `payload`, typed `unknown` by contract. Nothing here is guaranteed:

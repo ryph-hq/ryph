@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { SkillSync } from "$lib/api/types";
+import type { SkillSync } from "#lib/api/types.ts";
 import {
   commitUrl,
   parseSkillDrop,

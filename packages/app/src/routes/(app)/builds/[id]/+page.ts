@@ -1,11 +1,11 @@
 import { error } from "@sveltejs/kit";
 import type { PageLoad } from "./$types";
-import { browser } from "$app/environment";
-import { ApiError } from "$lib/api/call";
-import { getEnvironmentById } from "$lib/api/environments";
-import { getConnectedRepo } from "$lib/api/repos";
-import type { EnvironmentView, ForgeProvider } from "$lib/api/types";
-import { getWorkspace } from "$lib/api/workspaces";
+import { browser } from "$app/env";
+import { ApiError } from "#lib/api/call.ts";
+import { getEnvironmentById } from "#lib/api/environments.ts";
+import { getConnectedRepo } from "#lib/api/repos.ts";
+import type { EnvironmentView, ForgeProvider } from "#lib/api/types.ts";
+import { getWorkspace } from "#lib/api/workspaces.ts";
 
 /** What a build was built for, as the page names and links it; null once it is gone. */
 export type BuildSubject = { name: string; provider: ForgeProvider | null; href: string } | null;

@@ -1,4 +1,4 @@
-import type { ToolCall } from "$lib/api/tools";
+import type { ToolCall } from "#lib/api/tools.ts";
 import { ID_BODY } from "./ids";
 
 /**

@@ -1,7 +1,7 @@
 import type { PageLoad } from "./$types";
-import { getAgents } from "$lib/api/agents";
-import { getForges } from "$lib/api/forge";
-import { getMemoryAccess, getMemoryProposals, getMemorySubjects } from "$lib/api/memory";
+import { getAgents } from "#lib/api/agents.ts";
+import { getForges } from "#lib/api/forge.ts";
+import { getMemoryAccess, getMemoryProposals, getMemorySubjects } from "#lib/api/memory.ts";
 import { parseFilters, splitPage, toApiFilters } from "./filters";
 import { gitlabHostOf } from "./labels";
 

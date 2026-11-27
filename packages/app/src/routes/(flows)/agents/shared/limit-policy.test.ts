@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { DeploymentLimits } from "$lib/api/types";
+import type { DeploymentLimits } from "#lib/api/types.ts";
 import {
   ceilingHours,
   composeLimitPolicy,

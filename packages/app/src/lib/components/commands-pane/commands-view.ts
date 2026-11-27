@@ -3,7 +3,7 @@ import type {
   CommandsEvent,
   CommandsSnapshot,
   LiveCommandsJob,
-} from "$lib/api/background";
+} from "#lib/api/background.ts";
 
 // The rules the Commands tab follows, kept apart from the component so they can be tested: how
 // the live room's lines move a viewer's jobs, how those meet the durable record, and how a job's

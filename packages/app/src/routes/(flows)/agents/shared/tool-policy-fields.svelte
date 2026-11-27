@@ -4,27 +4,27 @@ import {
   PROBE_FAILURE_LABEL,
   probeMcpServer,
   type ToolAccessState,
-} from "$lib/api/mcp-servers";
+} from "#lib/api/mcp-servers.ts";
 import {
   type CatalogueEntry,
   type Harness,
   type McpServer,
   PLATFORM_FORGE_SERVER_ID,
   type ProbeResult,
-} from "$lib/api/types";
-import * as Alert from "$lib/components/ui/alert";
-import { Badge } from "$lib/components/ui/badge";
-import { Button } from "$lib/components/ui/button";
-import * as Card from "$lib/components/ui/card";
-import { Checkbox } from "$lib/components/ui/checkbox";
-import * as Collapsible from "$lib/components/ui/collapsible";
-import * as Empty from "$lib/components/ui/empty";
-import * as Field from "$lib/components/ui/field";
-import { Input } from "$lib/components/ui/input";
-import { Label } from "$lib/components/ui/label";
-import * as Sheet from "$lib/components/ui/sheet";
-import { Spinner } from "$lib/components/ui/spinner";
-import { Switch } from "$lib/components/ui/switch";
+} from "#lib/api/types.ts";
+import * as Alert from "#lib/components/ui/alert/index.ts";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import * as Card from "#lib/components/ui/card/index.ts";
+import { Checkbox } from "#lib/components/ui/checkbox/index.ts";
+import * as Collapsible from "#lib/components/ui/collapsible/index.ts";
+import * as Empty from "#lib/components/ui/empty/index.ts";
+import * as Field from "#lib/components/ui/field/index.ts";
+import { Input } from "#lib/components/ui/input/index.ts";
+import { Label } from "#lib/components/ui/label/index.ts";
+import * as Sheet from "#lib/components/ui/sheet/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
+import { Switch } from "#lib/components/ui/switch/index.ts";
 import BoxIcon from "@lucide/svelte/icons/box";
 import BrainIcon from "@lucide/svelte/icons/brain";
 import ChevronRightIcon from "@lucide/svelte/icons/chevron-right";

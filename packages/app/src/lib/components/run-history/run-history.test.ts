@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { HistoryWindow } from "$lib/api/history";
-import type { HistoryEvent, RunMessage, RunnerResult } from "$lib/api/types";
+import type { HistoryWindow } from "#lib/api/history.ts";
+import type { HistoryEvent, RunMessage, RunnerResult } from "#lib/api/types.ts";
 import { KEEP_AROUND, MAX_PAGES, OLDER_PAGE, RunHistory } from "./run-history.svelte";
 
 // A run's history is read at its tail and back from there, so the seams this guards are the ones

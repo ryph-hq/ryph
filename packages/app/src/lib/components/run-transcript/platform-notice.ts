@@ -3,11 +3,11 @@ import {
   type RunMessage,
   type SystemPayload,
   systemPayloadSchema,
-} from "$lib/api/types";
-import { systemPayloadLabel } from "$lib/utils/environments";
-import { backgroundNoticeOf, noticeFailed, noticeSentence } from "$lib/utils/background";
-import { endLabel, subagentNoticeOf } from "$lib/utils/subagents";
-import { formatElapsed } from "$lib/utils/format";
+} from "#lib/api/types.ts";
+import { systemPayloadLabel } from "#lib/utils/environments.ts";
+import { backgroundNoticeOf, noticeFailed, noticeSentence } from "#lib/utils/background.ts";
+import { endLabel, subagentNoticeOf } from "#lib/utils/subagents.ts";
+import { formatElapsed } from "#lib/utils/format.ts";
 
 export interface PlatformNoticeSummary {
   label: string;

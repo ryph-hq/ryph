@@ -1,7 +1,7 @@
 <script lang="ts">
 import type { FileDiffMetadata, Virtualizer } from "@pierre/diffs";
 import type { WorkerPoolManager } from "@pierre/diffs/worker";
-import { Button } from "$lib/components/ui/button";
+import { Button } from "#lib/components/ui/button/index.ts";
 import { mode } from "mode-watcher";
 import { fileStats } from "./diff-files";
 import PatchFilePlain from "./patch-file-plain.svelte";

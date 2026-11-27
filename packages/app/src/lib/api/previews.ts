@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { isPreviewUrl } from "$lib/utils/previews";
+import { isPreviewUrl } from "#lib/utils/previews.ts";
 
 const preview = z.object({
   id: z.string(),

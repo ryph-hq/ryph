@@ -1,10 +1,10 @@
 <script lang="ts">
-import type { TargetFields } from "$lib/api/command-rooms";
-import type { ConnectedRepo, WorkspaceWithRepos } from "$lib/api/types";
-import * as Field from "$lib/components/ui/field";
-import { Input } from "$lib/components/ui/input";
-import * as Select from "$lib/components/ui/select";
-import { forgeRepoLabel } from "$lib/utils/forge";
+import type { TargetFields } from "#lib/api/command-rooms.ts";
+import type { ConnectedRepo, WorkspaceWithRepos } from "#lib/api/types.ts";
+import * as Field from "#lib/components/ui/field/index.ts";
+import { Input } from "#lib/components/ui/input/index.ts";
+import * as Select from "#lib/components/ui/select/index.ts";
+import { forgeRepoLabel } from "#lib/utils/forge.ts";
 
 let {
   fields = $bindable(),

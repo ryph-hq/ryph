@@ -1,11 +1,11 @@
-import { can } from "$lib/utils/auth/capabilities";
+import { can } from "#lib/utils/auth/capabilities.ts";
 import { redirect } from "@sveltejs/kit";
 import type { PageLoad } from "./$types";
-import { getAgents } from "$lib/api/agents";
-import { getChatroom, getChatroomChannels, getChatroomGroups } from "$lib/api/chatrooms";
-import { getCommandRoom } from "$lib/api/command-rooms";
-import { getConnectedRepos } from "$lib/api/repos";
-import { getWorkspaces } from "$lib/api/workspaces";
+import { getAgents } from "#lib/api/agents.ts";
+import { getChatroom, getChatroomChannels, getChatroomGroups } from "#lib/api/chatrooms.ts";
+import { getCommandRoom } from "#lib/api/command-rooms.ts";
+import { getConnectedRepos } from "#lib/api/repos.ts";
+import { getWorkspaces } from "#lib/api/workspaces.ts";
 
 export const load: PageLoad = async ({ parent, url, params, fetch }) => {
   const { user } = await parent();

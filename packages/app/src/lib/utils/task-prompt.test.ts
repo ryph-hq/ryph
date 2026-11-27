@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ApiError } from "$lib/api/call";
+import { ApiError } from "#lib/api/call.ts";
 import {
   asksForPrompt,
   awaitsPrompt,

@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("$env/dynamic/private", () => ({ env: { RYPH_PROXY_SECRET: "hop" } }));
-vi.mock("$app/environment", () => ({ dev: true }));
+vi.mock(
+  "$app/env/private",
+  async () => (await import("#lib/testing/env-mock.ts")).envMock({ RYPH_PROXY_SECRET: "hop" }),
+);
+vi.mock("$app/env", () => ({ dev: true }));
 
 import { POST } from "./+server";
 

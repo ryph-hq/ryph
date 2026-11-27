@@ -7,23 +7,24 @@ import "@fontsource-variable/inter";
 import "@fontsource-variable/inter/wght-italic.css";
 import "@fontsource-variable/host-grotesk";
 import "@fontsource-variable/jetbrains-mono";
-import staticFavicon from "$lib/assets/favicon.svg";
-import { faviconUri } from "$lib/brand/favicon";
+import staticFavicon from "#lib/assets/favicon.svg";
+import { faviconUri } from "#lib/brand/favicon.ts";
 import { afterNavigate, onNavigate } from "$app/navigation";
-import { NavProgress } from "$lib/components/nav-progress";
-import { Toaster } from "$lib/components/ui/sonner";
+import { NavProgress } from "#lib/components/nav-progress/index.ts";
+import { Toaster } from "#lib/components/ui/sonner/index.ts";
 import { ModeWatcher } from "mode-watcher";
-import { trackViewTransition, viewTransitionsEnabled } from "$lib/utils/view-transition";
-import { noteSessionExpiry } from "$lib/utils/auth/auth";
-import { toastPosition } from "$lib/utils/toast-position.svelte";
+import { trackViewTransition, viewTransitionsEnabled } from "#lib/utils/view-transition.ts";
+import { noteSessionExpiry } from "#lib/utils/auth/auth.ts";
+import { toastPosition } from "#lib/utils/toast-position.svelte.ts";
 
 let { children, data } = $props();
 
-// A different blob in the tab on every page, as on the landing page ($lib/brand/favicon). The
+// A different blob in the tab on every page, as on the landing page (#lib/brand/favicon). The
 // server renders the plain mark, so hydration agrees; once the page is up, and on every move after,
 // the browser draws a new one.
 let favicon = $state(staticFavicon);
-afterNavigate(() => {
+afterNavigate(({ shallow, type }) => {
+  if (shallow && type === "goto") return;
   favicon = faviconUri();
 });
 
@@ -48,6 +49,8 @@ $effect.pre(() => noteSessionExpiry(data.sessionExpiresIn));
 //   along with the page.
 // - a different section is a different page, and all of it moves.
 onNavigate((navigation) => {
+  // A flow's step change (a shallow `goto`) is not a move between pages.
+  if (navigation.shallow && navigation.type === "goto") return;
   if (!viewTransitionsEnabled()) return;
 
   const from = navigation.from?.url.pathname ?? "";

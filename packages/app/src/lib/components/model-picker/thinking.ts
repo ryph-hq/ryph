@@ -1,4 +1,4 @@
-// Imports nothing through `$lib`, and only the import-free level list: @ryph/host's tests reach
+// Imports nothing through `#lib`, and only the import-free level list: @ryph/host's tests reach
 // this file by path to pin the rule below against the models.json the runner really writes.
 import { THINKING_LEVELS, type ThinkingLevel } from "../../api/thinking-levels";
 

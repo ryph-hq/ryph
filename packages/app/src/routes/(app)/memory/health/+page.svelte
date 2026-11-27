@@ -1,11 +1,11 @@
 <script lang="ts">
-import PageTitle from "$lib/components/page-title/page-title.svelte";
-import { memorySubjectKey } from "$lib/api/types";
-import ForgeIcon from "$lib/components/forge-icon/forge-icon.svelte";
-import { Badge } from "$lib/components/ui/badge";
-import * as Card from "$lib/components/ui/card";
-import * as Table from "$lib/components/ui/table";
-import { formatDateTime, formatRelativeTime } from "$lib/utils/format";
+import PageTitle from "#lib/components/page-title/page-title.svelte";
+import { memorySubjectKey } from "#lib/api/types.ts";
+import ForgeIcon from "#lib/components/forge-icon/forge-icon.svelte";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import * as Card from "#lib/components/ui/card/index.ts";
+import * as Table from "#lib/components/ui/table/index.ts";
+import { formatDateTime, formatRelativeTime } from "#lib/utils/format.ts";
 import BuildingIcon from "@lucide/svelte/icons/building-2";
 import type { PageProps } from "./$types";
 import { subjectDisplay } from "../labels";

@@ -4,7 +4,11 @@ import { describe, expect, it, vi } from "vitest";
 import { load } from "./+page";
 import Page from "./+page.svelte";
 
-vi.mock("$env/dynamic/public", () => ({ env: { PUBLIC_GITHUB_APP_NAME: "ryph-test" } }));
+vi.mock(
+  "$app/env/public",
+  async () =>
+    (await import("#lib/testing/env-mock.ts")).envMock({ PUBLIC_GITHUB_APP_NAME: "ryph-test" }),
+);
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
 const repo = {
   fullName: "owner/example",

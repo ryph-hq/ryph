@@ -1,5 +1,5 @@
-import type { GitlabHook } from "$lib/api/repos";
-import { formatRelativeTime } from "$lib/utils/format";
+import type { GitlabHook } from "#lib/api/repos.ts";
+import { formatRelativeTime } from "#lib/utils/format.ts";
 
 /** One value to paste, with a copy button beside it; `value` null where it is not known. */
 export type HookValue = { label: string; value: string | null };

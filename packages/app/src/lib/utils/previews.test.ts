@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import type { ToolCall } from "$lib/api/tools";
+import type { ToolCall } from "#lib/api/tools.ts";
 import {
   isLocalPreviewUrl,
   openablePreviewUrl,

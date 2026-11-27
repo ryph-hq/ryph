@@ -1,8 +1,8 @@
 <script lang="ts">
-import { Button } from "$lib/components/ui/button";
+import { Button } from "#lib/components/ui/button/index.ts";
 import ExternalLinkIcon from "@lucide/svelte/icons/external-link";
-import type { RunPreview } from "$lib/api/previews";
-import { isLocalPreviewUrl } from "$lib/utils/previews";
+import type { RunPreview } from "#lib/api/previews.ts";
+import { isLocalPreviewUrl } from "#lib/utils/previews.ts";
 
 let { previews, available = true, href }: {
   previews: RunPreview[];

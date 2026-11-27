@@ -1,6 +1,6 @@
 import { getContext, setContext } from "svelte";
-import type { CheckSuiteView } from "$lib/api/types";
-import { ID_BODY } from "$lib/utils/ids";
+import type { CheckSuiteView } from "#lib/api/types.ts";
+import { ID_BODY } from "#lib/utils/ids.ts";
 
 // The check suites a page already holds, kept live while any runs: a checks tool call in the
 // transcript shows the suite it started from here, rather than reading each one again. A page that

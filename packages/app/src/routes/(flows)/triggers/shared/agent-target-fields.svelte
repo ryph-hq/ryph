@@ -1,11 +1,11 @@
 <script lang="ts">
-import type { Agent, ConnectedRepo, WorkspaceWithRepos } from "$lib/api/types";
-import { Badge } from "$lib/components/ui/badge";
-import * as Field from "$lib/components/ui/field";
-import { Input } from "$lib/components/ui/input";
-import * as Select from "$lib/components/ui/select";
-import * as ToggleGroup from "$lib/components/ui/toggle-group";
-import { forgeRepoLabel } from "$lib/utils/forge";
+import type { Agent, ConnectedRepo, WorkspaceWithRepos } from "#lib/api/types.ts";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import * as Field from "#lib/components/ui/field/index.ts";
+import { Input } from "#lib/components/ui/input/index.ts";
+import * as Select from "#lib/components/ui/select/index.ts";
+import * as ToggleGroup from "#lib/components/ui/toggle-group/index.ts";
+import { forgeRepoLabel } from "#lib/utils/forge.ts";
 import type { TargetFields } from "./automation-steps";
 
 // The agent step: who every fire runs as, and what the run checks out. Only live agents and

@@ -1,16 +1,21 @@
 <script lang="ts">
-import { type ConnectedRepo, type ForgeWhere, type Harness, MAX_FORGE_CAP } from "$lib/api/types";
-import * as Alert from "$lib/components/ui/alert";
-import { Badge } from "$lib/components/ui/badge";
-import { Button } from "$lib/components/ui/button";
-import { Checkbox } from "$lib/components/ui/checkbox";
-import * as Field from "$lib/components/ui/field";
-import { Input } from "$lib/components/ui/input";
-import { Label } from "$lib/components/ui/label";
-import * as Select from "$lib/components/ui/select";
-import * as ToggleGroup from "$lib/components/ui/toggle-group";
-import ForgeRepoLabel from "$lib/components/forge-repo-label/forge-repo-label.svelte";
-import TagInput from "$lib/components/tag-input/tag-input.svelte";
+import {
+  type ConnectedRepo,
+  type ForgeWhere,
+  type Harness,
+  MAX_FORGE_CAP,
+} from "#lib/api/types.ts";
+import * as Alert from "#lib/components/ui/alert/index.ts";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import { Checkbox } from "#lib/components/ui/checkbox/index.ts";
+import * as Field from "#lib/components/ui/field/index.ts";
+import { Input } from "#lib/components/ui/input/index.ts";
+import { Label } from "#lib/components/ui/label/index.ts";
+import * as Select from "#lib/components/ui/select/index.ts";
+import * as ToggleGroup from "#lib/components/ui/toggle-group/index.ts";
+import ForgeRepoLabel from "#lib/components/forge-repo-label/forge-repo-label.svelte";
+import TagInput from "#lib/components/tag-input/tag-input.svelte";
 import InfoIcon from "@lucide/svelte/icons/info";
 import {
   composeForgePolicy,
@@ -19,7 +24,7 @@ import {
   type ForgeToolsState,
   parseLabels,
 } from "./forge-policy";
-import ToggleRow from "$lib/components/toggle-row/toggle-row.svelte";
+import ToggleRow from "#lib/components/toggle-row/toggle-row.svelte";
 
 let {
   fields = $bindable(),

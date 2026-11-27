@@ -1,7 +1,7 @@
 <script lang="ts">
 import { beforeNavigate } from "$app/navigation";
-import * as Tooltip from "$lib/components/ui/tooltip/index.js";
-import { cn, type WithElementRef } from "$lib/utils.js";
+import * as Tooltip from "#lib/components/ui/tooltip/index.ts";
+import { cn, type WithElementRef } from "#lib/utils.ts";
 import {
   SIDEBAR_COOKIE_MAX_AGE,
   SIDEBAR_COOKIE_NAME,
@@ -37,7 +37,10 @@ const sidebar = setSidebar({
 
 // On mobile the sidebar is a sheet over the page, so following a link in it should put it away,
 // straight away rather than once the next page has loaded.
-beforeNavigate(() => sidebar.setOpenMobile(false));
+beforeNavigate(({ shallow, type }) => {
+  if (shallow && type === "goto") return;
+  sidebar.setOpenMobile(false);
+});
 </script>
 
 <svelte:window onkeydown={sidebar.handleShortcutKeydown} />

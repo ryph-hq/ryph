@@ -1,8 +1,8 @@
 <script lang="ts">
-import type { CheckResultState, CheckSuiteState } from "$lib/api/types";
-import { Spinner } from "$lib/components/ui/spinner";
-import { cn } from "$lib/utils.js";
-import { checkStateLabel } from "$lib/utils/checks";
+import type { CheckResultState, CheckSuiteState } from "#lib/api/types.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
+import { cn } from "#lib/utils.ts";
+import { checkStateLabel } from "#lib/utils/checks.ts";
 import BanIcon from "@lucide/svelte/icons/ban";
 import CircleCheckIcon from "@lucide/svelte/icons/circle-check";
 import CircleDashedIcon from "@lucide/svelte/icons/circle-dashed";

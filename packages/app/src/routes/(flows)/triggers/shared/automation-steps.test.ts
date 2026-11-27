@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Automation } from "$lib/api/types";
+import type { Automation } from "#lib/api/types.ts";
 import {
   awaitingPaste,
   datadogWebhookName,
@@ -9,7 +9,7 @@ import {
   PRESETS,
   secretIsPasted,
   setupSteps,
-} from "$lib/automations/presets";
+} from "#lib/automations/presets.ts";
 import {
   applyPreset,
   blankResponse,

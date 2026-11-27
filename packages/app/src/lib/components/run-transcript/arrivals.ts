@@ -1,4 +1,4 @@
-import type { TranscriptRow } from "$lib/components/run-history/run-history.svelte";
+import type { TranscriptRow } from "#lib/components/run-history/run-history.svelte.ts";
 
 /** One tracker per transcript. Logical keys survive virtualiser remounts; sequence high-water
  * marks distinguish new speech from older pages or previously hidden rows becoming visible. */

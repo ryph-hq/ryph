@@ -1,6 +1,6 @@
 import type { PageLoad } from "./$types";
-import { getAgents } from "$lib/api/agents";
-import { getMemory, getMemorySubjects } from "$lib/api/memory";
+import { getAgents } from "#lib/api/agents.ts";
+import { getMemory, getMemorySubjects } from "#lib/api/memory.ts";
 
 export const load: PageLoad = async ({ fetch, params, depends }) => {
   depends("app:memory");

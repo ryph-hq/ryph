@@ -1,7 +1,7 @@
 <script lang="ts">
-import type { RunSize } from "$lib/api/types";
-import * as Select from "$lib/components/ui/select";
-import { DEFAULT_SIZE_VALUE, sizeClassLabel, sizeSummary } from "$lib/utils/run-sizes";
+import type { RunSize } from "#lib/api/types.ts";
+import * as Select from "#lib/components/ui/select/index.ts";
+import { DEFAULT_SIZE_VALUE, sizeClassLabel, sizeSummary } from "#lib/utils/run-sizes.ts";
 
 let {
   value,

@@ -1,8 +1,8 @@
 <script lang="ts">
 import { page } from "$app/state";
-import * as Collapsible from "$lib/components/ui/collapsible";
-import * as Field from "$lib/components/ui/field";
-import { Input } from "$lib/components/ui/input";
+import * as Collapsible from "#lib/components/ui/collapsible/index.ts";
+import * as Field from "#lib/components/ui/field/index.ts";
+import { Input } from "#lib/components/ui/input/index.ts";
 import ChevronRightIcon from "@lucide/svelte/icons/chevron-right";
 import { defaultAgentEmail } from "./agent-steps";
 

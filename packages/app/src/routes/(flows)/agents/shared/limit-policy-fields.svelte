@@ -1,11 +1,11 @@
 <script lang="ts">
-import type { DeploymentLimits } from "$lib/api/types";
-import * as Alert from "$lib/components/ui/alert";
-import * as Field from "$lib/components/ui/field";
-import { Input } from "$lib/components/ui/input";
+import type { DeploymentLimits } from "#lib/api/types.ts";
+import * as Alert from "#lib/components/ui/alert/index.ts";
+import * as Field from "#lib/components/ui/field/index.ts";
+import { Input } from "#lib/components/ui/input/index.ts";
 import InfoIcon from "@lucide/svelte/icons/info";
-import ToggleRow from "$lib/components/toggle-row/toggle-row.svelte";
-import { formatElapsed } from "$lib/utils/format";
+import ToggleRow from "#lib/components/toggle-row/toggle-row.svelte";
+import { formatElapsed } from "#lib/utils/format.ts";
 import { ceilingHours, type LimitFields } from "./limit-policy";
 
 let {

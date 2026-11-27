@@ -1,4 +1,4 @@
-import { RUN_REFRESH_MS } from "$lib/utils/run-refresh";
+import { RUN_REFRESH_MS } from "#lib/utils/run-refresh.ts";
 
 /** How often an open run page re-runs its load to renew the run grants, short of their lifetime. */
 export const RUN_GRANT_REFRESH_MS = 8 * 60 * 1000;

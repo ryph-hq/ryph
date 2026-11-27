@@ -1,8 +1,8 @@
 <script lang="ts">
-import { goto, pushState } from "$app/navigation";
+import { goto } from "$app/navigation";
 import { page } from "$app/state";
-import { createAutomation } from "$lib/api/automations";
-import type { Automation } from "$lib/api/types";
+import { createAutomation } from "#lib/api/automations.ts";
+import type { Automation } from "#lib/api/types.ts";
 import {
   formatLabel,
   isPresetVerification,
@@ -10,17 +10,17 @@ import {
   type PresetId,
   type PresetVerification,
   responseSummary,
-} from "$lib/automations/presets";
-import ReviewFact from "$lib/components/stepped-flow/review-fact.svelte";
-import ReviewSection from "$lib/components/stepped-flow/review-section.svelte";
-import SteppedFlow, { type FlowStepItem } from "$lib/components/stepped-flow/stepped-flow.svelte";
-import { stepOf } from "$lib/components/stepped-flow/steps";
-import UnsavedChangesGuard from "$lib/components/unsaved-changes-guard/unsaved-changes-guard.svelte";
-import * as Alert from "$lib/components/ui/alert";
-import { Button } from "$lib/components/ui/button";
-import { Spinner } from "$lib/components/ui/spinner";
-import WebhookSetup from "$lib/components/webhook-setup/webhook-setup.svelte";
-import { forgeRepoLabel } from "$lib/utils/forge";
+} from "#lib/automations/presets.ts";
+import ReviewFact from "#lib/components/stepped-flow/review-fact.svelte";
+import ReviewSection from "#lib/components/stepped-flow/review-section.svelte";
+import SteppedFlow, { type FlowStepItem } from "#lib/components/stepped-flow/stepped-flow.svelte";
+import { stepOf } from "#lib/components/stepped-flow/steps.ts";
+import UnsavedChangesGuard from "#lib/components/unsaved-changes-guard/unsaved-changes-guard.svelte";
+import * as Alert from "#lib/components/ui/alert/index.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
+import WebhookSetup from "#lib/components/webhook-setup/webhook-setup.svelte";
+import { forgeRepoLabel } from "#lib/utils/forge.ts";
 import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
 import ArrowRightIcon from "@lucide/svelte/icons/arrow-right";
 import PlusIcon from "@lucide/svelte/icons/plus";
@@ -161,7 +161,7 @@ function go(id: AutomationStepId) {
   // the step, never quietly swapped. Every way onto a step the first time passes through here; the
   // browser's history only revisits steps already seen.
   if (id === "response") response = settleResponseChoice(response, trigger);
-  pushState("", { step: id });
+  void goto("", { shallow: true, state: { step: id } });
 }
 
 function next() {

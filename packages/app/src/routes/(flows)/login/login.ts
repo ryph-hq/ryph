@@ -5,7 +5,7 @@ import { toast } from "svelte-sonner";
 // Refresh the user as part of the destination navigation. Invalidating on the login
 // page first reruns its loader, which redirects and races the handler's navigation.
 async function finishLogin(backTo: string | null) {
-  await goto(backTo ?? "/agents", { invalidateAll: true });
+  await goto(backTo ?? "/agents", { refreshAll: true });
 }
 
 export async function signInWithPasskey(backTo: string | null) {

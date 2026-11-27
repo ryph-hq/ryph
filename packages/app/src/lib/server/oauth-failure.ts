@@ -1,4 +1,4 @@
-import { providerLabel } from "$lib/utils/providers";
+import { providerLabel } from "#lib/utils/providers.ts";
 
 export type OAuthFailure = { error: string; linkRequired: boolean };
 

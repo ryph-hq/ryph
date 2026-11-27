@@ -1,4 +1,8 @@
-import { attachmentProblem, MAX_ATTACHMENTS, type UploadedAttachment } from "$lib/api/attachments";
+import {
+  attachmentProblem,
+  MAX_ATTACHMENTS,
+  type UploadedAttachment,
+} from "#lib/api/attachments.ts";
 
 // The images waiting in the message box, each uploaded the moment it is added so that pressing
 // send is only the message: the ids are already the run's. A chip leaves only by being removed

@@ -1,6 +1,6 @@
 // Whether a signed-in person is sent through the welcome flow, and the flag that stops it.
 
-import { can } from "$lib/utils/auth/capabilities";
+import { can } from "#lib/utils/auth/capabilities.ts";
 
 /** Set once the welcome flow is finished or skipped, in this browser. */
 export const WELCOME_COOKIE = "ryph_welcome";

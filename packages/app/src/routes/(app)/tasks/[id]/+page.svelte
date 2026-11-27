@@ -1,95 +1,100 @@
 <script lang="ts">
-import { dev } from "$app/environment";
+import { dev } from "$app/env";
 import { goto, invalidate } from "$app/navigation";
 import { page } from "$app/state";
-import { historianLiveSource, type LiveSource } from "$lib/api/browser-live";
-import { type BackgroundJob, commandsLiveSource, getRunBackground } from "$lib/api/background";
-import { getRunLanes, subscribeRunLanes } from "$lib/api/history";
-import { postRunMessage } from "$lib/api/messages";
-import { cancelTask, createTask, type CreateTaskInput, finishTask } from "$lib/api/tasks";
-import type { ToolCall } from "$lib/api/tools";
-import { startWithoutEnvironment } from "$lib/api/environments";
+import { historianLiveSource, type LiveSource } from "#lib/api/browser-live.ts";
+import { type BackgroundJob, commandsLiveSource, getRunBackground } from "#lib/api/background.ts";
+import { getRunLanes, subscribeRunLanes } from "#lib/api/history.ts";
+import { postRunMessage } from "#lib/api/messages.ts";
+import { cancelTask, createTask, type CreateTaskInput, finishTask } from "#lib/api/tasks.ts";
+import type { ToolCall } from "#lib/api/tools.ts";
+import { startWithoutEnvironment } from "#lib/api/environments.ts";
 import {
   isPatchAdvancing,
   type RunMessage,
   type TaskDetail,
   TERMINAL_RUN_STATES,
-} from "$lib/api/types";
-import EnvironmentWait from "$lib/components/environment-wait/environment-wait.svelte";
-import AgentAvatar from "$lib/components/agent-avatar/agent-avatar.svelte";
-import { setCheckSuitesContext } from "$lib/components/tool-call/check-suites-context";
-import { setPatchesContext } from "$lib/components/tool-call/patches-context";
-import { setRunSkillsContext } from "$lib/components/tool-call/run-skills-context";
-import { runSkillsView } from "$lib/utils/skills";
-import ThreadLabel from "$lib/components/thread-label/thread-label.svelte";
-import { RunHistory } from "$lib/components/run-history/run-history.svelte";
-import { type MemoryCall, memoryCallOf } from "$lib/utils/memory-calls";
+} from "#lib/api/types.ts";
+import EnvironmentWait from "#lib/components/environment-wait/environment-wait.svelte";
+import AgentAvatar from "#lib/components/agent-avatar/agent-avatar.svelte";
+import { setCheckSuitesContext } from "#lib/components/tool-call/check-suites-context.ts";
+import { setPatchesContext } from "#lib/components/tool-call/patches-context.ts";
+import { setRunSkillsContext } from "#lib/components/tool-call/run-skills-context.ts";
+import { runSkillsView } from "#lib/utils/skills.ts";
+import ThreadLabel from "#lib/components/thread-label/thread-label.svelte";
+import { RunHistory } from "#lib/components/run-history/run-history.svelte.ts";
+import { type MemoryCall, memoryCallOf } from "#lib/utils/memory-calls.ts";
 import {
   closingNotes,
   type ForgeCall,
   forgeCallOf,
   matchForgeWrites,
-} from "$lib/utils/forge-calls";
-import { getTaskListContext } from "$lib/components/task-list/live-task-list.svelte";
-import RunTranscript from "$lib/components/run-transcript/run-transcript.svelte";
-import RunStateBadge from "$lib/components/run-state-badge/run-state-badge.svelte";
-import { runSizeLabel, sizeSummary } from "$lib/utils/run-sizes";
-import RunSkills from "$lib/components/run-skills/run-skills.svelte";
-import * as Alert from "$lib/components/ui/alert";
-import * as AlertDialog from "$lib/components/ui/alert-dialog";
-import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
-import { Badge } from "$lib/components/ui/badge";
-import { Button } from "$lib/components/ui/button";
-import * as Empty from "$lib/components/ui/empty";
-import { Spinner } from "$lib/components/ui/spinner";
-import RunComposer, { type ComposerBox } from "$lib/components/run-composer/run-composer.svelte";
-import { taskDraftKey } from "$lib/components/run-composer/draft";
-import BrowserPane from "$lib/components/browser-pane/browser-pane.svelte";
+} from "#lib/utils/forge-calls.ts";
+import { getTaskListContext } from "#lib/components/task-list/live-task-list.svelte.ts";
+import RunTranscript from "#lib/components/run-transcript/run-transcript.svelte";
+import RunStateBadge from "#lib/components/run-state-badge/run-state-badge.svelte";
+import { runSizeLabel, sizeSummary } from "#lib/utils/run-sizes.ts";
+import RunSkills from "#lib/components/run-skills/run-skills.svelte";
+import * as Alert from "#lib/components/ui/alert/index.ts";
+import * as AlertDialog from "#lib/components/ui/alert-dialog/index.ts";
+import * as DropdownMenu from "#lib/components/ui/dropdown-menu/index.ts";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import * as Empty from "#lib/components/ui/empty/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
+import RunComposer, { type ComposerBox } from "#lib/components/run-composer/run-composer.svelte";
+import { taskDraftKey } from "#lib/components/run-composer/draft.ts";
+import BrowserPane from "#lib/components/browser-pane/browser-pane.svelte";
 import {
   PreviewsState,
   setPreviewsContext,
-} from "$lib/components/tool-call/previews-context.svelte";
-import CommandsPane from "$lib/components/commands-pane/commands-pane.svelte";
-import { CommandsState } from "$lib/components/commands-pane/commands-state.svelte";
+} from "#lib/components/tool-call/previews-context.svelte.ts";
+import CommandsPane from "#lib/components/commands-pane/commands-pane.svelte";
+import { CommandsState } from "#lib/components/commands-pane/commands-state.svelte.ts";
 import {
   COMMANDS_POLL_MS,
   CommandsCues,
   mergeJobs,
   needsPolling,
   settleWithRun,
-} from "$lib/components/commands-pane/commands-view";
-import { setBackgroundJobsContext } from "$lib/components/tool-call/background-jobs-context";
-import { backgroundCallOf } from "$lib/utils/background";
-import SubagentsPane from "$lib/components/subagents-pane/subagents-pane.svelte";
-import { setSubagentsContext } from "$lib/components/tool-call/subagents-context";
-import { LanesState } from "$lib/components/subagents-pane/lanes-state.svelte";
-import { previewCallOf } from "$lib/utils/previews";
-import type { TranscriptAction } from "$lib/components/browser-pane/live-view";
+} from "#lib/components/commands-pane/commands-view.ts";
+import { setBackgroundJobsContext } from "#lib/components/tool-call/background-jobs-context.ts";
+import { backgroundCallOf } from "#lib/utils/background.ts";
+import SubagentsPane from "#lib/components/subagents-pane/subagents-pane.svelte";
+import { setSubagentsContext } from "#lib/components/tool-call/subagents-context.ts";
+import { LanesState } from "#lib/components/subagents-pane/lanes-state.svelte.ts";
+import { previewCallOf } from "#lib/utils/previews.ts";
+import type { TranscriptAction } from "#lib/components/browser-pane/live-view.ts";
 import {
   detailsPane,
   type DetailsPaneContext,
-} from "$lib/components/details-pane/details-pane.svelte";
-import RunActions from "$lib/components/run-pane/run-actions.svelte";
-import ArtifactPane from "$lib/components/run-pane/artifact-pane.svelte";
-import { artifactsOfRun } from "$lib/utils/artifacts";
-import { pageHeader } from "$lib/components/page-header/page-header.svelte";
-import RunUsage from "$lib/components/run-pane/run-usage.svelte";
-import { runPaneTab } from "$lib/components/run-pane/pane-tab.svelte";
-import * as Tooltip from "$lib/components/ui/tooltip";
-import { describeBrowserCall } from "$lib/utils/browser-tools";
-import AttachmentImages from "$lib/components/attachment-images/attachment-images.svelte";
-import * as Tabs from "$lib/components/ui/tabs";
-import { DEFAULT_ENVIRONMENT_ID, runEnvironmentLabel } from "$lib/utils/environments";
-import { isSuiteSettled, suitesForRun } from "$lib/utils/checks";
-import { isLegacyTask, LEGACY_RERUN, LEGACY_START_AGAIN } from "$lib/utils/legacy-task";
-import { forgeRepoLabel, providerOfRepoRef, repoThreadLabel, threadLabel } from "$lib/utils/forge";
+} from "#lib/components/details-pane/details-pane.svelte.ts";
+import RunActions from "#lib/components/run-pane/run-actions.svelte";
+import ArtifactPane from "#lib/components/run-pane/artifact-pane.svelte";
+import { artifactsOfRun } from "#lib/utils/artifacts.ts";
+import { pageHeader } from "#lib/components/page-header/page-header.svelte.ts";
+import RunUsage from "#lib/components/run-pane/run-usage.svelte";
+import { runPaneTab } from "#lib/components/run-pane/pane-tab.svelte.ts";
+import * as Tooltip from "#lib/components/ui/tooltip/index.ts";
+import { describeBrowserCall } from "#lib/utils/browser-tools.ts";
+import AttachmentImages from "#lib/components/attachment-images/attachment-images.svelte";
+import * as Tabs from "#lib/components/ui/tabs/index.ts";
+import { DEFAULT_ENVIRONMENT_ID, runEnvironmentLabel } from "#lib/utils/environments.ts";
+import { isSuiteSettled, suitesForRun } from "#lib/utils/checks.ts";
+import { isLegacyTask, LEGACY_RERUN, LEGACY_START_AGAIN } from "#lib/utils/legacy-task.ts";
+import {
+  forgeRepoLabel,
+  providerOfRepoRef,
+  repoThreadLabel,
+  threadLabel,
+} from "#lib/utils/forge.ts";
 import {
   branchName,
   formatDateTime,
   formatElapsed,
   formatRelativeTime,
   formatUsd,
-} from "$lib/utils/format";
+} from "#lib/utils/format.ts";
 import ExternalLinkIcon from "@lucide/svelte/icons/external-link";
 import KeyRoundIcon from "@lucide/svelte/icons/key-round";
 import MessagesSquareIcon from "@lucide/svelte/icons/messages-square";
@@ -104,12 +109,12 @@ import RefreshCwIcon from "@lucide/svelte/icons/refresh-cw";
 import RotateCcwIcon from "@lucide/svelte/icons/rotate-ccw";
 import ScrollTextIcon from "@lucide/svelte/icons/scroll-text";
 import TriangleAlertIcon from "@lucide/svelte/icons/triangle-alert";
-import { HOOK_BANNER_TITLE, HOOK_HELD_LABEL, isHeld } from "$lib/utils/hook-check";
+import { HOOK_BANNER_TITLE, HOOK_HELD_LABEL, isHeld } from "#lib/utils/hook-check.ts";
 import FileDiffIcon from "@lucide/svelte/icons/file-diff";
 import SquareTerminalIcon from "@lucide/svelte/icons/square-terminal";
 import XIcon from "@lucide/svelte/icons/x";
 import MoreHorizontalIcon from "@lucide/svelte/icons/more-horizontal";
-import { finishButton } from "$lib/utils/run-finish";
+import { finishButton } from "#lib/utils/run-finish.ts";
 import CircleCheckIcon from "@lucide/svelte/icons/circle-check";
 import CirclePauseIcon from "@lucide/svelte/icons/circle-pause";
 import {
@@ -122,11 +127,11 @@ import {
   StartAgain,
   takeHandoff,
   taskName,
-} from "$lib/utils/task-prompt";
-import PaneHeader from "$lib/components/task-page/pane-header.svelte";
-import PromptStage from "$lib/components/task-page/prompt-stage.svelte";
-import TaskColumn from "$lib/components/task-page/task-column.svelte";
-import TaskMasthead from "$lib/components/task-page/task-masthead.svelte";
+} from "#lib/utils/task-prompt.ts";
+import PaneHeader from "#lib/components/task-page/pane-header.svelte";
+import PromptStage from "#lib/components/task-page/prompt-stage.svelte";
+import TaskColumn from "#lib/components/task-page/task-column.svelte";
+import TaskMasthead from "#lib/components/task-page/task-masthead.svelte";
 import { tick, untrack } from "svelte";
 import type { Attachment } from "svelte/attachments";
 import { prefersReducedMotion } from "svelte/motion";
@@ -525,7 +530,7 @@ $effect(() => {
   // `dev` first, so a production build drops the import along with the branch.
   if (!dev || !browserMock) return;
   let cancelled = false;
-  void import("$lib/components/browser-pane/mock-source").then((mock) => {
+  void import("#lib/components/browser-pane/mock-source.ts").then((mock) => {
     if (!cancelled) mockSource = mock.createMockBrowser().source;
   });
   return () => {

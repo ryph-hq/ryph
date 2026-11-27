@@ -1,16 +1,16 @@
 <script lang="ts">
-import { goto, invalidateAll } from "$app/navigation";
-import { ApiError } from "$lib/api/call";
-import { connectGithubUserRepo } from "$lib/api/repos";
-import type { SubmissionPolicy } from "$lib/api/types";
-import FlowStep from "$lib/components/flow-step/flow-step.svelte";
-import { Badge } from "$lib/components/ui/badge";
-import { Button } from "$lib/components/ui/button";
-import * as Field from "$lib/components/ui/field";
-import * as InputGroup from "$lib/components/ui/input-group";
-import * as Select from "$lib/components/ui/select";
-import { Skeleton } from "$lib/components/ui/skeleton";
-import { Spinner } from "$lib/components/ui/spinner";
+import { goto, refreshAll } from "$app/navigation";
+import { ApiError } from "#lib/api/call.ts";
+import { connectGithubUserRepo } from "#lib/api/repos.ts";
+import type { SubmissionPolicy } from "#lib/api/types.ts";
+import FlowStep from "#lib/components/flow-step/flow-step.svelte";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import * as Field from "#lib/components/ui/field/index.ts";
+import * as InputGroup from "#lib/components/ui/input-group/index.ts";
+import * as Select from "#lib/components/ui/select/index.ts";
+import { Skeleton } from "#lib/components/ui/skeleton/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
 import ArrowRightIcon from "@lucide/svelte/icons/arrow-right";
 import CheckIcon from "@lucide/svelte/icons/check";
 import LinkIcon from "@lucide/svelte/icons/link-2";
@@ -19,7 +19,7 @@ import SearchIcon from "@lucide/svelte/icons/search";
 import { toast } from "svelte-sonner";
 import UnavailableStep from "../unavailable-step.svelte";
 import type { PageProps } from "./$types";
-import { withBackTo } from "$lib/utils/safe-path";
+import { withBackTo } from "#lib/utils/safe-path.ts";
 import { filterGithubRepos, githubConnectFailure, githubListFailure } from "./listing";
 
 let { data }: PageProps = $props();
@@ -42,7 +42,7 @@ let retrying = $state(false);
 async function retry() {
   retrying = true;
   try {
-    await invalidateAll();
+    await refreshAll();
   } finally {
     retrying = false;
   }
@@ -65,7 +65,7 @@ async function submit(event: SubmitEvent) {
     // Someone else connected it meanwhile: read the list again so it shows as connected.
     if (e instanceof ApiError && e.status === 409) {
       picked = null;
-      await invalidateAll();
+      await refreshAll();
     }
   } finally {
     connecting = false;

@@ -1,16 +1,16 @@
 <script lang="ts">
-import { env } from "$env/dynamic/public";
+import * as env from "$app/env/public";
 import { goto } from "$app/navigation";
-import { connectRepo } from "$lib/api/repos";
-import { withBackTo } from "$lib/utils/safe-path";
-import type { SubmissionPolicy } from "$lib/api/types";
-import FlowStep from "$lib/components/flow-step/flow-step.svelte";
-import ForgeIcon from "$lib/components/forge-icon/forge-icon.svelte";
-import { Badge } from "$lib/components/ui/badge";
-import { Button } from "$lib/components/ui/button";
-import * as Field from "$lib/components/ui/field";
-import * as Select from "$lib/components/ui/select";
-import { Spinner } from "$lib/components/ui/spinner";
+import { connectRepo } from "#lib/api/repos.ts";
+import { withBackTo } from "#lib/utils/safe-path.ts";
+import type { SubmissionPolicy } from "#lib/api/types.ts";
+import FlowStep from "#lib/components/flow-step/flow-step.svelte";
+import ForgeIcon from "#lib/components/forge-icon/forge-icon.svelte";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import * as Field from "#lib/components/ui/field/index.ts";
+import * as Select from "#lib/components/ui/select/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
 import CheckIcon from "@lucide/svelte/icons/check";
 import ExternalLinkIcon from "@lucide/svelte/icons/external-link";
 import FolderGit2Icon from "@lucide/svelte/icons/folder-git-2";

@@ -1,18 +1,18 @@
 <script lang="ts">
-import type { SkillFile } from "$lib/api/types";
-import CodeView from "$lib/components/code-view/code-view.svelte";
-import CopyButton from "$lib/components/copy-button/copy-button.svelte";
-import Markdown from "$lib/components/markdown/markdown.svelte";
-import { Badge } from "$lib/components/ui/badge";
-import { cn } from "$lib/utils";
-import { formatBytes } from "$lib/utils/environments";
+import type { SkillFile } from "#lib/api/types.ts";
+import CodeView from "#lib/components/code-view/code-view.svelte";
+import CopyButton from "#lib/components/copy-button/copy-button.svelte";
+import Markdown from "#lib/components/markdown/markdown.svelte";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import { cn } from "#lib/utils.ts";
+import { formatBytes } from "#lib/utils/environments.ts";
 import {
   readingOrder,
   resolveSkillLink,
   SKILL_FILE,
   skillBody,
   skillFileKind,
-} from "$lib/utils/skills";
+} from "#lib/utils/skills.ts";
 import FileIcon from "@lucide/svelte/icons/file";
 import FileTextIcon from "@lucide/svelte/icons/file-text";
 import TerminalIcon from "@lucide/svelte/icons/terminal";

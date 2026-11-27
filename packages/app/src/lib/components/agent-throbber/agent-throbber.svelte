@@ -1,8 +1,8 @@
 <script lang="ts">
-import { blobPath } from "$lib/brand/blob";
-import { BlobMotion } from "$lib/brand/blob-motion";
-import { agentFaceParts } from "$lib/utils/avatar";
-import { cn } from "$lib/utils";
+import { blobPath } from "#lib/brand/blob.ts";
+import { BlobMotion } from "#lib/brand/blob-motion.ts";
+import { agentFaceParts } from "#lib/utils/avatar.ts";
+import { cn } from "#lib/utils.ts";
 import { onMount } from "svelte";
 
 export type ThrobberMood = "sleepy" | "working" | "thinking" | "happy" | "evil";

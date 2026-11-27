@@ -1,6 +1,6 @@
 import { isRedirect } from "@sveltejs/kit";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ForgeProvider, GitlabMode } from "$lib/api/types";
+import type { ForgeProvider, GitlabMode } from "#lib/api/types.ts";
 
 const forge = vi.hoisted(() => ({
   providers: ["gitlab"] as ForgeProvider[],
@@ -8,15 +8,15 @@ const forge = vi.hoisted(() => ({
   down: false,
 }));
 
-vi.mock("$lib/api/forge", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("$lib/api/forge")>()),
+vi.mock("#lib/api/forge.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("#lib/api/forge.ts")>()),
   getForges: () =>
     forge.down
       ? Promise.reject(new Error("forge unreachable"))
       : Promise.resolve({ providers: forge.providers, github: null, gitlab: forge.gitlab }),
 }));
 const projects = vi.hoisted(() => ({ asked: 0 }));
-vi.mock("$lib/api/repos", () => ({
+vi.mock("#lib/api/repos.ts", () => ({
   getGitlabProjects: () => {
     projects.asked++;
     return Promise.resolve([]);
@@ -24,7 +24,7 @@ vi.mock("$lib/api/repos", () => ({
 }));
 
 const identities = vi.hoisted(() => ({ linked: [] as string[], down: false }));
-vi.mock("$lib/api/identities", () => ({
+vi.mock("#lib/api/identities.ts", () => ({
   listIdentities: () =>
     identities.down ? Promise.reject(new Error("auth unreachable")) : Promise.resolve(
       identities.linked.map((provider) => ({ provider, login: "ada", linkedAt: "" })),

@@ -1,7 +1,7 @@
 <script lang="ts">
-import type { AttachmentRef } from "$lib/api/types";
-import * as Dialog from "$lib/components/ui/dialog";
-import { cn } from "$lib/utils";
+import type { AttachmentRef } from "#lib/api/types.ts";
+import * as Dialog from "#lib/components/ui/dialog/index.ts";
+import { cn } from "#lib/utils.ts";
 import AttachmentThumb from "./attachment-thumb.svelte";
 import { getAttachmentUrlContext } from "./attachment-url-context";
 

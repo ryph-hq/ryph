@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ROLES } from "$lib/utils/auth/capabilities";
+import { ROLES } from "#lib/utils/auth/capabilities.ts";
 import { THINKING_LEVELS, type ThinkingLevel } from "./thinking-levels";
 
 export const userSchema = z.object({

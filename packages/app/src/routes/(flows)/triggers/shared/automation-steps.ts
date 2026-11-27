@@ -10,7 +10,7 @@ import {
   type CreateAutomationInput,
   type ResponsePolicyInput,
   type UpdateAutomationInput,
-} from "$lib/api/automations";
+} from "#lib/api/automations.ts";
 import {
   type Agent,
   type Automation,
@@ -21,7 +21,7 @@ import {
   isOneConversation,
   type ResponseConversation,
   type WebhookFormat,
-} from "$lib/api/types";
+} from "#lib/api/types.ts";
 import {
   blankMapping,
   composeMapping,
@@ -33,7 +33,7 @@ import {
   type PresetId,
   presetOfFormat,
   type ResponseChoice,
-} from "$lib/automations/presets";
+} from "#lib/automations/presets.ts";
 
 export type { ResponseChoice };
 

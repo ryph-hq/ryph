@@ -2,38 +2,38 @@
 import { untrack } from "svelte";
 import { goto } from "$app/navigation";
 import { page } from "$app/state";
-import { createTask } from "$lib/api/tasks";
-import type { Agent, ConnectedRepo, ThinkingLevel, WorkspaceWithRepos } from "$lib/api/types";
-import { can } from "$lib/utils/auth/capabilities";
-import AgentAvatar from "$lib/components/agent-avatar/agent-avatar.svelte";
-import ForgeIcon from "$lib/components/forge-icon/forge-icon.svelte";
-import PickCard from "$lib/components/pick-card/pick-card.svelte";
-import PickGrid from "$lib/components/pick-card/pick-grid.svelte";
-import { preselect } from "$lib/components/pick-card/pick-list";
-import TaskColumn from "$lib/components/task-page/task-column.svelte";
-import { Button } from "$lib/components/ui/button";
-import * as Collapsible from "$lib/components/ui/collapsible";
-import * as Empty from "$lib/components/ui/empty";
-import * as Field from "$lib/components/ui/field";
-import { Input } from "$lib/components/ui/input";
-import ModelSelect from "$lib/components/model-picker/model-select.svelte";
+import { createTask } from "#lib/api/tasks.ts";
+import type { Agent, ConnectedRepo, ThinkingLevel, WorkspaceWithRepos } from "#lib/api/types.ts";
+import { can } from "#lib/utils/auth/capabilities.ts";
+import AgentAvatar from "#lib/components/agent-avatar/agent-avatar.svelte";
+import ForgeIcon from "#lib/components/forge-icon/forge-icon.svelte";
+import PickCard from "#lib/components/pick-card/pick-card.svelte";
+import PickGrid from "#lib/components/pick-card/pick-grid.svelte";
+import { preselect } from "#lib/components/pick-card/pick-list.ts";
+import TaskColumn from "#lib/components/task-page/task-column.svelte";
+import { Button } from "#lib/components/ui/button/index.ts";
+import * as Collapsible from "#lib/components/ui/collapsible/index.ts";
+import * as Empty from "#lib/components/ui/empty/index.ts";
+import * as Field from "#lib/components/ui/field/index.ts";
+import { Input } from "#lib/components/ui/input/index.ts";
+import ModelSelect from "#lib/components/model-picker/model-select.svelte";
 import {
   choicesFor,
   modelsForKey,
   thinkingLevelsForKey,
-} from "$lib/components/model-picker/models";
-import ThinkingSelect from "$lib/components/model-picker/thinking-select.svelte";
+} from "#lib/components/model-picker/models.ts";
+import ThinkingSelect from "#lib/components/model-picker/thinking-select.svelte";
 import {
   offersThinking,
   THINKING_LABELS,
   thinkingInvalid,
   thinkingToSend,
-} from "$lib/components/model-picker/thinking";
-import { Spinner } from "$lib/components/ui/spinner";
-import * as ToggleGroup from "$lib/components/ui/toggle-group";
-import { agentAvatar } from "$lib/utils/avatar";
-import { forgeRepoLabel, localRepoName, shortenRid } from "$lib/utils/forge";
-import { HOUR_MS } from "$lib/utils/limits";
+} from "#lib/components/model-picker/thinking.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
+import * as ToggleGroup from "#lib/components/ui/toggle-group/index.ts";
+import { agentAvatar } from "#lib/utils/avatar.ts";
+import { forgeRepoLabel, localRepoName, shortenRid } from "#lib/utils/forge.ts";
+import { HOUR_MS } from "#lib/utils/limits.ts";
 import BotIcon from "@lucide/svelte/icons/bot";
 import ChevronRightIcon from "@lucide/svelte/icons/chevron-right";
 import LayersIcon from "@lucide/svelte/icons/layers";

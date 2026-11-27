@@ -1,7 +1,7 @@
 <script lang="ts">
 import { page } from "$app/state";
-import ErrorState from "$lib/components/error-state/error-state.svelte";
-import { scopeFor } from "$lib/utils/page-error";
+import ErrorState from "#lib/components/error-state/error-state.svelte";
+import { scopeFor } from "#lib/utils/page-error.ts";
 
 const scope = $derived(scopeFor(page.route.id));
 </script>

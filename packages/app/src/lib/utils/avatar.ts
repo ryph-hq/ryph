@@ -1,4 +1,4 @@
-import { blobBounds, blobPath, randomBlob, type Wave } from "$lib/brand/blob";
+import { blobBounds, blobPath, randomBlob, type Wave } from "#lib/brand/blob.ts";
 
 /** An agent's face, and the colour it is drawn in. */
 export interface AgentAvatar {

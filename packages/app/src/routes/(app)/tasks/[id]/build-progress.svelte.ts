@@ -1,5 +1,5 @@
-import { getEnvironmentById } from "$lib/api/environments";
-import type { EnvironmentView } from "$lib/api/types";
+import { getEnvironmentById } from "#lib/api/environments.ts";
+import type { EnvironmentView } from "#lib/api/types.ts";
 
 /** How often the build a run waits on is read again. */
 export const BUILD_POLL_MS = 4_000;

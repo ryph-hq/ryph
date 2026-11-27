@@ -1,10 +1,10 @@
 import { redirect } from "@sveltejs/kit";
-import { can } from "$lib/utils/auth/capabilities";
+import { can } from "#lib/utils/auth/capabilities.ts";
 import type { PageLoad } from "./$types";
-import { getAutomations } from "$lib/api/automations";
-import { getChatrooms } from "$lib/api/chatrooms";
-import { getCommandRoom } from "$lib/api/command-rooms";
-import type { Chatroom, CommandRoom } from "$lib/api/types";
+import { getAutomations } from "#lib/api/automations.ts";
+import { getChatrooms } from "#lib/api/chatrooms.ts";
+import { getCommandRoom } from "#lib/api/command-rooms.ts";
+import type { Chatroom, CommandRoom } from "#lib/api/types.ts";
 
 export const load: PageLoad = async ({ fetch, depends, parent }) => {
   // Listing automations takes `automations:manage`; the nav hides the page from everyone else,

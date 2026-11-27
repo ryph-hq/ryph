@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { LiveFrame, LiveMessage, LiveRoom } from "$lib/api/browser-live";
+import type { LiveFrame, LiveMessage, LiveRoom } from "#lib/api/browser-live.ts";
 import {
   applyMessage,
   CAPS,

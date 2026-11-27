@@ -1,6 +1,6 @@
 import { render } from "svelte/server";
 import { describe, expect, it } from "vitest";
-import { type TaskSummary, taskSummarySchema } from "$lib/api/types";
+import { type TaskSummary, taskSummarySchema } from "#lib/api/types.ts";
 import TaskRow from "./task-row.svelte";
 
 const task: TaskSummary = {

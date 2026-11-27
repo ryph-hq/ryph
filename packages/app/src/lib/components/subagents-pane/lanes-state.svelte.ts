@@ -1,5 +1,5 @@
-import type { LaneSummary } from "$lib/api/history";
-import { type Subagent, subagentsOf, withLane } from "$lib/utils/subagents";
+import type { LaneSummary } from "#lib/api/history.ts";
+import { type Subagent, subagentsOf, withLane } from "#lib/utils/subagents.ts";
 
 /**
  * One run's subagents as the page holds them: the lanes the historian's feed (or its listing) has

@@ -6,22 +6,22 @@ import type {
   PatchBuild,
   RunArtifact,
   ThreadKind,
-} from "$lib/api/types";
-import ArtifactThumbnail from "$lib/components/artifact-thumbnail/artifact-thumbnail.svelte";
-import CheckSuiteChecks from "$lib/components/check-suite-panel/check-suite-checks.svelte";
-import CheckStateBadge from "$lib/components/check-state-badge/check-state-badge.svelte";
+} from "#lib/api/types.ts";
+import ArtifactThumbnail from "#lib/components/artifact-thumbnail/artifact-thumbnail.svelte";
+import CheckSuiteChecks from "#lib/components/check-suite-panel/check-suite-checks.svelte";
+import CheckStateBadge from "#lib/components/check-state-badge/check-state-badge.svelte";
 import MemoryNote from "./memory-note.svelte";
 import PatchItem from "./patch-item.svelte";
 import PaneCard from "./pane-card.svelte";
-import Markdown from "$lib/components/markdown/markdown.svelte";
-import type { ForgeWrite } from "$lib/utils/forge-calls";
-import { Badge } from "$lib/components/ui/badge";
-import { TONES } from "$lib/components/ui/badge/tones";
-import { Button } from "$lib/components/ui/button";
-import * as Empty from "$lib/components/ui/empty";
-import * as ToggleGroup from "$lib/components/ui/toggle-group";
-import { environmentLogHref } from "$lib/api/environments";
-import { countsLabel, listedSuiteIds, suiteCounts } from "$lib/utils/checks";
+import Markdown from "#lib/components/markdown/markdown.svelte";
+import type { ForgeWrite } from "#lib/utils/forge-calls.ts";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import { TONES } from "#lib/components/ui/badge/tones.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import * as Empty from "#lib/components/ui/empty/index.ts";
+import * as ToggleGroup from "#lib/components/ui/toggle-group/index.ts";
+import { environmentLogHref } from "#lib/api/environments.ts";
+import { countsLabel, listedSuiteIds, suiteCounts } from "#lib/utils/checks.ts";
 import { SvelteSet } from "svelte/reactivity";
 import { untrack } from "svelte";
 import { VList } from "virtua/svelte";
@@ -32,11 +32,11 @@ import {
   patchBuildLabel,
   setupWarningLabel,
   shortCommit,
-} from "$lib/utils/environments";
-import { latestRunVersion, runArtifactLabel } from "$lib/utils/artifacts";
-import { repoThreadLabel } from "$lib/utils/forge";
-import { formatDateTime, formatElapsed, formatTime } from "$lib/utils/format";
-import type { MemoryCall } from "$lib/utils/memory-calls";
+} from "#lib/utils/environments.ts";
+import { latestRunVersion, runArtifactLabel } from "#lib/utils/artifacts.ts";
+import { repoThreadLabel } from "#lib/utils/forge.ts";
+import { formatDateTime, formatElapsed, formatTime } from "#lib/utils/format.ts";
+import type { MemoryCall } from "#lib/utils/memory-calls.ts";
 import AppWindowIcon from "@lucide/svelte/icons/app-window";
 import BoxIcon from "@lucide/svelte/icons/box";
 import BrainIcon from "@lucide/svelte/icons/brain";

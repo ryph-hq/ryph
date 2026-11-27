@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { CatalogueEntry, McpServer } from "$lib/api/types";
+import type { CatalogueEntry, McpServer } from "#lib/api/types.ts";
 import {
   changedSettings,
   composeCatalogueBody,

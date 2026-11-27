@@ -1,7 +1,7 @@
 <script lang="ts">
-import PageTitle from "$lib/components/page-title/page-title.svelte";
-import SingleUserNotice from "$lib/components/single-user-notice/single-user-notice.svelte";
-import { Separator } from "$lib/components/ui/separator";
+import PageTitle from "#lib/components/page-title/page-title.svelte";
+import SingleUserNotice from "#lib/components/single-user-notice/single-user-notice.svelte";
+import { Separator } from "#lib/components/ui/separator/index.ts";
 import type { PageProps } from "./$types";
 import InvitesSection from "./invites-section.svelte";
 import UsersSection from "./users-section.svelte";

@@ -1,6 +1,6 @@
 <script lang="ts">
-import type { ForgeProvider } from "$lib/api/types";
-import { cn } from "$lib/utils";
+import type { ForgeProvider } from "#lib/api/types.ts";
+import { cn } from "#lib/utils.ts";
 import LaptopIcon from "@lucide/svelte/icons/laptop";
 import SproutIcon from "@lucide/svelte/icons/sprout";
 

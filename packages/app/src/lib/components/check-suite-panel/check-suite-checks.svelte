@@ -1,11 +1,11 @@
 <script lang="ts">
-import type { CheckSuiteView } from "$lib/api/types";
-import CheckStateIcon from "$lib/components/check-state-icon/check-state-icon.svelte";
-import InheritedBadge from "$lib/components/inherited-badge/inherited-badge.svelte";
-import { Badge } from "$lib/components/ui/badge";
-import { checkDurationMs, watchedChange } from "$lib/utils/checks";
-import { formatElapsed } from "$lib/utils/format";
-import { liveClock } from "$lib/utils/live-clock.svelte";
+import type { CheckSuiteView } from "#lib/api/types.ts";
+import CheckStateIcon from "#lib/components/check-state-icon/check-state-icon.svelte";
+import InheritedBadge from "#lib/components/inherited-badge/inherited-badge.svelte";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import { checkDurationMs, watchedChange } from "#lib/utils/checks.ts";
+import { formatElapsed } from "#lib/utils/format.ts";
+import { liveClock } from "#lib/utils/live-clock.svelte.ts";
 
 // A suite's checks, one row each, each opening its log; and the platform's note on the suite.
 let { suite }: { suite: CheckSuiteView } = $props();

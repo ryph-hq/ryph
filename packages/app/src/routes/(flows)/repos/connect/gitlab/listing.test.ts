@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { ApiError } from "$lib/api/call";
-import type { GitlabProject } from "$lib/api/repos";
-import type { GitlabMode } from "$lib/api/types";
+import { ApiError } from "#lib/api/call.ts";
+import type { GitlabProject } from "#lib/api/repos.ts";
+import type { GitlabMode } from "#lib/api/types.ts";
 import {
   filterGitlabProjects,
   gitlabConnectFailure,

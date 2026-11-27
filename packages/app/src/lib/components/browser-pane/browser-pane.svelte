@@ -1,12 +1,12 @@
 <script lang="ts">
-import type { LiveSource } from "$lib/api/browser-live";
-import { Button } from "$lib/components/ui/button";
-import * as Empty from "$lib/components/ui/empty";
-import { Input } from "$lib/components/ui/input";
-import * as Tabs from "$lib/components/ui/tabs";
-import * as ToggleGroup from "$lib/components/ui/toggle-group";
-import { browserToolIcon } from "$lib/components/tool-call/browser-icons";
-import { formatTime } from "$lib/utils/format";
+import type { LiveSource } from "#lib/api/browser-live.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import * as Empty from "#lib/components/ui/empty/index.ts";
+import { Input } from "#lib/components/ui/input/index.ts";
+import * as Tabs from "#lib/components/ui/tabs/index.ts";
+import * as ToggleGroup from "#lib/components/ui/toggle-group/index.ts";
+import { browserToolIcon } from "#lib/components/tool-call/browser-icons.ts";
+import { formatTime } from "#lib/utils/format.ts";
 import GlobeIcon from "@lucide/svelte/icons/globe";
 import MonitorIcon from "@lucide/svelte/icons/monitor";
 import XIcon from "@lucide/svelte/icons/x";

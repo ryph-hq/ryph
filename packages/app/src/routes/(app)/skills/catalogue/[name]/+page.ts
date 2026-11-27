@@ -1,8 +1,8 @@
 import { error, redirect } from "@sveltejs/kit";
-import { can } from "$lib/utils/auth/capabilities";
+import { can } from "#lib/utils/auth/capabilities.ts";
 import type { PageLoad } from "./$types";
-import { ApiError } from "$lib/api/call";
-import { getCatalogueSkill } from "$lib/api/skills";
+import { ApiError } from "#lib/api/call.ts";
+import { getCatalogueSkill } from "#lib/api/skills.ts";
 
 /** One of ryph's own skills: what it says, and its files. */
 export const load: PageLoad = async ({ fetch, params, parent }) => {

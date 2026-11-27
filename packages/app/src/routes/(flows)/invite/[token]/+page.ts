@@ -1,6 +1,6 @@
 import type { PageLoad } from "./$types";
-import { getAuthSettings, previewInvite } from "$lib/api/auth";
-import { listProviders } from "$lib/api/identities";
+import { getAuthSettings, previewInvite } from "#lib/api/auth.ts";
+import { listProviders } from "#lib/api/identities.ts";
 
 export const load: PageLoad = async ({ parent, params, fetch }) => {
   const { user } = await parent();

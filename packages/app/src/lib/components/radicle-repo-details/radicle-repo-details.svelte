@@ -1,9 +1,9 @@
 <script lang="ts">
-import type { RadicleRepoInfo } from "$lib/api/types";
-import CommandBlock from "$lib/components/command-block/command-block.svelte";
-import CopyButton from "$lib/components/copy-button/copy-button.svelte";
-import { Badge } from "$lib/components/ui/badge";
-import { shortenDid } from "$lib/utils/forge";
+import type { RadicleRepoInfo } from "#lib/api/types.ts";
+import CommandBlock from "#lib/components/command-block/command-block.svelte";
+import CopyButton from "#lib/components/copy-button/copy-button.svelte";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import { shortenDid } from "#lib/utils/forge.ts";
 
 let {
   repoRef,

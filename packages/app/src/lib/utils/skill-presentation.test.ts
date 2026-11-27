@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { SkillPresentation } from "$lib/api/types";
+import type { SkillPresentation } from "#lib/api/types.ts";
 import {
   hasBrandColor,
   iconIsMask,

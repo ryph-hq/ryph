@@ -1,14 +1,14 @@
 import { isRedirect } from "@sveltejs/kit";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { GithubMode } from "$lib/api/types";
+import type { GithubMode } from "#lib/api/types.ts";
 
 const forge = vi.hoisted(() => ({ github: null as GithubMode | null }));
 
-vi.mock("$lib/api/forge", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("$lib/api/forge")>()),
+vi.mock("#lib/api/forge.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("#lib/api/forge.ts")>()),
   getForges: () => Promise.resolve({ providers: ["github"], github: forge.github, radicle: null }),
 }));
-vi.mock("$lib/api/repos", () => ({
+vi.mock("#lib/api/repos.ts", () => ({
   getGithubRepos: () => {
     repos.asked++;
     return Promise.resolve([]);

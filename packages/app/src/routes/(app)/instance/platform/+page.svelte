@@ -1,11 +1,11 @@
 <script lang="ts">
-import PageTitle from "$lib/components/page-title/page-title.svelte";
-import SettingsSection from "$lib/components/settings-section/settings-section.svelte";
-import { Separator } from "$lib/components/ui/separator";
+import PageTitle from "#lib/components/page-title/page-title.svelte";
+import SettingsSection from "#lib/components/settings-section/settings-section.svelte";
+import { Separator } from "#lib/components/ui/separator/index.ts";
 import BackgroundModel from "./background-model.svelte";
 import EgressAllowlist from "./egress-allowlist.svelte";
 import ReservedCapacity from "./reserved-capacity.svelte";
-import { can } from "$lib/utils/auth/capabilities";
+import { can } from "#lib/utils/auth/capabilities.ts";
 import type { PageProps } from "./$types";
 
 let { data }: PageProps = $props();

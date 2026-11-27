@@ -1,26 +1,26 @@
 <script lang="ts">
 import { goto } from "$app/navigation";
 import { page } from "$app/state";
-import { listBuilds } from "$lib/api/environments";
-import type { BuildListItem } from "$lib/api/types";
-import BuildStatusBadge from "$lib/components/build-status-badge/build-status-badge.svelte";
-import ForgeRepoLabel from "$lib/components/forge-repo-label/forge-repo-label.svelte";
-import PageTable, { edgeEnd, edgeStart } from "$lib/components/page-table/page-table.svelte";
-import PageTitle from "$lib/components/page-title/page-title.svelte";
-import { Button } from "$lib/components/ui/button";
-import * as Empty from "$lib/components/ui/empty";
-import * as Select from "$lib/components/ui/select";
-import { Spinner } from "$lib/components/ui/spinner";
-import * as Table from "$lib/components/ui/table";
+import { listBuilds } from "#lib/api/environments.ts";
+import type { BuildListItem } from "#lib/api/types.ts";
+import BuildStatusBadge from "#lib/components/build-status-badge/build-status-badge.svelte";
+import ForgeRepoLabel from "#lib/components/forge-repo-label/forge-repo-label.svelte";
+import PageTable, { edgeEnd, edgeStart } from "#lib/components/page-table/page-table.svelte";
+import PageTitle from "#lib/components/page-title/page-title.svelte";
+import { Button } from "#lib/components/ui/button/index.ts";
+import * as Empty from "#lib/components/ui/empty/index.ts";
+import * as Select from "#lib/components/ui/select/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
+import * as Table from "#lib/components/ui/table/index.ts";
 import {
   buildDurationMs,
   buildKindLabel,
   builtFromLabel,
   isBuildActive,
   triggerLabel,
-} from "$lib/utils/environments";
-import { formatDateTime, formatElapsed, formatRelativeTime } from "$lib/utils/format";
-import { refreshWhileLive } from "$lib/utils/live-refresh.svelte.js";
+} from "#lib/utils/environments.ts";
+import { formatDateTime, formatElapsed, formatRelativeTime } from "#lib/utils/format.ts";
+import { refreshWhileLive } from "#lib/utils/live-refresh.svelte.ts";
 import ContainerIcon from "@lucide/svelte/icons/container";
 import GitBranchIcon from "@lucide/svelte/icons/git-branch";
 import LayersIcon from "@lucide/svelte/icons/layers";
@@ -43,10 +43,10 @@ const subjectByValue = $derived(new Map(data.subjects.map((s) => [s.value, s])))
 
 /** Narrows the list: the filter lands in the address, and the load reads it from there. */
 function setFilter(key: "state" | "subject", value: string, fallback: string) {
-  const url = new URL(page.url);
+  const url = new URL(page.url.href);
   if (value === fallback) url.searchParams.delete(key);
   else url.searchParams.set(key, value);
-  void goto(url, { keepFocus: true, noScroll: true, replaceState: true });
+  void goto(url, { reset: false, replace: true });
 }
 
 const filtered = $derived(data.filters.subject !== null || data.filters.state !== "any");

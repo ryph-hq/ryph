@@ -1,7 +1,7 @@
 import { z } from "zod";
-import type { LaneSummary } from "$lib/api/history";
-import type { ToolCall } from "$lib/api/tools";
-import type { HistoryEvent } from "$lib/api/types";
+import type { LaneSummary } from "#lib/api/history.ts";
+import type { ToolCall } from "#lib/api/tools.ts";
+import type { HistoryEvent } from "#lib/api/types.ts";
 import { formatElapsed } from "./format";
 
 // Subagents as a reader meets them: the marks a subagent's lane opens, continues and closes with,

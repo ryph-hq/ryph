@@ -1,7 +1,7 @@
 <script lang="ts">
-import type { PatchState } from "$lib/api/types";
-import { Badge } from "$lib/components/ui/badge";
-import { Spinner } from "$lib/components/ui/spinner";
+import type { PatchState } from "#lib/api/types.ts";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
 
 let { state, held = null }: {
   state: PatchState;

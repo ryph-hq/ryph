@@ -5,7 +5,7 @@ import {
   type Provider,
   type ProviderKey,
   type ThinkingLevel,
-} from "$lib/api/types";
+} from "#lib/api/types.ts";
 import { thinkingLevelsFor } from "./thinking";
 
 /** The models a provider offers as choices: a custom endpoint's declared list, or the price

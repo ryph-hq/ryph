@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 // The refresh a 401 triggers, stubbed: the real one posts to /auth/refresh.
 const refresh = vi.hoisted(() => ({ user: null as unknown }));
-vi.mock("$lib/utils/auth/auth", () => ({
+vi.mock("#lib/utils/auth/auth.ts", () => ({
   refreshSession: () => Promise.resolve(refresh.user),
 }));
 

@@ -1,8 +1,8 @@
 // The credential half of the register and rotate dialogs: three auth kinds, and the one input that
 // is not a single string — a header map — typed as lines the operator can read back.
 
-import type { McpCredentialInput } from "$lib/api/mcp-servers";
-import type { McpAuthKind } from "$lib/api/types";
+import type { McpCredentialInput } from "#lib/api/mcp-servers.ts";
+import type { McpAuthKind } from "#lib/api/types.ts";
 
 /**
  * A header map from `Name: value` lines, one header per line; blank lines are skipped. The first

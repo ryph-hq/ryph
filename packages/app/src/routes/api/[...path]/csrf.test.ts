@@ -5,10 +5,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 // any other localhost port) could send them on a `no-cors` POST with a body no preflight ever
 // questioned. Only a request this app's own pages could have made goes upstream.
 
-vi.mock("$env/dynamic/private", () => ({ env: { RYPH_PROXY_SECRET: "hop" } }));
-vi.mock("$app/environment", () => ({ dev: true }));
-vi.mock("$lib/server/auth", async (importOriginal) => ({
-  ...await importOriginal<typeof import("$lib/server/auth")>(),
+vi.mock(
+  "$app/env/private",
+  async () => (await import("#lib/testing/env-mock.ts")).envMock({ RYPH_PROXY_SECRET: "hop" }),
+);
+vi.mock("$app/env", () => ({ dev: true }));
+vi.mock("#lib/server/auth.ts", async (importOriginal) => ({
+  ...await importOriginal<typeof import("#lib/server/auth.ts")>(),
   RYPH_API_URL: "http://api.test",
   RYPH_AUTOMATIONS_URL: "http://api.test",
   RYPH_CHAT_URL: "http://api.test",
@@ -66,7 +69,7 @@ async function send(
     // oxlint-disable-next-line no-explicit-any
     event: event as any,
     // oxlint-disable-next-line no-explicit-any
-    resolve: (e: any) => (e.request.method === "GET" ? GET : POST)(e),
+    resolve: async (e: any) => await (e.request.method === "GET" ? GET : POST)(e),
   });
 }
 

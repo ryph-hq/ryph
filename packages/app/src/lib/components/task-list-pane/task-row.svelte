@@ -1,11 +1,11 @@
 <script lang="ts">
-import type { TaskSummary } from "$lib/api/types";
-import AgentAvatar from "$lib/components/agent-avatar/agent-avatar.svelte";
-import RunStateBadge from "$lib/components/run-state-badge/run-state-badge.svelte";
-import { Badge } from "$lib/components/ui/badge";
-import { cn } from "$lib/utils";
-import { formatDateTime, formatRelativeTime } from "$lib/utils/format";
-import TaskTitle from "$lib/components/task-title/task-title.svelte";
+import type { TaskSummary } from "#lib/api/types.ts";
+import AgentAvatar from "#lib/components/agent-avatar/agent-avatar.svelte";
+import RunStateBadge from "#lib/components/run-state-badge/run-state-badge.svelte";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import { cn } from "#lib/utils.ts";
+import { formatDateTime, formatRelativeTime } from "#lib/utils/format.ts";
+import TaskTitle from "#lib/components/task-title/task-title.svelte";
 
 let { task, selected = false, class: className }: {
   task: TaskSummary;

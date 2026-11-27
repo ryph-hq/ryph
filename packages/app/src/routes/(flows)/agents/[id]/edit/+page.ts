@@ -1,15 +1,15 @@
 import { redirect } from "@sveltejs/kit";
 import type { PageLoad } from "./$types";
-import { getAgent } from "$lib/api/agents";
-import { getEgress } from "$lib/api/egress";
-import { getForgeProviders } from "$lib/api/forge";
-import { getHarnesses } from "$lib/api/harnesses";
-import { getLimitsOrNull } from "$lib/api/limits";
-import { getMcpCatalogue, getToolAccess } from "$lib/api/mcp-servers";
-import { getModelAccess } from "$lib/api/provider-keys";
-import { getProvidersOrEmpty } from "$lib/api/providers";
-import { getConnectedRepos } from "$lib/api/repos";
-import { getSkillsOrNull } from "$lib/api/skills";
+import { getAgent } from "#lib/api/agents.ts";
+import { getEgress } from "#lib/api/egress.ts";
+import { getForgeProviders } from "#lib/api/forge.ts";
+import { getHarnesses } from "#lib/api/harnesses.ts";
+import { getLimitsOrNull } from "#lib/api/limits.ts";
+import { getMcpCatalogue, getToolAccess } from "#lib/api/mcp-servers.ts";
+import { getModelAccess } from "#lib/api/provider-keys.ts";
+import { getProvidersOrEmpty } from "#lib/api/providers.ts";
+import { getConnectedRepos } from "#lib/api/repos.ts";
+import { getSkillsOrNull } from "#lib/api/skills.ts";
 
 export const load: PageLoad = async ({ parent, url, params, fetch }) => {
   const { user } = await parent();

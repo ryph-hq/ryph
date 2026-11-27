@@ -1,6 +1,6 @@
 <script lang="ts">
-import { Badge } from "$lib/components/ui/badge";
-import * as Tooltip from "$lib/components/ui/tooltip";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import * as Tooltip from "#lib/components/ui/tooltip/index.ts";
 import InfoIcon from "@lucide/svelte/icons/info";
 
 /** Inside a link, the link is the tab stop: the badge then shows its tooltip on hover only. */

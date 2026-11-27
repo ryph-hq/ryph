@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ToolCall, ToolView } from "$lib/api/tools";
+import type { ToolCall, ToolView } from "#lib/api/tools.ts";
 import { memoryCallOf } from "./memory-calls";
 
 function call(view: ToolView, over: Partial<ToolCall> = {}): ToolCall {

@@ -5,8 +5,8 @@ import {
   sessionHeaders,
   setAuthCookies,
   UpstreamAuthError,
-} from "$lib/server/auth";
-import { sessionSecondsLeft } from "$lib/utils/auth/jwt";
+} from "#lib/server/auth.ts";
+import { sessionSecondsLeft } from "#lib/utils/auth/jwt.ts";
 
 export const POST: RequestHandler = async (event) => {
   const { locals } = event;

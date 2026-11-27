@@ -3,16 +3,16 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 // An artifact's content, against a stubbed control plane: what is asked of it, the exact headers
 // the browser gets whatever came back, and how a refusal reads inside a frame.
 
-vi.mock("$lib/server/auth", () => ({
+vi.mock("#lib/server/auth.ts", () => ({
   RYPH_API_URL: "http://api.test",
   sessionHeaders: () => ({ "x-client-ip": "203.0.113.7" }),
 }));
-vi.mock("$lib/utils/auth/jwt", () => ({
+vi.mock("#lib/utils/auth/jwt.ts", () => ({
   getUserData: (token: string | undefined) => token === "good-jwt" ? { id: "u-1" } : null,
 }));
 
 import { GET } from "./+server";
-import { ARTIFACT_HANDSHAKE, ARTIFACT_SIGN_IN_HANDSHAKE } from "$lib/server/artifact-content";
+import { ARTIFACT_HANDSHAKE, ARTIFACT_SIGN_IN_HANDSHAKE } from "#lib/server/artifact-content.ts";
 
 type Sent = { url: string; headers: Headers };
 

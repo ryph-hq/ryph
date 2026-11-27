@@ -1,7 +1,12 @@
 import { error, json, type RequestHandler } from "@sveltejs/kit";
 import { z } from "zod";
-import { readAuthBody } from "$lib/server/request-body";
-import { acceptInvite, sessionHeaders, setAuthCookies, UpstreamAuthError } from "$lib/server/auth";
+import { readAuthBody } from "#lib/server/request-body.ts";
+import {
+  acceptInvite,
+  sessionHeaders,
+  setAuthCookies,
+  UpstreamAuthError,
+} from "#lib/server/auth.ts";
 
 const bodySchema = z.object({
   name: z.string().optional(),

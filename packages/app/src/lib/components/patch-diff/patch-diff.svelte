@@ -1,9 +1,9 @@
 <script lang="ts">
 import { parsePatchFiles, type Virtualizer } from "@pierre/diffs";
 import type { WorkerPoolManager } from "@pierre/diffs/worker";
-import * as Alert from "$lib/components/ui/alert";
-import * as Empty from "$lib/components/ui/empty";
-import * as ToggleGroup from "$lib/components/ui/toggle-group";
+import * as Alert from "#lib/components/ui/alert/index.ts";
+import * as Empty from "#lib/components/ui/empty/index.ts";
+import * as ToggleGroup from "#lib/components/ui/toggle-group/index.ts";
 import TriangleAlertIcon from "@lucide/svelte/icons/triangle-alert";
 import { inTreeOrder, totalStats, treeStatuses } from "./diff-files";
 import PatchFileDiff from "./patch-file-diff.svelte";

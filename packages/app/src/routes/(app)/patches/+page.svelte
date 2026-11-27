@@ -1,25 +1,25 @@
 <script lang="ts">
-import PageTable, { edgeEnd, edgeStart } from "$lib/components/page-table/page-table.svelte";
-import PageTitle from "$lib/components/page-title/page-title.svelte";
+import PageTable, { edgeEnd, edgeStart } from "#lib/components/page-table/page-table.svelte";
+import PageTitle from "#lib/components/page-title/page-title.svelte";
 import { goto } from "$app/navigation";
-import { getPatches } from "$lib/api/patches";
-import { isPatchAdvancing } from "$lib/api/types";
+import { getPatches } from "#lib/api/patches.ts";
+import { isPatchAdvancing } from "#lib/api/types.ts";
 import { appendPatchPage, type DeeperPatches, mergePatchHead } from "./patch-queue";
-import PatchActions from "$lib/components/patch-actions/patch-actions.svelte";
-import PatchStateBadge from "$lib/components/patch-state-badge/patch-state-badge.svelte";
-import LandedBadge from "$lib/components/patch-state-badge/landed-badge.svelte";
-import CheckStateBadge from "$lib/components/check-state-badge/check-state-badge.svelte";
-import { shortCommit } from "$lib/utils/environments";
-import { countsLabel, isSuiteSettled } from "$lib/utils/checks";
-import { Badge } from "$lib/components/ui/badge";
-import { Button } from "$lib/components/ui/button";
-import * as Empty from "$lib/components/ui/empty";
-import * as Select from "$lib/components/ui/select";
-import { Spinner } from "$lib/components/ui/spinner";
-import * as Table from "$lib/components/ui/table";
-import { formatDateTime, formatRelativeTime } from "$lib/utils/format";
-import { refreshWhileLive } from "$lib/utils/live-refresh.svelte.js";
-import ForgeRepoLabel from "$lib/components/forge-repo-label/forge-repo-label.svelte";
+import PatchActions from "#lib/components/patch-actions/patch-actions.svelte";
+import PatchStateBadge from "#lib/components/patch-state-badge/patch-state-badge.svelte";
+import LandedBadge from "#lib/components/patch-state-badge/landed-badge.svelte";
+import CheckStateBadge from "#lib/components/check-state-badge/check-state-badge.svelte";
+import { shortCommit } from "#lib/utils/environments.ts";
+import { countsLabel, isSuiteSettled } from "#lib/utils/checks.ts";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import * as Empty from "#lib/components/ui/empty/index.ts";
+import * as Select from "#lib/components/ui/select/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
+import * as Table from "#lib/components/ui/table/index.ts";
+import { formatDateTime, formatRelativeTime } from "#lib/utils/format.ts";
+import { refreshWhileLive } from "#lib/utils/live-refresh.svelte.ts";
+import ForgeRepoLabel from "#lib/components/forge-repo-label/forge-repo-label.svelte";
 import GitBranchIcon from "@lucide/svelte/icons/git-branch";
 import GitPullRequestIcon from "@lucide/svelte/icons/git-pull-request";
 import CircleAlertIcon from "@lucide/svelte/icons/circle-alert";
@@ -31,7 +31,7 @@ import {
   hookCheckNotice,
   isCheckingHooks,
   isHeld,
-} from "$lib/utils/hook-check";
+} from "#lib/utils/hook-check.ts";
 import { toast } from "svelte-sonner";
 import type { PageProps } from "./$types";
 
@@ -96,7 +96,7 @@ const filterLabel = $derived(
 
 async function changeFilter(state: string) {
   await goto(state === "all" ? "/patches" : `/patches?state=${encodeURIComponent(state)}`, {
-    keepFocus: true,
+    reset: false,
   });
 }
 

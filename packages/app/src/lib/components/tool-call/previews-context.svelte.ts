@@ -1,6 +1,6 @@
 import { getContext, setContext } from "svelte";
-import { getRunPreviews, type RunPreview } from "$lib/api/previews";
-import { previewHref } from "$lib/utils/previews";
+import { getRunPreviews, type RunPreview } from "#lib/api/previews.ts";
+import { previewHref } from "#lib/utils/previews.ts";
 
 const KEY = Symbol("run-previews");
 

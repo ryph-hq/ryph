@@ -1,10 +1,10 @@
 <script lang="ts">
 import { goto, invalidate } from "$app/navigation";
-import FlowStep from "$lib/components/flow-step/flow-step.svelte";
-import { Button } from "$lib/components/ui/button";
-import * as Field from "$lib/components/ui/field";
-import { Input } from "$lib/components/ui/input";
-import { Spinner } from "$lib/components/ui/spinner";
+import FlowStep from "#lib/components/flow-step/flow-step.svelte";
+import { Button } from "#lib/components/ui/button/index.ts";
+import * as Field from "#lib/components/ui/field/index.ts";
+import { Input } from "#lib/components/ui/input/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
 import UserPlusIcon from "@lucide/svelte/icons/user-plus";
 import { toast } from "svelte-sonner";
 import type { PageProps } from "./$types";

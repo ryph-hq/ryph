@@ -1,6 +1,11 @@
 <script lang="ts">
-import { presetById, type PresetId, type SetupContext, setupSteps } from "$lib/automations/presets";
-import CopyButton from "$lib/components/copy-button/copy-button.svelte";
+import {
+  presetById,
+  type PresetId,
+  type SetupContext,
+  setupSteps,
+} from "#lib/automations/presets.ts";
+import CopyButton from "#lib/components/copy-button/copy-button.svelte";
 import { untrack } from "svelte";
 import ChevronRightIcon from "@lucide/svelte/icons/chevron-right";
 import ExternalLinkIcon from "@lucide/svelte/icons/external-link";

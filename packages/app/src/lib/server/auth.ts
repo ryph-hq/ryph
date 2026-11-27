@@ -1,8 +1,8 @@
-import { dev } from "$app/environment";
-import { env } from "$env/dynamic/private";
+import { dev } from "$app/env";
+import * as env from "$app/env/private";
 import type { Cookies } from "@sveltejs/kit";
 import { z } from "zod";
-import { userSchema } from "$lib/api/types";
+import { userSchema } from "#lib/api/types.ts";
 
 // 127.0.0.1, not localhost: the host binds IPv4 loopback only, and macOS resolves localhost to
 // ::1 first.

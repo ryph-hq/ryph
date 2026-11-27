@@ -1,5 +1,5 @@
 import type { LayoutLoad } from "./$types";
-import { getTasks } from "$lib/api/tasks";
+import { getTasks } from "#lib/api/tasks.ts";
 
 // The whole section's list, not just the index page's: on a wide screen every task route shows it
 // in the pane beside the page panel. `page.data.tasks` is how the app shell — which is what renders

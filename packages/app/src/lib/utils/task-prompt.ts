@@ -1,5 +1,5 @@
-import { ApiError } from "$lib/api/call";
-import { type Phase, type RunState, TERMINAL_RUN_STATES } from "$lib/api/types";
+import { ApiError } from "#lib/api/call.ts";
+import { type Phase, type RunState, TERMINAL_RUN_STATES } from "#lib/api/types.ts";
 
 /** What a list row says in place of the title of a task that has not been told what to do. */
 export const AWAITING_PROMPT_LABEL = "Waiting for instructions…";

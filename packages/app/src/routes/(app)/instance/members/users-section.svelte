@@ -1,22 +1,22 @@
 <script lang="ts">
-import { ROLES } from "$lib/utils/auth/capabilities";
+import { ROLES } from "#lib/utils/auth/capabilities.ts";
 import { invalidate } from "$app/navigation";
-import { deleteUser, mintResetLink, mintVerificationLink, updateUser } from "$lib/api/admin";
-import type { User } from "$lib/api/types";
-import * as AlertDialog from "$lib/components/ui/alert-dialog";
-import { Badge } from "$lib/components/ui/badge";
-import { Button } from "$lib/components/ui/button";
-import * as Dialog from "$lib/components/ui/dialog";
-import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
-import { Input } from "$lib/components/ui/input";
-import { Spinner } from "$lib/components/ui/spinner";
-import * as Table from "$lib/components/ui/table";
-import { formatDateTime } from "$lib/utils/format";
+import { deleteUser, mintResetLink, mintVerificationLink, updateUser } from "#lib/api/admin.ts";
+import type { User } from "#lib/api/types.ts";
+import * as AlertDialog from "#lib/components/ui/alert-dialog/index.ts";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import * as Dialog from "#lib/components/ui/dialog/index.ts";
+import * as DropdownMenu from "#lib/components/ui/dropdown-menu/index.ts";
+import { Input } from "#lib/components/ui/input/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
+import * as Table from "#lib/components/ui/table/index.ts";
+import { formatDateTime } from "#lib/utils/format.ts";
 import CopyIcon from "@lucide/svelte/icons/copy";
 import MoreHorizontalIcon from "@lucide/svelte/icons/more-horizontal";
 import { toast } from "svelte-sonner";
 import type { PageData } from "./$types";
-import { refreshWhileLive } from "$lib/utils/live-refresh.svelte";
+import { refreshWhileLive } from "#lib/utils/live-refresh.svelte.ts";
 
 let { data }: { data: PageData } = $props();
 

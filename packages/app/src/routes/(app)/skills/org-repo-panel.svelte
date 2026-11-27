@@ -1,21 +1,25 @@
 <script lang="ts">
-import { isWebLink } from "$lib/api/forge";
-import { disconnectOrgSkillsRepo, type SyncedOverview, syncOrgSkillsRepo } from "$lib/api/skills";
-import type { ConnectedRepo, OrgSkillsRepo, SkillsOverview, SkillWarning } from "$lib/api/types";
-import ForgeIcon from "$lib/components/forge-icon/forge-icon.svelte";
-import ForgeRepoLabel from "$lib/components/forge-repo-label/forge-repo-label.svelte";
-import SkillCard from "$lib/components/skill-card/skill-card.svelte";
-import * as Alert from "$lib/components/ui/alert";
-import * as AlertDialog from "$lib/components/ui/alert-dialog";
-import { Badge } from "$lib/components/ui/badge";
-import { Button } from "$lib/components/ui/button";
-import * as Collapsible from "$lib/components/ui/collapsible";
-import * as Dialog from "$lib/components/ui/dialog";
-import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
-import { Spinner } from "$lib/components/ui/spinner";
-import { shortCommit } from "$lib/utils/environments";
-import { formatDateTime, formatRelativeTime } from "$lib/utils/format";
-import { commitUrl, shortDigest, syncAnswerMessage, syncFailureTitle } from "$lib/utils/skills";
+import { isWebLink } from "#lib/api/forge.ts";
+import {
+  disconnectOrgSkillsRepo,
+  type SyncedOverview,
+  syncOrgSkillsRepo,
+} from "#lib/api/skills.ts";
+import type { ConnectedRepo, OrgSkillsRepo, SkillsOverview, SkillWarning } from "#lib/api/types.ts";
+import ForgeIcon from "#lib/components/forge-icon/forge-icon.svelte";
+import ForgeRepoLabel from "#lib/components/forge-repo-label/forge-repo-label.svelte";
+import SkillCard from "#lib/components/skill-card/skill-card.svelte";
+import * as Alert from "#lib/components/ui/alert/index.ts";
+import * as AlertDialog from "#lib/components/ui/alert-dialog/index.ts";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import * as Collapsible from "#lib/components/ui/collapsible/index.ts";
+import * as Dialog from "#lib/components/ui/dialog/index.ts";
+import * as DropdownMenu from "#lib/components/ui/dropdown-menu/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
+import { shortCommit } from "#lib/utils/environments.ts";
+import { formatDateTime, formatRelativeTime } from "#lib/utils/format.ts";
+import { commitUrl, shortDigest, syncAnswerMessage, syncFailureTitle } from "#lib/utils/skills.ts";
 import ChevronRightIcon from "@lucide/svelte/icons/chevron-right";
 import ExternalLinkIcon from "@lucide/svelte/icons/external-link";
 import GitBranchIcon from "@lucide/svelte/icons/git-branch";

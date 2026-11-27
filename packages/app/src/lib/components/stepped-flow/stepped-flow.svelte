@@ -12,15 +12,15 @@ export interface FlowStepItem {
 </script>
 
 <script lang="ts">
-import { sidebarMenuButtonVariants } from "$lib/components/ui/sidebar/sidebar-menu-button.svelte";
-import { cn } from "$lib/utils";
-import RyphLogo from "$lib/components/ryph-logo/ryph-logo.svelte";
+import { sidebarMenuButtonVariants } from "#lib/components/ui/sidebar/sidebar-menu-button.svelte";
+import { cn } from "#lib/utils.ts";
+import RyphLogo from "#lib/components/ryph-logo/ryph-logo.svelte";
 import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
 import CheckIcon from "@lucide/svelte/icons/check";
 import CircleAlertIcon from "@lucide/svelte/icons/circle-alert";
 import { flushSync, type Snippet, untrack } from "svelte";
-import { requestToastPosition } from "$lib/utils/toast-position.svelte";
-import { viewTransitionsEnabled } from "$lib/utils/view-transition";
+import { requestToastPosition } from "#lib/utils/toast-position.svelte.ts";
+import { viewTransitionsEnabled } from "#lib/utils/view-transition.ts";
 
 let {
   title,

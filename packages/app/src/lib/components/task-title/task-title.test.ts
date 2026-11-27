@@ -1,6 +1,6 @@
 import { render } from "svelte/server";
 import { describe, expect, it } from "vitest";
-import { AWAITING_PROMPT_LABEL } from "$lib/utils/task-prompt";
+import { AWAITING_PROMPT_LABEL } from "#lib/utils/task-prompt.ts";
 import TaskTitle from "./task-title.svelte";
 
 describe("task title", () => {

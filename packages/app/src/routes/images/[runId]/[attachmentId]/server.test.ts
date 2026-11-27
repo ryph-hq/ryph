@@ -4,11 +4,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 // The image link a forge comment carries, against a stubbed control plane: who is sent to sign
 // in, what is asked of the control plane, and which of its headers reach the browser.
 
-vi.mock("$lib/server/auth", () => ({
+vi.mock("#lib/server/auth.ts", () => ({
   RYPH_API_URL: "http://api.test",
   sessionHeaders: () => ({ "x-client-ip": "203.0.113.7" }),
 }));
-vi.mock("$lib/utils/auth/jwt", () => ({
+vi.mock("#lib/utils/auth/jwt.ts", () => ({
   getUserData: (token: string | undefined) => token === "good-jwt" ? { id: "u-1" } : null,
 }));
 

@@ -1,6 +1,6 @@
 import { render } from "svelte/server";
 import { describe, expect, it, vi } from "vitest";
-import type { EnvironmentView, SubjectEnvironment } from "$lib/api/types";
+import type { EnvironmentView, SubjectEnvironment } from "#lib/api/types.ts";
 import EnvironmentPanel from "./environment-panel.svelte";
 
 vi.mock("$app/navigation", () => ({ goto: vi.fn() }));

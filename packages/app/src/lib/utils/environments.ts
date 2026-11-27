@@ -1,4 +1,4 @@
-import type { EnvironmentDefinitionRead } from "$lib/api/environments";
+import type { EnvironmentDefinitionRead } from "#lib/api/environments.ts";
 import type {
   EnvironmentStatus,
   EnvironmentView,
@@ -6,7 +6,7 @@ import type {
   RunEnvironment,
   SubjectEnvironment,
   SystemPayload,
-} from "$lib/api/types";
+} from "#lib/api/types.ts";
 
 // The environment card and the run page speak the user's vocabulary — Dockerfile, setup,
 // environment — and nothing else: no layer, no digest, no build context. Everything that turns a

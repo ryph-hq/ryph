@@ -1,12 +1,12 @@
 <script lang="ts">
-import { goto, pushState } from "$app/navigation";
+import { goto } from "$app/navigation";
 import { page } from "$app/state";
-import { updateAutomation } from "$lib/api/automations";
-import SteppedFlow, { type FlowStepItem } from "$lib/components/stepped-flow/stepped-flow.svelte";
-import { stepOf } from "$lib/components/stepped-flow/steps";
-import UnsavedChangesGuard from "$lib/components/unsaved-changes-guard/unsaved-changes-guard.svelte";
-import { Button } from "$lib/components/ui/button";
-import { Spinner } from "$lib/components/ui/spinner";
+import { updateAutomation } from "#lib/api/automations.ts";
+import SteppedFlow, { type FlowStepItem } from "#lib/components/stepped-flow/stepped-flow.svelte";
+import { stepOf } from "#lib/components/stepped-flow/steps.ts";
+import UnsavedChangesGuard from "#lib/components/unsaved-changes-guard/unsaved-changes-guard.svelte";
+import { Button } from "#lib/components/ui/button/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
 import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
 import ArrowRightIcon from "@lucide/svelte/icons/arrow-right";
 import CheckIcon from "@lucide/svelte/icons/check";
@@ -85,7 +85,7 @@ const webhookUrl = $derived(
 // The step on screen lives in the history entry's state (shallow routing), so the browser's
 // back and forward buttons walk the steps without a navigation.
 function go(id: AutomationStepId) {
-  if (id !== current) pushState("", { step: id });
+  if (id !== current) void goto("", { shallow: true, state: { step: id } });
 }
 
 async function submit(event: SubmitEvent) {

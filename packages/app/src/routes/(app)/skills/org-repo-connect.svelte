@@ -1,16 +1,16 @@
 <script lang="ts">
-import { connectOrgSkillsRepo, type SyncedOverview } from "$lib/api/skills";
-import type { ConnectedRepo } from "$lib/api/types";
-import ForgeIcon from "$lib/components/forge-icon/forge-icon.svelte";
-import { Button } from "$lib/components/ui/button";
-import * as Dialog from "$lib/components/ui/dialog";
-import * as Empty from "$lib/components/ui/empty";
-import * as Field from "$lib/components/ui/field";
-import { Input } from "$lib/components/ui/input";
-import * as Select from "$lib/components/ui/select";
-import { Spinner } from "$lib/components/ui/spinner";
-import { forgeRepoLabel } from "$lib/utils/forge";
-import { syncAnswerMessage } from "$lib/utils/skills";
+import { connectOrgSkillsRepo, type SyncedOverview } from "#lib/api/skills.ts";
+import type { ConnectedRepo } from "#lib/api/types.ts";
+import ForgeIcon from "#lib/components/forge-icon/forge-icon.svelte";
+import { Button } from "#lib/components/ui/button/index.ts";
+import * as Dialog from "#lib/components/ui/dialog/index.ts";
+import * as Empty from "#lib/components/ui/empty/index.ts";
+import * as Field from "#lib/components/ui/field/index.ts";
+import { Input } from "#lib/components/ui/input/index.ts";
+import * as Select from "#lib/components/ui/select/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
+import { forgeRepoLabel } from "#lib/utils/forge.ts";
+import { syncAnswerMessage } from "#lib/utils/skills.ts";
 import FolderGit2Icon from "@lucide/svelte/icons/folder-git-2";
 import { toast } from "svelte-sonner";
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-import CopyButton from "$lib/components/copy-button/copy-button.svelte";
+import CopyButton from "#lib/components/copy-button/copy-button.svelte";
 
 let { prompt }: { prompt: string } = $props();
 </script>

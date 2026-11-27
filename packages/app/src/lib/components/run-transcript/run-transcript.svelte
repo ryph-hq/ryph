@@ -1,12 +1,12 @@
 <script lang="ts">
-import type { RunMessage, RunSkills } from "$lib/api/types";
-import type { RunHistory, TranscriptRow } from "$lib/components/run-history/run-history.svelte";
-import AgentAvatar from "$lib/components/agent-avatar/agent-avatar.svelte";
-import AttachmentImages from "$lib/components/attachment-images/attachment-images.svelte";
-import ForgeRepoLabel from "$lib/components/forge-repo-label/forge-repo-label.svelte";
-import AgentThrobber from "$lib/components/agent-throbber/agent-throbber.svelte";
-import Markdown from "$lib/components/markdown/markdown.svelte";
-import RunResult from "$lib/components/run-result/run-result.svelte";
+import type { RunMessage, RunSkills } from "#lib/api/types.ts";
+import type { RunHistory, TranscriptRow } from "#lib/components/run-history/run-history.svelte.ts";
+import AgentAvatar from "#lib/components/agent-avatar/agent-avatar.svelte";
+import AttachmentImages from "#lib/components/attachment-images/attachment-images.svelte";
+import ForgeRepoLabel from "#lib/components/forge-repo-label/forge-repo-label.svelte";
+import AgentThrobber from "#lib/components/agent-throbber/agent-throbber.svelte";
+import Markdown from "#lib/components/markdown/markdown.svelte";
+import RunResult from "#lib/components/run-result/run-result.svelte";
 import AgentActivity from "./agent-activity.svelte";
 import PlatformNotice from "./platform-notice.svelte";
 import {
@@ -20,34 +20,34 @@ import {
 import { parseFireMessage } from "./alert-message";
 import { placementFor, spliceOf } from "./splice";
 import { TranscriptArrivals } from "./arrivals";
-import ToolCallView, { presentationFor } from "$lib/components/tool-call/tool-call.svelte";
-import * as Avatar from "$lib/components/ui/avatar";
-import { Badge } from "$lib/components/ui/badge";
-import { Button } from "$lib/components/ui/button";
-import * as Collapsible from "$lib/components/ui/collapsible";
-import { Spinner } from "$lib/components/ui/spinner";
-import { shortCommit, systemPayloadLabel } from "$lib/utils/environments";
-import { formatCount, formatElapsed, formatRelativeTime, formatTime } from "$lib/utils/format";
-import { personInitials } from "$lib/utils/avatar";
-import { browserUnavailableReason } from "$lib/utils/browser-tools";
-import { parseSkillDrop, skillRead } from "$lib/utils/skills";
-import { getRunSkillsContext } from "$lib/components/tool-call/run-skills-context";
-import { getBackgroundJobsContext } from "$lib/components/tool-call/background-jobs-context";
-import { getSubagentsContext } from "$lib/components/tool-call/subagents-context";
-import { noticeFailed, noticeSentence } from "$lib/utils/background";
-import { getPatchesContext, getPatchesRefresh } from "$lib/components/tool-call/patches-context";
-import HookWarning from "$lib/components/hook-warning/hook-warning.svelte";
+import ToolCallView, { presentationFor } from "#lib/components/tool-call/tool-call.svelte";
+import * as Avatar from "#lib/components/ui/avatar/index.ts";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import * as Collapsible from "#lib/components/ui/collapsible/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
+import { shortCommit, systemPayloadLabel } from "#lib/utils/environments.ts";
+import { formatCount, formatElapsed, formatRelativeTime, formatTime } from "#lib/utils/format.ts";
+import { personInitials } from "#lib/utils/avatar.ts";
+import { browserUnavailableReason } from "#lib/utils/browser-tools.ts";
+import { parseSkillDrop, skillRead } from "#lib/utils/skills.ts";
+import { getRunSkillsContext } from "#lib/components/tool-call/run-skills-context.ts";
+import { getBackgroundJobsContext } from "#lib/components/tool-call/background-jobs-context.ts";
+import { getSubagentsContext } from "#lib/components/tool-call/subagents-context.ts";
+import { noticeFailed, noticeSentence } from "#lib/utils/background.ts";
+import { getPatchesContext, getPatchesRefresh } from "#lib/components/tool-call/patches-context.ts";
+import HookWarning from "#lib/components/hook-warning/hook-warning.svelte";
 import {
   heldNoticeLine,
   HOOK_NOTICE_PAST_LABEL,
   isHeld,
   isHeldNotice,
-} from "$lib/utils/hook-check";
+} from "#lib/utils/hook-check.ts";
 import JumpToBottom from "./jump-to-bottom.svelte";
 import BookOpenTextIcon from "@lucide/svelte/icons/book-open-text";
 import ChevronRightIcon from "@lucide/svelte/icons/chevron-right";
 import CircleIcon from "@lucide/svelte/icons/circle";
-import CheckStateIcon from "$lib/components/check-state-icon/check-state-icon.svelte";
+import CheckStateIcon from "#lib/components/check-state-icon/check-state-icon.svelte";
 import CloudOffIcon from "@lucide/svelte/icons/cloud-off";
 import EllipsisIcon from "@lucide/svelte/icons/ellipsis";
 import MessageCircleDashedIcon from "@lucide/svelte/icons/message-circle-dashed";
@@ -58,7 +58,7 @@ import SquareTerminalIcon from "@lucide/svelte/icons/square-terminal";
 import TriangleAlertIcon from "@lucide/svelte/icons/triangle-alert";
 import { onMount, tick, untrack } from "svelte";
 import { Virtualizer, WindowVirtualizer } from "virtua/svelte";
-import { endLabel, laneMarkOf, modeLabel } from "$lib/utils/subagents";
+import { endLabel, laneMarkOf, modeLabel } from "#lib/utils/subagents.ts";
 import BotIcon from "@lucide/svelte/icons/bot";
 import FlagIcon from "@lucide/svelte/icons/flag";
 

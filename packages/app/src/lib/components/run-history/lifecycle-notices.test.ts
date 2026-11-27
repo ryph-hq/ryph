@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { RunEvent, RunMessage } from "$lib/api/types";
+import type { RunEvent, RunMessage } from "#lib/api/types.ts";
 import { RunHistory } from "./run-history.svelte";
 
 const event: RunEvent = {
