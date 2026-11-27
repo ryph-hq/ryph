@@ -196,8 +196,13 @@ export function costHeadline(t: UsageTotals): string {
 export function costSourceNote(t: UsageTotals, source: string): string {
   const estimate = `Costs are list-price estimates from Ryph's built-in price list (${source})`;
   switch (costBasis(t)) {
-    case "billed":
-      return "Costs are what OpenRouter billed.";
+    case "billed": {
+      if (t.includedRequests === 0 && t.unpricedRequests === 0) {
+        return "Costs are what OpenRouter billed.";
+      }
+      const n = t.reportedRequests;
+      return `Costs are what OpenRouter billed for ${n} ${n === 1 ? "call" : "calls"}.`;
+    }
     case "mixed": {
       const n = t.reportedRequests;
       return `${estimate}, except ${n} ${n === 1 ? "call" : "calls"} priced at OpenRouter's bill.`;

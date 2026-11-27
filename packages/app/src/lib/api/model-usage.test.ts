@@ -172,6 +172,26 @@ describe("where the costs come from", () => {
       unpricedRequests: 1,
     });
     expect(costBasis(t)).toBe("billed");
+    expect(costSourceNote(t, source)).toBe("Costs are what OpenRouter billed for 2 calls.");
+  });
+
+  it("says every call was billed only when none were included or unpriced", () => {
+    const included = usageTotalsSchema.parse({
+      ...totals,
+      meteredRequests: 2,
+      reportedRequests: 1,
+      includedRequests: 1,
+    });
+    expect(costSourceNote(included, source)).toBe("Costs are what OpenRouter billed for 1 call.");
+    const unpriced = usageTotalsSchema.parse({
+      ...totals,
+      meteredRequests: 3,
+      reportedRequests: 2,
+      unpricedRequests: 1,
+    });
+    expect(costSourceNote(unpriced, source)).toBe(
+      "Costs are what OpenRouter billed for 2 calls.",
+    );
   });
 
   it("keeps the estimate wording for the rest of a mix", () => {
