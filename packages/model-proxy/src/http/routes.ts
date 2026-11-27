@@ -187,7 +187,7 @@ export function providerKeyRoutes(deps: ProviderKeyRoutesDeps): Route[] {
       return {
         refused: null,
         extra: {
-          warning: "OpenRouter could not check this key just now, so it was saved unchecked",
+          warning: "Key saved. OpenRouter couldn't check it.",
         },
       };
     }

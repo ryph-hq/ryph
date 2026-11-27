@@ -35,6 +35,8 @@ export const openRouterSyncSchema = z.object({
   attemptedAt: z.string().nullable(),
   /** Why the last attempt failed; null once one works. */
   error: z.string().nullable(),
+  /** The failure's code when the admin can act on it: `openrouter_sync_shrunk`. */
+  errorCode: z.string().nullable().default(null),
   syncing: z.boolean(),
 });
 export type OpenRouterSync = z.infer<typeof openRouterSyncSchema>;

@@ -46,6 +46,7 @@ const catalogue = {
     syncedAt: "2026-11-27T10:00:00.000Z",
     attemptedAt: "2026-11-27T10:00:00.000Z",
     error: null,
+    errorCode: null,
     syncing: false,
   },
 };
@@ -57,6 +58,22 @@ describe("the catalogue", () => {
     expect(seen[0].url).toBe("/api/v1/openrouter/models");
     expect(read.models[1].price).toBeNull();
     expect(read.sync.syncedAt).toBe("2026-11-27T10:00:00.000Z");
+    expect(read.sync.errorCode).toBeNull();
+  });
+
+  it("reads a sync with no code as null", async () => {
+    const { errorCode: _, ...sync } = catalogue.sync;
+    const { f } = answering(200, { ...catalogue, sync });
+    expect((await getOpenRouterCatalogue(f)).sync.errorCode).toBeNull();
+  });
+
+  it("reads the code of a sync refused for a shrunk list", async () => {
+    const shrunk = {
+      ...catalogue,
+      sync: { ...catalogue.sync, error: "down from 300", errorCode: "openrouter_sync_shrunk" },
+    };
+    const { f } = answering(200, shrunk);
+    expect((await getOpenRouterCatalogue(f)).sync.errorCode).toBe("openrouter_sync_shrunk");
   });
 
   it("refuses a model missing a field", async () => {

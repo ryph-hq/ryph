@@ -91,12 +91,17 @@ export interface OpenRouterModel extends OpenRouterCatalogueEntry {
   updatedAt: string;
 }
 
+/** The code on a sync that refused a list for losing more than half the models the last one
+ * listed: what the admin's "Use this list anyway" keys on, there being no other way to tell it. */
+export const OPENROUTER_SYNC_SHRUNK = "openrouter_sync_shrunk";
+
 /** Where the catalogue sync stands: when it last worked, when it was last tried, and why that
- * try failed. */
+ * try failed, in words and (for a failure the admin can act on) as a code. */
 export interface OpenRouterSync {
   syncedAt: string | null;
   attemptedAt: string | null;
   error: string | null;
+  errorCode: string | null;
 }
 
 type Json = Record<string, unknown>;

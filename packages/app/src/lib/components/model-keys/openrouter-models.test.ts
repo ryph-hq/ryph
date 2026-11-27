@@ -140,7 +140,7 @@ describe("the sync line", () => {
     vi.useRealTimers();
   });
 
-  const base = { syncedAt: null, attemptedAt: null, error: null, syncing: false };
+  const base = { syncedAt: null, attemptedAt: null, error: null, errorCode: null, syncing: false };
 
   it("says syncing first, then a failure, then when it last worked", () => {
     expect(syncLine({ ...base, syncing: true, error: "x" })).toEqual({

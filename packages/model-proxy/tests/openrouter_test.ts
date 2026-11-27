@@ -204,6 +204,7 @@ test("a sync writes the catalogue; a failed one keeps it and says why", async ()
     syncedAt: NOW.toISOString(),
     attemptedAt: NOW.toISOString(),
     error: null,
+    errorCode: null,
   });
   assertEquals((await store.listOpenRouterModels()).length, 3);
 
@@ -213,6 +214,7 @@ test("a sync writes the catalogue; a failed one keeps it and says why", async ()
   assertEquals(failed.syncedAt, NOW.toISOString(), "the last good sync is kept");
   assertEquals(failed.attemptedAt, now.toISOString());
   assertEquals(failed.error, "OpenRouter answered 503 for its model list");
+  assertEquals(failed.errorCode, null, "only a shrunk list carries a code");
   assertEquals((await store.listOpenRouterModels()).every((m) => m.listed), true);
 
   // An empty list is a failure too: it would unlist every model.
@@ -276,11 +278,14 @@ test("a short list keeps enabled models; one half gone fails unless forced", asy
     refused.error,
     "OpenRouter's model list had 2 usable models, down from 8, so the old list was kept",
   );
+  assertEquals(refused.errorCode, "openrouter_sync_shrunk");
+  assertEquals((await store.getOpenRouterSync())?.errorCode, "openrouter_sync_shrunk");
   assertEquals((await listed()).length, 8);
 
   // Forced, the list is taken: the enabled models' second miss in a row unlists them.
   const forced = await catalogue.sync({ force: true });
   assertEquals(forced.error, null);
+  assertEquals(forced.errorCode, null);
   assertEquals(await usable(), []);
   assertEquals(await listed(), ["m/2", "m/3"]);
 });
@@ -327,7 +332,9 @@ test("a list past the cap fails, and so does a write, with a short error", async
 const ADMIN = "admin-secret";
 const USER = "user-secret";
 
-function makeApi(opts: { store?: KeyStore; api?: ReturnType<typeof fakeOpenRouter> } = {}) {
+function makeApi(
+  opts: { store?: KeyStore; api?: ReturnType<typeof fakeOpenRouter>; changed?: () => void } = {},
+) {
   const store = opts.store ?? memoryKeyStore();
   const api = opts.api ?? fakeOpenRouter();
   const catalogue = makeOpenRouterCatalogue({ store, api, now: () => NOW, diag: quiet });
@@ -360,6 +367,7 @@ function makeApi(opts: { store?: KeyStore; api?: ReturnType<typeof fakeOpenRoute
       authenticateManage,
       now: () => NOW,
       diag: quiet,
+      ...(opts.changed === undefined ? {} : { changed: opts.changed }),
     }),
   ];
   const handler = async (req: Request): Promise<Response> => {
@@ -406,6 +414,7 @@ test("the catalogue routes are the admin's, and the enabled set is held to the c
     syncedAt: NOW.toISOString(),
     attemptedAt: NOW.toISOString(),
     error: null,
+    errorCode: null,
     syncing: false,
   });
   // The sync's bookkeeping stays out of the picker.
@@ -417,6 +426,7 @@ test("the catalogue routes are the admin's, and the enabled set is held to the c
   });
   assertEquals(refused.status, 400);
   const why = await refused.json();
+  assertEquals(why.error, "Some models can't be enabled");
   assertEquals(why.unknown, ["nope/never", "openrouter/auto"]);
   assertEquals(why.noTools, ["acme/no-tools"]);
 
@@ -434,7 +444,9 @@ test("the catalogue routes are the admin's, and the enabled set is held to the c
 test("an unlisted model cannot be enabled again, but an enabled one stays in the picker", async () => {
   const { call, catalogue, api } = makeApi();
   await catalogue.sync();
-  await call("PUT", "/v1/openrouter/models/enabled", { ids: ["openai/gpt-6"] });
+  await call("PUT", "/v1/openrouter/models/enabled", {
+    ids: ["openai/gpt-6", "anthropic/claude-sonnet-5"],
+  });
   // Gone from two lists in a row, the enabled model is unlisted. (The lists are a third of the
   // last one, which only a forced sync takes.)
   api.models = { data: [listedModel("anthropic/claude-sonnet-5")] };
@@ -446,9 +458,47 @@ test("an unlisted model cannot be enabled again, but an enabled one stays in the
     ["anthropic/claude-sonnet-5", true],
     ["openai/gpt-6", false],
   ]);
+  // Still enabled, it may stay in the set a save carries: one model OpenRouter dropped must not
+  // block every later save of the rest.
+  const kept = await call("PUT", "/v1/openrouter/models/enabled", {
+    ids: ["openai/gpt-6", "anthropic/claude-sonnet-5"],
+  });
+  assertEquals(kept.status, 200);
+
+  // Once turned off, it cannot be turned on again.
+  assertEquals(
+    (await call("PUT", "/v1/openrouter/models/enabled", { ids: ["anthropic/claude-sonnet-5"] }))
+      .status,
+    200,
+  );
   const refused = await call("PUT", "/v1/openrouter/models/enabled", { ids: ["openai/gpt-6"] });
   assertEquals(refused.status, 400);
   assertEquals((await refused.json()).unlisted, ["openai/gpt-6"]);
+});
+
+test("an enabled model that stops taking tools does not block a save, and stays away from runs", async () => {
+  const { call, catalogue, api, store } = makeApi();
+  await catalogue.sync();
+  const set = (ids: string[]) => call("PUT", "/v1/openrouter/models/enabled", { ids });
+  assertEquals((await set(["openai/gpt-6"])).status, 200);
+  // OpenRouter stops saying the model takes tools.
+  api.models = {
+    data: [
+      ...MODELS_BODY.data.filter((m) => m.id !== "openai/gpt-6"),
+      listedModel("openai/gpt-6", { supported_parameters: ["reasoning"] }),
+    ],
+  };
+  await catalogue.sync();
+  // Adding another model still saves with it in the set...
+  assertEquals((await set(["openai/gpt-6", "anthropic/claude-sonnet-5"])).status, 200);
+  // ...but once turned off, it is a model newly enabled, which must take tools.
+  assertEquals((await set(["anthropic/claude-sonnet-5"])).status, 200);
+  const again = await set(["openai/gpt-6", "anthropic/claude-sonnet-5"]);
+  assertEquals(again.status, 400);
+  assertEquals((await again.json()).noTools, ["openai/gpt-6"]);
+  assertEquals((await store.listUsableOpenRouterModels()).map((m) => m.id), [
+    "anthropic/claude-sonnet-5",
+  ]);
 });
 
 test("Sync now answers the catalogue, or a 502 that says why and keeps it", async () => {
@@ -464,6 +514,92 @@ test("Sync now answers the catalogue, or a 502 that says why and keeps it", asyn
   assert(body.error.includes("OpenRouter answered 500"));
   assertEquals(body.models.length, 3, "the last catalogue stands");
   assertEquals(body.sync.error, "OpenRouter answered 500 for its model list");
+  assertEquals(body.code, undefined, "only a shrunk list's failure carries a code");
+  assertEquals(body.sync.errorCode, null);
+});
+
+test("a catalogue read that starts a sync answers that one is running", async () => {
+  const api = fakeOpenRouter();
+  let release = () => {};
+  const held = new Promise<void>((resolve) => (release = resolve));
+  const listModels = api.listModels;
+  let asked = 0;
+  api.listModels = async () => {
+    asked += 1;
+    await held;
+    return await listModels();
+  };
+  const { call, store } = makeApi({ api });
+  await store.createProviderKey({
+    id: "pk-or",
+    provider: OPENROUTER,
+    label: "team",
+    last4: "abcd",
+    encryptedSecret: "sealed:sk-or-team",
+    archivedAt: null,
+    createdAt: NOW.toISOString(),
+    updatedAt: NOW.toISOString(),
+  });
+
+  // Never synced, with a live key: the read starts one, and says so, so the picker reads again.
+  const first = await (await call("GET", "/v1/openrouter/models")).json();
+  assertEquals(first.sync.syncing, true);
+  assertEquals(first.models, []);
+  assertEquals(asked, 1);
+
+  release();
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  const after = await (await call("GET", "/v1/openrouter/models")).json();
+  assertEquals(after.sync.syncing, false);
+  assertEquals(after.models.length, 3);
+  assertEquals(asked, 1, "fresh now: no second sync");
+});
+
+test("saving the enabled set and a sync that writes tell the proxy's cache", async () => {
+  let changes = 0;
+  const { call, api } = makeApi({ changed: () => changes++ });
+  await call("POST", "/v1/openrouter/sync");
+  await call("PUT", "/v1/openrouter/models/enabled", { ids: ["openai/gpt-6"] });
+  assertEquals(changes, 1, "the routes tell it of a save");
+  // A refused save changes nothing, and says nothing.
+  await call("PUT", "/v1/openrouter/models/enabled", { ids: ["nope/never"] });
+  assertEquals(changes, 1);
+
+  let synced = 0;
+  const catalogue = makeOpenRouterCatalogue({
+    store: memoryKeyStore(),
+    api,
+    now: () => NOW,
+    diag: quiet,
+    changed: () => synced++,
+  });
+  await catalogue.sync();
+  assertEquals(synced, 1);
+  api.models = new Error("down");
+  await catalogue.sync();
+  assertEquals(synced, 1, "a failed sync wrote nothing");
+});
+
+test("a sync refused for a shrunk list says so by code, until a forced one takes the list", async () => {
+  const { call, api } = makeApi();
+  assertEquals((await call("POST", "/v1/openrouter/sync")).status, 200);
+
+  api.models = { data: [listedModel("anthropic/claude-sonnet-5")] };
+  const shrunk = await call("POST", "/v1/openrouter/sync");
+  assertEquals(shrunk.status, 502);
+  const body = await shrunk.json();
+  assertEquals(body.code, "openrouter_sync_shrunk");
+  assertEquals(body.sync.errorCode, "openrouter_sync_shrunk");
+  assertEquals(body.models.length, 3, "the old list stands");
+  // The catalogue read carries it too, for a picker that never saw the 502.
+  const read = await (await call("GET", "/v1/openrouter/models")).json();
+  assertEquals(read.sync.errorCode, "openrouter_sync_shrunk");
+
+  const forced = await call("POST", "/v1/openrouter/sync", { force: true });
+  assertEquals(forced.status, 200);
+  const taken = await forced.json();
+  assertEquals(taken.sync.errorCode, null);
+  assertEquals(taken.sync.error, null);
 });
 
 test("the provider list offers OpenRouter's enabled, listed models with their prices", async () => {
@@ -706,7 +842,7 @@ test("an OpenRouter key OpenRouter cannot be asked about is saved, with a warnin
   // A failed first sync does not fail the save either.
   assertEquals(created.status, 201);
   const body = await created.json();
-  assert(typeof body.warning === "string");
+  assertEquals(body.warning, "Key saved. OpenRouter couldn't check it.");
   assert(!("openrouter" in body));
   assertEquals((await store.listProviderKeys()).length, 1);
   assert((await store.getOpenRouterSync())?.error !== null);

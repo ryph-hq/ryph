@@ -8,8 +8,13 @@
 //   provider list
 // - a change to the enabled set that changes what the platform's policy may call kills the
 //   platform's credentials, as saving the policy does: each consumer re-mints under the new set
-// - only a model OpenRouter lists, that takes tools, can be enabled: pi drives an agent through
-//   tool calls, and a model without them would fail every run on its first turn
+// - only a model OpenRouter lists, that takes tools, can be NEWLY enabled: pi drives an agent
+//   through tool calls, and a model without them would fail every run on its first turn. One
+//   already enabled may stay in the set it is saved with even after it stops qualifying, so a
+//   change elsewhere in the list still saves; the proxy keeps it away from runs regardless (it
+//   serves only enabled models that are still listed), and the picker shows it to be turned off
+// - a sync that refused a list for shrinking says so by code (`errorCode`), on its 502 and in
+//   the catalogue's sync state, so the admin can be offered to take the list anyway
 // - a key's credit is read live from OpenRouter with the key itself, and never stored
 // - nothing here sends a key anywhere but OpenRouter
 
@@ -52,18 +57,30 @@ export async function liveOpenRouterKey(store: KeyStore): Promise<boolean> {
 }
 
 /**
- * Starts a sync in the background when the catalogue is stale and a live OpenRouter key exists.
- * Never holds the read that asked, and never fails it.
+ * Starts a sync when the catalogue is stale and a live OpenRouter key exists. Resolves once that
+ * is decided, never waiting out the sync itself, and never rejects: from then on
+ * `catalogue.syncing()` says whether one runs.
  */
+export async function startStaleSync(
+  store: KeyStore,
+  catalogue: OpenRouterCatalogue,
+  diag: { warn(event: string, data?: Record<string, unknown>): void },
+): Promise<void> {
+  try {
+    if (catalogue.syncing() || !(await liveOpenRouterKey(store))) return;
+    await catalogue.startIfStale();
+  } catch (err) {
+    diag.warn("openrouter.background_sync_failed", { err: String(err) });
+  }
+}
+
+/** `startStaleSync` for a read that says nothing of syncing: never holds it at all. */
 export function syncStaleInBackground(
   store: KeyStore,
   catalogue: OpenRouterCatalogue,
   diag: { warn(event: string, data?: Record<string, unknown>): void },
 ): void {
-  void (async () => {
-    if (catalogue.syncing() || !(await liveOpenRouterKey(store))) return;
-    await catalogue.syncIfStale();
-  })().catch((err) => diag.warn("openrouter.background_sync_failed", { err: String(err) }));
+  void startStaleSync(store, catalogue, diag);
 }
 
 /**
@@ -105,6 +122,8 @@ export interface OpenRouterRoutesDeps {
   authenticateManage(req: Request): Promise<Response | null>;
   now(): Date;
   diag: { warn(event: string, data?: Record<string, unknown>): void };
+  /** Told after the enabled set was saved: what agents may use can have changed with it. */
+  changed?(): void;
 }
 
 export function openRouterRoutes(deps: OpenRouterRoutesDeps): Route[] {
@@ -123,6 +142,7 @@ export function openRouterRoutes(deps: OpenRouterRoutesDeps): Route[] {
         syncedAt: sync?.syncedAt ?? null,
         attemptedAt: sync?.attemptedAt ?? null,
         error: sync?.error ?? null,
+        errorCode: sync?.errorCode ?? null,
         syncing: catalogue.syncing(),
       },
     };
@@ -131,7 +151,9 @@ export function openRouterRoutes(deps: OpenRouterRoutesDeps): Route[] {
   const list = async (req: Request): Promise<Response> => {
     const denied = await deps.authenticateManage(req);
     if (denied) return denied;
-    syncStaleInBackground(store, catalogue, deps.diag);
+    // Decided before the answer is built, so a read that starts a sync says `syncing: true` and
+    // the picker knows to read again.
+    await startStaleSync(store, catalogue, deps.diag);
     return json(200, await catalogueBody());
   };
 
@@ -146,18 +168,17 @@ export function openRouterRoutes(deps: OpenRouterRoutesDeps): Route[] {
     const noTools: string[] = [];
     for (const id of body.data.ids) {
       const model = byId.get(id);
+      // Already enabled: kept whatever became of it, or one model OpenRouter changed would block
+      // every later save. Only enabled AND listed models reach runs either way.
+      if (model?.enabled === true) continue;
       if (model === undefined) unknown.push(id);
       else if (!model.listed) unlisted.push(id);
       else if (!model.tools) noTools.push(id);
     }
-    const problems = [
-      ...(unknown.length === 0 ? [] : [`not in OpenRouter's catalogue: ${unknown.join(", ")}`]),
-      ...(unlisted.length === 0 ? [] : [`no longer listed by OpenRouter: ${unlisted.join(", ")}`]),
-      ...(noTools.length === 0 ? [] : [`does not take tools: ${noTools.join(", ")}`]),
-    ];
-    if (problems.length > 0) {
+    // Which ids, and why, are in the three lists, for a client to name them each.
+    if (unknown.length + unlisted.length + noTools.length > 0) {
       return json(400, {
-        error: `these models cannot be enabled — ${problems.join("; ")}`,
+        error: "Some models can't be enabled",
         unknown,
         unlisted,
         noTools,
@@ -169,6 +190,7 @@ export function openRouterRoutes(deps: OpenRouterRoutesDeps): Route[] {
       ? await platformModels(platform.allowedModels)
       : null;
     await store.setOpenRouterEnabled(body.data.ids, at);
+    deps.changed?.();
     // The platform's credentials carry the enabled set as it was when they were minted. When the
     // change moves what its policy may call, they are killed, as a policy edit kills them: the
     // consumers re-mint under the new set — or are refused, saying which model is off.
@@ -197,7 +219,11 @@ export function openRouterRoutes(deps: OpenRouterRoutesDeps): Route[] {
     const state = await catalogue.sync({ force: body.data.force });
     const answer = await catalogueBody();
     if (state.error !== null) {
-      return json(502, { error: `could not sync OpenRouter's models: ${state.error}`, ...answer });
+      return json(502, {
+        error: `could not sync OpenRouter's models: ${state.error}`,
+        ...(state.errorCode === null ? {} : { code: state.errorCode }),
+        ...answer,
+      });
     }
     return json(200, answer);
   };

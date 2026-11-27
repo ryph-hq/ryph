@@ -312,11 +312,17 @@ test("the OpenRouter catalogue round-trips through both stores identically", asy
       await store.setOpenRouterEnabled([], T1);
       assertEquals((await store.listOpenRouterModels()).filter((r) => r.enabled), [], name);
 
-      const state = { syncedAt: T0, attemptedAt: T1, error: "OpenRouter answered 503" };
+      const state = {
+        syncedAt: T0,
+        attemptedAt: T1,
+        error: "the list shrank",
+        errorCode: "openrouter_sync_shrunk",
+      };
       await store.putOpenRouterSync(state);
       assertEquals(await store.getOpenRouterSync(), state, name);
-      await store.putOpenRouterSync({ ...state, error: null });
+      await store.putOpenRouterSync({ ...state, error: null, errorCode: null });
       assertEquals((await store.getOpenRouterSync())?.error, null, name);
+      assertEquals((await store.getOpenRouterSync())?.errorCode, null, name);
     }
   } finally {
     await stores.drizzle.close();

@@ -129,6 +129,8 @@ export const openrouterSync = pgTable("openrouter_sync", {
   syncedAt: text("synced_at"),
   attemptedAt: text("attempted_at"),
   error: text("error"),
+  // A code beside the error, for the one failure the admin can act on: OPENROUTER_SYNC_SHRUNK.
+  errorCode: text("error_code"),
 });
 
 export const virtualKeys = pgTable("virtual_keys", {
