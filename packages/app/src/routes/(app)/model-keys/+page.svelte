@@ -42,6 +42,11 @@ import EndpointFields from "#lib/components/model-keys/endpoint-fields.svelte";
 import KeySecretFields from "#lib/components/model-keys/key-secret-fields.svelte";
 import OpenrouterCredit from "#lib/components/model-keys/openrouter-credit.svelte";
 import OpenrouterModels from "#lib/components/model-keys/openrouter-models.svelte";
+import {
+  CATALOGUE_NOT_READ,
+  enabledModelsLine,
+  PICKER_DIALOG_CLASS,
+} from "#lib/components/model-keys/openrouter-models.ts";
 import { planAccountLine, planStatusBadge } from "#lib/components/model-keys/plan-key.ts";
 import {
   keyProviderOptions,
@@ -58,6 +63,7 @@ import ExternalLinkIcon from "@lucide/svelte/icons/external-link";
 import LogInIcon from "@lucide/svelte/icons/log-in";
 import LogOutIcon from "@lucide/svelte/icons/log-out";
 import KeyRoundIcon from "@lucide/svelte/icons/key-round";
+import ListChecksIcon from "@lucide/svelte/icons/list-checks";
 import MoreHorizontalIcon from "@lucide/svelte/icons/more-horizontal";
 import PencilIcon from "@lucide/svelte/icons/pencil";
 import PlusIcon from "@lucide/svelte/icons/plus";
@@ -239,6 +245,8 @@ async function submitArchiveEndpoint() {
 }
 
 let addOpen = $state(false);
+/** The add dialog's step: the key, then OpenRouter's models once an OpenRouter key is saved. */
+let addStep = $state<"key" | "models">("key");
 let addProvider = $state("");
 let addLabel = $state("");
 let addSecret = $state("");
@@ -246,6 +254,18 @@ let adding = $state(false);
 /** The proxy's words when the endpoint's address changed while saving; the dialog stays open. */
 let addSecretError: string | null = $state(null);
 const selectedProvider = $derived(providerOptions.find((p) => p.id === addProvider));
+
+// The step is set back on opening, so the dialog keeps showing the picker while it closes.
+function openAdd() {
+  addStep = "key";
+  addSecretError = null;
+  addOpen = true;
+}
+
+function closeAdd() {
+  addOpen = false;
+  addSecretError = null;
+}
 
 async function submitAdd(event: SubmitEvent) {
   event.preventDefault();
@@ -263,7 +283,9 @@ async function submitAdd(event: SubmitEvent) {
     });
     if (key.warning) toast.warning(key.warning);
     else toast.success(`Registered "${key.label}"`);
-    addOpen = false;
+    // An OpenRouter key goes on to pick its models; the first sync ran before the key came back.
+    if (key.provider === OPENROUTER_PROVIDER) addStep = "models";
+    else addOpen = false;
     addProvider = "";
     addLabel = "";
     addSecret = "";
@@ -328,6 +350,29 @@ async function submitRotate(event: SubmitEvent) {
   } finally {
     rotating = false;
   }
+}
+
+// ── OpenRouter models ───────────────────────────────────────────────────────────────────────
+//
+// The enabled set is the deployment's, so every OpenRouter key opens the same picker. It shows in
+// its own dialog from a key's menu, and as the add dialog's second step.
+
+let modelsOpen = $state(false);
+let addPicker = $state<ReturnType<typeof OpenrouterModels> | null>(null);
+let modelsPicker = $state<ReturnType<typeof OpenrouterModels> | null>(null);
+/** How to close the dialog whose unsaved ticks are being asked about, while that is asked. */
+let discardThen = $state<(() => void) | null>(null);
+
+/** Closes a picker's dialog, asking first when it holds unsaved ticks. */
+function closeOverChanges(picker: ReturnType<typeof OpenrouterModels> | null, close: () => void) {
+  if (picker?.hasChanges()) discardThen = close;
+  else close();
+}
+
+function discardAndClose() {
+  const close = discardThen;
+  discardThen = null;
+  close?.();
 }
 
 // ── ChatGPT plan keys ───────────────────────────────────────────────────────────────────────
@@ -459,11 +504,7 @@ async function submitArchive() {
   <PageTitle title="Model keys">
     {#snippet actions()}
       {#if data.modelAccessEnabled && canManage}
-        <Button
-          onclick={() => {
-            addOpen = true;
-          }}
-        >
+        <Button onclick={openAdd}>
           <PlusIcon data-icon="inline-start" />
           Add key
         </Button>
@@ -520,7 +561,7 @@ async function submitArchive() {
         </Empty.Header>
         {#if canManage}
           <Empty.Content>
-            <Button onclick={() => (addOpen = true)}>
+            <Button onclick={openAdd}>
               <PlusIcon data-icon="inline-start" />
               Add key
             </Button>
@@ -569,6 +610,12 @@ async function submitArchive() {
                     </DropdownMenu.Trigger>
                     <DropdownMenu.Content align="end">
                       <DropdownMenu.Group>
+                        {#if key.provider === OPENROUTER_PROVIDER && data.openrouter}
+                          <DropdownMenu.Item onclick={() => (modelsOpen = true)}>
+                            <ListChecksIcon />
+                            Choose models…
+                          </DropdownMenu.Item>
+                        {/if}
                         {#if !key.providerMissing}
                           <DropdownMenu.Item onclick={() => openRotate(key)}>
                             <RefreshCwIcon />
@@ -649,6 +696,26 @@ async function submitArchive() {
                   {#key key.updatedAt}
                     <OpenrouterCredit keyId={key.id} />
                   {/key}
+                  {#if data.openrouter?.catalogue}
+                    {@const models = enabledModelsLine(data.openrouter.catalogue)}
+                    <Card.Description
+                      class={[
+                        "text-xs",
+                        models.problem && "text-warning-foreground dark:text-warning",
+                      ]}
+                    >
+                      {models.text}.
+                      {#if models.problem}
+                        <button
+                          type="button"
+                          class="text-foreground underline underline-offset-4"
+                          onclick={() => (modelsOpen = true)}
+                        >
+                          Choose models
+                        </button>
+                      {/if}
+                    </Card.Description>
+                  {/if}
                 {/if}
               {/if}
               <Card.Description class="truncate text-xs" title={users.join(", ")}>
@@ -664,7 +731,7 @@ async function submitArchive() {
         {#if canManage}
           <button
             type="button"
-            onclick={() => (addOpen = true)}
+            onclick={openAdd}
             class="text-muted-foreground hover:bg-muted/50 hover:text-foreground focus-visible:ring-ring/50 flex min-h-40 items-center justify-center gap-2 rounded-xl border border-dashed text-sm transition-colors outline-none focus-visible:ring-[3px]"
           >
             <PlusIcon class="size-4" />
@@ -672,10 +739,6 @@ async function submitArchive() {
           </button>
         {/if}
       </div>
-    {/if}
-
-    {#if data.openrouter}
-      <OpenrouterModels read={data.openrouter} dependency="app:model-keys" />
     {/if}
 
     <!-- The ChatGPT plan: a sign-in rather than a pasted key. Once signed in, the plan is a key
@@ -776,86 +839,139 @@ async function submitArchive() {
 {/key}
 
 <Dialog.Root
-  bind:open={addOpen}
-  onOpenChange={(open) => {
-    if (!open) addSecretError = null;
-  }}
+  bind:open={
+    () => addOpen,
+    (open) => {
+      if (open) addOpen = true;
+      else closeOverChanges(addPicker, closeAdd);
+    }
+  }
 >
-  <Dialog.Content>
-    <form onsubmit={submitAdd}>
-      <Dialog.Header>
-        <Dialog.Title>Add a provider key</Dialog.Title>
-        <Dialog.Description>
-          The secret is sealed on arrival and never shown again — only its last four characters
-          remain visible.
-        </Dialog.Description>
-      </Dialog.Header>
-      <Field.FieldGroup class="py-4">
-        <Field.Field>
-          <Field.FieldLabel for="add-provider">Provider</Field.FieldLabel>
-          <Select.Root type="single" bind:value={addProvider}>
-            <Select.Trigger id="add-provider" class="w-full">
-              {selectedProvider ? providerOptionLabel(selectedProvider) : "Select a provider"}
-            </Select.Trigger>
-            <Select.Content>
-              <Select.Group>
-                {#each providerOptions as provider (provider.id)}
-                  <Select.Item value={provider.id} label={providerOptionLabel(provider)} />
-                {/each}
-              </Select.Group>
-            </Select.Content>
-          </Select.Root>
-          {#if canManage}
+  <Dialog.Content class={addStep === "models" ? PICKER_DIALOG_CLASS : undefined}>
+    {#if addStep === "models"}
+      <OpenrouterModels
+        bind:this={addPicker}
+        placement="dialog"
+        read={data.openrouter ?? CATALOGUE_NOT_READ}
+        dependency="app:model-keys"
+        doneLabel="Skip for now"
+        ondone={closeAdd}
+      />
+    {:else}
+      <form onsubmit={submitAdd}>
+        <Dialog.Header>
+          <Dialog.Title>Add a provider key</Dialog.Title>
+          <Dialog.Description>
+            The secret is sealed on arrival and never shown again — only its last four characters
+            remain visible.
+          </Dialog.Description>
+        </Dialog.Header>
+        <Field.FieldGroup class="py-4">
+          <Field.Field>
+            <Field.FieldLabel for="add-provider">Provider</Field.FieldLabel>
+            <Select.Root type="single" bind:value={addProvider}>
+              <Select.Trigger id="add-provider" class="w-full">
+                {selectedProvider ? providerOptionLabel(selectedProvider) : "Select a provider"}
+              </Select.Trigger>
+              <Select.Content>
+                <Select.Group>
+                  {#each providerOptions as provider (provider.id)}
+                    <Select.Item value={provider.id} label={providerOptionLabel(provider)} />
+                  {/each}
+                </Select.Group>
+              </Select.Content>
+            </Select.Root>
+            {#if canManage}
+              <Field.FieldDescription>
+                Not listed?
+                <button
+                  type="button"
+                  class="text-foreground underline underline-offset-4"
+                  onclick={() => {
+                    addOpen = false;
+                    openNewEndpoint();
+                  }}
+                >
+                  Add a custom provider
+                </button>
+              </Field.FieldDescription>
+            {/if}
             <Field.FieldDescription>
-              Not listed?
-              <button
-                type="button"
-                class="text-foreground underline underline-offset-4"
-                onclick={() => {
-                  addOpen = false;
-                  openNewEndpoint();
-                }}
-              >
-                Add a custom provider
-              </button>
+              The built-in providers and every custom endpoint registered above. Add a custom endpoint
+              first to use its key here.
             </Field.FieldDescription>
+          </Field.Field>
+          <KeySecretFields
+            bind:label={addLabel}
+            bind:secret={addSecret}
+            secretPlaceholder={addProvider === OPENROUTER_PROVIDER ? "sk-or-…" : undefined}
+          />
+          {#if addSecretError}
+            <Field.FieldError>{addSecretError}</Field.FieldError>
           {/if}
-          <Field.FieldDescription>
-            The built-in providers and every custom endpoint registered above. Add a custom endpoint
-            first to use its key here.
-          </Field.FieldDescription>
-        </Field.Field>
-        <KeySecretFields
-          bind:label={addLabel}
-          bind:secret={addSecret}
-          secretPlaceholder={addProvider === OPENROUTER_PROVIDER ? "sk-or-…" : undefined}
-        />
-        {#if addSecretError}
-          <Field.FieldError>{addSecretError}</Field.FieldError>
-        {/if}
-      </Field.FieldGroup>
-      <Dialog.Footer>
-        <Button
-          type="button"
-          variant="ghost"
-          onclick={() => {
-            addOpen = false;
-          }}
-        >
-          Cancel
-        </Button>
-        <Button type="submit" disabled={adding}>
-          {#if adding}
-            <Spinner data-icon="inline-start" />
-          {:else}
-            <PlusIcon data-icon="inline-start" />
-          {/if}
-          Register key
-        </Button>
-      </Dialog.Footer>
-    </form>
+        </Field.FieldGroup>
+        <Dialog.Footer>
+          <Button
+            type="button"
+            variant="ghost"
+            onclick={() => {
+              addOpen = false;
+            }}
+          >
+            Cancel
+          </Button>
+          <Button type="submit" disabled={adding}>
+            {#if adding}
+              <Spinner data-icon="inline-start" />
+            {:else}
+              <PlusIcon data-icon="inline-start" />
+            {/if}
+            Register key
+          </Button>
+        </Dialog.Footer>
+      </form>
+    {/if}
   </Dialog.Content>
 </Dialog.Root>
+
+<Dialog.Root
+  bind:open={
+    () => modelsOpen,
+    (open) => {
+      if (open) modelsOpen = true;
+      else closeOverChanges(modelsPicker, () => (modelsOpen = false));
+    }
+  }
+>
+  <Dialog.Content class={PICKER_DIALOG_CLASS}>
+    <OpenrouterModels
+      bind:this={modelsPicker}
+      placement="dialog"
+      read={data.openrouter ?? CATALOGUE_NOT_READ}
+      dependency="app:model-keys"
+      ondone={() => (modelsOpen = false)}
+    />
+  </Dialog.Content>
+</Dialog.Root>
+
+<!-- Over a picker's dialog: keeping the ticks is the safe answer, so it is the filled one. -->
+<AlertDialog.Root
+  open={discardThen !== null}
+  onOpenChange={(open) => {
+    if (!open) discardThen = null;
+  }}
+>
+  <AlertDialog.Content>
+    <AlertDialog.Header>
+      <AlertDialog.Title>Discard your changes?</AlertDialog.Title>
+      <AlertDialog.Description>The models you picked haven't been saved.</AlertDialog.Description>
+    </AlertDialog.Header>
+    <AlertDialog.Footer>
+      <AlertDialog.Action variant="outline" onclick={discardAndClose}>Discard</AlertDialog.Action>
+      <AlertDialog.Cancel variant="default">Keep editing</AlertDialog.Cancel>
+    </AlertDialog.Footer>
+  </AlertDialog.Content>
+</AlertDialog.Root>
 
 <Dialog.Root
   open={rotateTarget !== null}

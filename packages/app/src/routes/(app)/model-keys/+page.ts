@@ -23,8 +23,9 @@ export const load: PageLoad = async ({ fetch, depends, parent }) => {
     getProvidersOrEmpty(fetch),
     // Only to say which agents use each key; a list that will not load costs the cards that line.
     getAgents(fetch).catch(() => []),
-    // An admin picks OpenRouter's models once the deployment holds a live OpenRouter key; the
-    // read waits only on the keys, alongside the rest.
+    // An admin picks OpenRouter's models, from a key's menu or after adding one, once the
+    // deployment holds a live OpenRouter key; the cards say how many are on. The read waits only
+    // on the keys, alongside the rest.
     accessRead.then(async (access): Promise<CatalogueRead | null> => {
       const { user } = await parent();
       const offered = access.modelAccessEnabled && can(user, "models:manage") &&
