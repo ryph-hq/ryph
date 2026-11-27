@@ -74,6 +74,7 @@ import {
   newestId,
   newTaskHref,
   quickAgentModelProblem,
+  quickAgentModels,
   WELCOME_STEPS,
   type WelcomeStepId,
 } from "./welcome";
@@ -298,13 +299,18 @@ const agentKey = $derived(agentKeys.find((key) => key.id === agentKeyId) ?? agen
 // the key in use changes, for whatever reason, the agent goes back to that key's default.
 let modelPick = $state({ keyId: "", model: "" });
 const agentModel = $derived(modelPick.keyId === agentKey?.id ? modelPick.model : "");
-const agentModels = $derived(modelsForKey(data.providers, agentKey));
+// Null when an OpenRouter key's models could not be read at all.
+const agentModelsRead = $derived(quickAgentModels(data.providers, agentKey, data.openrouter));
+const agentModels = $derived(agentModelsRead ?? []);
 // An OpenRouter agent needs a default model from the ones enabled for agents, so those are
 // picked here first when there are none yet.
 const agentOnOpenRouter = $derived(agentKey?.provider === OPENROUTER_PROVIDER);
-const pickOpenRouterModels = $derived(agentOnOpenRouter && agentModels.length === 0);
+const agentModelsUnread = $derived(agentOnOpenRouter && agentModelsRead === null);
+const pickOpenRouterModels = $derived(
+  agentOnOpenRouter && agentModelsRead !== null && agentModelsRead.length === 0,
+);
 const agentModelProblem = $derived(
-  quickAgentModelProblem(agentKey?.provider, agentModel, agentModels),
+  quickAgentModelProblem(agentKey?.provider, agentModel, agentModelsRead),
 );
 let creatingAgent = $state(false);
 
@@ -797,7 +803,9 @@ function submit(event: SubmitEvent) {
                     </Select.Content>
                   </Select.Root>
                 </Field.Field>
-                {#if !pickOpenRouterModels}
+                {#if agentModelsUnread}
+                  {@render unreadAlert("OpenRouter models")}
+                {:else if !pickOpenRouterModels}
                   <Field.Field>
                     <Field.FieldLabel for="welcome-agent-model">Model</Field.FieldLabel>
                     <ModelSelect

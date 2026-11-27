@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Harness, Provider, ProviderKey } from "#lib/api/types.ts";
+import type { OpenRouterModel } from "#lib/api/openrouter.ts";
 import {
   backgroundProviderKeys,
   composeQuickAgent,
@@ -8,6 +9,7 @@ import {
   newestId,
   newTaskHref,
   quickAgentModelProblem,
+  quickAgentModels,
   summarizeImages,
 } from "./welcome";
 
@@ -220,5 +222,66 @@ describe("the quick agent's model", () => {
     expect(quickAgentModelProblem("openrouter", "x/other", enabled))
       .toBe("Pick one of the enabled models");
     expect(quickAgentModelProblem("openrouter", "openai/gpt-5", enabled)).toBeNull();
+  });
+
+  it("says the models could not be read rather than asking for some", () => {
+    expect(quickAgentModelProblem("openrouter", "", null)).toMatch(/Couldn't load/);
+  });
+});
+
+describe("the quick agent's models", () => {
+  const orKey: ProviderKey = { ...key, id: "pk_or", provider: "openrouter" };
+  const openrouter: Provider = {
+    id: "openrouter",
+    label: "OpenRouter",
+    dialect: "openai-completions",
+    builtin: true,
+    baseUrl: "https://openrouter.ai/api/v1",
+    authHeader: "authorization",
+    authScheme: "Bearer",
+    models: [{ id: "a/listed" }],
+    archivedAt: null,
+  };
+  const row = (id: string, extra: Partial<OpenRouterModel> = {}): OpenRouterModel => ({
+    id,
+    label: id.toUpperCase(),
+    contextLength: 1000,
+    maxOutputTokens: 100,
+    vision: false,
+    reasoning: false,
+    tools: true,
+    price: null,
+    listed: true,
+    enabled: true,
+    ...extra,
+  });
+  const read = {
+    catalogue: {
+      models: [
+        row("a/on"),
+        row("b/off", { enabled: false }),
+        row("c/gone", { listed: false }),
+        row("d/no-tools", { tools: false }),
+      ],
+      sync: { syncedAt: null, attemptedAt: null, error: null, errorCode: null, syncing: false },
+    },
+    error: null,
+  };
+
+  it("reads the provider list when it has OpenRouter", () => {
+    expect(quickAgentModels([openrouter], orKey, read)).toEqual([{ id: "a/listed" }]);
+  });
+
+  it("falls back to the catalogue's usable enabled models when the list failed", () => {
+    expect(quickAgentModels([], orKey, read)).toEqual([{ id: "a/on", label: "A/ON" }]);
+  });
+
+  it("is null when neither could be read", () => {
+    expect(quickAgentModels([], orKey, { catalogue: null, error: "down" })).toBeNull();
+    expect(quickAgentModels([], orKey, null)).toBeNull();
+  });
+
+  it("leaves other keys to their provider's list", () => {
+    expect(quickAgentModels([], key, null)).toEqual([]);
   });
 });
