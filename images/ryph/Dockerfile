@@ -18,9 +18,9 @@
 # together with the other images. Built from the workspace root:
 #   docker build -f images/ryph/Dockerfile -t ryph .
 
-FROM node:26-trixie-slim@sha256:193fe51b64e77981119c98c2002c9e32a70e2f006fb4d25068ce0558998917f0 AS node
+FROM node:26-trixie-slim@sha256:abe7e5a82b61a8ef67b315b85497c9e65173387ccf2f4a029248184b8e020be5 AS node
 
-FROM oven/bun:1.4.4-slim@sha256:1846adf22496bd711036aae8be147e57bdebbaea2e5264e3e0b5af1db187d9a4 AS build
+FROM oven/bun:1.4.5-slim@sha256:b780593f3e10918cbdaec3d5a08d52224b9198069a65eb47812085c2ec007643 AS build
 WORKDIR /build
 # Every member's manifest, since bun wants each workspace a package names on disk; then the
 # binary's dependencies and the app's (vite builds the UI the binary embeds).

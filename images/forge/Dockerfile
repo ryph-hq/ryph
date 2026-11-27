@@ -12,7 +12,7 @@
 # Built from the workspace root (the lockfile lives there):
 #   docker build -f images/forge/Dockerfile -t ryph-forge .
 
-FROM oven/bun:1.4.4-slim@sha256:1846adf22496bd711036aae8be147e57bdebbaea2e5264e3e0b5af1db187d9a4
+FROM oven/bun:1.4.5-slim@sha256:b780593f3e10918cbdaec3d5a08d52224b9198069a65eb47812085c2ec007643
 
 # git backs the gateway: bare clones, upload-pack, bundle intake
 RUN apt-get update && apt-get install -y --no-install-recommends \

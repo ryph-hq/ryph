@@ -30,8 +30,8 @@
     "@std/path": "npm:@jsr/std__path@1",
     "@zod/zod": "npm:@jsr/zod__zod@^4.4.3",
     "croner": "^9.1.0",
-    "drizzle-kit": "0.31.10",
-    "drizzle-orm": "^0.44.7",
+    "drizzle-kit": "0.31.11",
+    "drizzle-orm": "^0.45.4",
     "postgres": "^3.4.9"
   }
 }

@@ -1,5 +1,5 @@
 [tools]
-bun = "1.4.4"
+bun = "1.4.5"
 # 26, not 24: the artifact sanitizer runs confined under `node --permission`, which needs 25 or
 # later (packages/orchestrator/docs/artifacts.md); the images ship the same major.
 node = "26"

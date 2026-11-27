@@ -33,9 +33,9 @@
 # Node, for the artifact sanitizer alone: `node --permission` is what confines the process that
 # parses untrusted HTML (packages/orchestrator/docs/artifacts.md). 25 is the first with every
 # scope it denies; this is the official image's binary, pinned by digest, copied on its own.
-FROM node:26-trixie-slim@sha256:193fe51b64e77981119c98c2002c9e32a70e2f006fb4d25068ce0558998917f0 AS node
+FROM node:26-trixie-slim@sha256:abe7e5a82b61a8ef67b315b85497c9e65173387ccf2f4a029248184b8e020be5 AS node
 
-FROM oven/bun:1.4.4-slim@sha256:1846adf22496bd711036aae8be147e57bdebbaea2e5264e3e0b5af1db187d9a4
+FROM oven/bun:1.4.5-slim@sha256:b780593f3e10918cbdaec3d5a08d52224b9198069a65eb47812085c2ec007643
 
 # Two users: `control` runs the control plane, `sanitizer` (1995, the uid the Kubernetes sidecar
 # runs as too) runs the artifact sanitizer supervisor in a container of its own (sanitizer.sh), so

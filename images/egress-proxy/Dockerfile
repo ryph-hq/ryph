@@ -19,7 +19,7 @@
 #   docker build -f images/egress-proxy/Dockerfile -t ryph-egress-proxy:dev .
 
 # Node and glibc, and nothing else: no shell, no package manager.
-FROM gcr.io/distroless/nodejs26-debian13:nonroot@sha256:a3bb283a564754266646d6029c5b6aa4f760b9415dae1398db8d7f8142ee1375
+FROM gcr.io/distroless/nodejs26-debian13:nonroot@sha256:a84242e747fbb5aaaa0180c273b6f7130ca34b3300082192ef58eea96089eb3c
 # Root-owned and read-only to 65534, which runs it.
 COPY images/egress-proxy/main.ts /app/main.ts
 # The base's workdir is /home/nonroot, mode 700 for uid 65532, and this runs as 65534. This

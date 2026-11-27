@@ -34,7 +34,7 @@
 #     --build-arg RYPH_VERSION=$(git rev-parse --short=12 HEAD) -t ryph-harness:dev .
 # or with `bun run agent-image`, which builds it between the universal image and ryph-agent.
 
-ARG NODE_VERSION=24.21.0
+ARG NODE_VERSION=24.22.3
 
 # ── tini, the run's PID 1 ─────────────────────────────────────────────────────────────────────
 # The upstream static release, pinned by checksum: the harness tag hashes this file, so the
@@ -52,7 +52,7 @@ ADD --checksum=sha256:eae1d3aa50c48fb23b8cbdf4e369d0910dfc538566bfd09df89a774aa8
 FROM tini-${TARGETARCH} AS tini
 
 # ── The runner and the baker, compiled ───────────────────────────────────────────────────────
-FROM oven/bun:1.4.4-slim@sha256:1846adf22496bd711036aae8be147e57bdebbaea2e5264e3e0b5af1db187d9a4 AS compile
+FROM oven/bun:1.4.5-slim@sha256:b780593f3e10918cbdaec3d5a08d52224b9198069a65eb47812085c2ec007643 AS compile
 WORKDIR /src
 COPY package.json bun.lock bunfig.toml ./
 # The manifests of the workspace members the runner imports, which are all bun needs on disk to

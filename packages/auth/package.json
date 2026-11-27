@@ -27,10 +27,10 @@
     "@std/assert": "npm:@jsr/std__assert@1",
     "@std/path": "npm:@jsr/std__path@1",
     "@zod/zod": "npm:@jsr/zod__zod@^4.4.3",
-    "drizzle-kit": "0.31.10",
-    "drizzle-orm": "^0.44.7",
+    "drizzle-kit": "0.31.11",
+    "drizzle-orm": "^0.45.4",
     "jose": "^6.1.0",
-    "nodemailer": "^7.0.6",
+    "nodemailer": "^10.6.1",
     "postgres": "^3.4.9"
   }
 }

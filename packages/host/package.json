@@ -40,7 +40,7 @@
     "@std/assert": "npm:@jsr/std__assert@1",
     "@std/path": "npm:@jsr/std__path@1",
     "@zod/zod": "npm:@jsr/zod__zod@^4.4.3",
-    "drizzle-kit": "0.31.10",
+    "drizzle-kit": "0.31.11",
     "@ryph/shared": "workspace:*"
   }
 }

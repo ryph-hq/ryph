@@ -349,8 +349,8 @@ Every `bun build --compile` passes `--no-compile-autoload-dotenv --no-compile-au
 
 ## Images (images/, deploy/compose-networked, deploy/helm)
 
-- **Base:** `oven/bun:1.4.4-slim`, pinned by digest (Debian trixie, 70 MB smaller than
-  `oven/bun:1.4.4`). Every service runs `bun --no-env-file src/main.ts`; the radicle bridge adds
+- **Base:** `oven/bun:1.4.5-slim`, pinned by digest (Debian trixie, 70 MB smaller than
+  `oven/bun:1.4.5`). Every service runs `bun --no-env-file src/main.ts`; the radicle bridge adds
   `--no-install` (it has no egress, so a missing package must fail at once, not try a registry).
 - **Install:** `COPY --parents packages/*/package.json ./` then
   `bun install --frozen-lockfile --production --filter @ryph/<pkg>`, as root, before `USER`. bun
