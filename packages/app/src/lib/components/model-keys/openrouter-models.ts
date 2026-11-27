@@ -81,6 +81,18 @@ export function enabledIds(models: readonly OpenRouterModel[]): Set<string> {
   return new Set(models.filter((m) => m.enabled).map((m) => m.id));
 }
 
+/**
+ * The unsaved choice, less any id the catalogue no longer has at all: a sync can drop a model
+ * that was ticked but not saved, and its tick must not linger as a change with no row.
+ */
+export function draftInCatalogue(
+  draft: ReadonlySet<string>,
+  models: readonly Pick<OpenRouterModel, "id">[],
+): Set<string> {
+  const ids = new Set(models.map((m) => m.id));
+  return new Set([...draft].filter((id) => ids.has(id)));
+}
+
 /** How many ids differ between two sets: what the Save bar counts as changes. */
 export function changeCount(a: ReadonlySet<string>, b: ReadonlySet<string>): number {
   let n = 0;

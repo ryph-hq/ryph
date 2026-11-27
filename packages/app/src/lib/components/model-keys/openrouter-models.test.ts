@@ -7,6 +7,7 @@ import {
   changeCount,
   creditFailureLine,
   creditLine,
+  draftInCatalogue,
   enabledIds,
   formatContext,
   formatModelPrice,
@@ -99,6 +100,13 @@ describe("saving", () => {
     expect(changeCount(new Set(["a", "b"]), new Set(["a", "b"]))).toBe(0);
     expect(changeCount(new Set(["a", "c"]), new Set(["a", "b"]))).toBe(2);
     expect(changeCount(new Set(), new Set(["a"]))).toBe(1);
+  });
+
+  it("forgets a tick on a model a sync dropped, so it is no change", () => {
+    const models = [model("a"), model("b", { enabled: true })];
+    const draft = draftInCatalogue(new Set(["b", "dropped"]), models);
+    expect([...draft]).toEqual(["b"]);
+    expect(changeCount(draft, new Set(["b"]))).toBe(0);
   });
 
   it("sends the choice less models OpenRouter no longer lists", () => {

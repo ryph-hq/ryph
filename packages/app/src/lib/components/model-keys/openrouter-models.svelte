@@ -28,6 +28,7 @@ import TriangleAlertIcon from "@lucide/svelte/icons/triangle-alert";
 import {
   type CatalogueRead,
   changeCount,
+  draftInCatalogue,
   enabledIds,
   formatContext,
   formatModelPrice,
@@ -62,7 +63,9 @@ const saved = $derived(catalogue === null ? new Set<string>() : enabledIds(catal
  * here, apart from the load's data, so a refresh of the catalogue keeps it.
  */
 let edits = $state.raw<ReadonlySet<string> | null>(null);
-const choice = $derived(edits ?? saved);
+const choice = $derived(
+  edits === null || catalogue === null ? saved : draftInCatalogue(edits, catalogue.models),
+);
 const changes = $derived(changeCount(choice, saved));
 
 let query = $state("");
@@ -304,6 +307,7 @@ function holdEnter(event: KeyboardEvent) {
           {@const price = formatModelPrice(model.price)}
           {@const inputId = `openrouter-model-${model.id}`}
           {@const noteId = `openrouter-model-note-${model.id}`}
+          {@const usable = model.listed && model.tools}
           <li
             class={[
               "has-[button:focus-visible]:bg-muted/50 flex flex-wrap items-center gap-x-4 gap-y-1.5 px-3 py-2.5",
@@ -313,8 +317,8 @@ function holdEnter(event: KeyboardEvent) {
             <Checkbox
               id={inputId}
               {checked}
-              disabled={saving || (!model.listed && !checked)}
-              aria-describedby={model.listed ? undefined : noteId}
+              disabled={saving || (!usable && !checked)}
+              aria-describedby={usable ? undefined : noteId}
               onCheckedChange={(on) => toggle(model.id, on === true)}
             />
             <label for={inputId} class="flex min-w-0 flex-1 cursor-pointer flex-col">
@@ -326,6 +330,8 @@ function holdEnter(event: KeyboardEvent) {
             <div class="flex flex-wrap items-center gap-2 pl-7 sm:pl-0">
               {#if !model.listed}
                 <Badge variant="destructive">No longer listed</Badge>
+              {:else if !model.tools}
+                <Badge variant="destructive">Can't use tools</Badge>
               {/if}
               {#if model.vision}
                 <Badge variant="outline">Vision</Badge>
@@ -368,6 +374,10 @@ function holdEnter(event: KeyboardEvent) {
             {#if !model.listed}
               <p id={noteId} class="text-muted-foreground w-full pl-7 text-xs">
                 OpenRouter dropped this model. Saving turns it off.
+              </p>
+            {:else if !model.tools}
+              <p id={noteId} class="text-muted-foreground w-full pl-7 text-xs">
+                OpenRouter says this model can't use tools now, so agents can't use it.
               </p>
             {/if}
           </li>
