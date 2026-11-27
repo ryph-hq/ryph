@@ -192,6 +192,11 @@ export async function refuseModelPolicy(
   // those. A policy naming any other would have it narrowed away at boot — or refused outright
   // when nothing is left — so it is refused here instead, naming the model.
   if (key.models !== null) {
+    // And a run on it must be told its model: pi, told none, picks its own default out of its
+    // built-in OpenRouter catalogue, a model nobody enabled, and every call is refused.
+    if (policy.defaultModel === null) {
+      return json(400, { error: "Pick a default model for OpenRouter" });
+    }
     const enabled = new Set(key.models);
     const named = [
       ...(policy.allowedModels === "*" ? [] : policy.allowedModels),
@@ -201,11 +206,6 @@ export async function refuseModelPolicy(
     if (missing !== undefined) {
       return json(400, {
         error: `model "${missing}" isn't enabled for OpenRouter — enable it under Model keys`,
-      });
-    }
-    if (policy.allowedModels === "*" && enabled.size === 0) {
-      return json(400, {
-        error: "no model is enabled for OpenRouter — enable some under Model keys",
       });
     }
   }

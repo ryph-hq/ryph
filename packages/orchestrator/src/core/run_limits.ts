@@ -50,6 +50,14 @@ export interface SpendGate {
  */
 const INCLUDED_PROVIDERS: ReadonlySet<string> = new Set(["chatgpt-plan"]);
 
+/**
+ * The provider whose runs must be told their model: OpenRouter. pi, given none, picks its own
+ * default out of its built-in OpenRouter catalogue, a model no admin enabled. Also the one
+ * provider whose served models the door asks the proxy for. @ryph/model-proxy's `OPENROUTER`,
+ * spelled here for the same reason as `INCLUDED_PROVIDERS` (pinned in tests/http_api_test.ts).
+ */
+export const OPENROUTER_PROVIDER = "openrouter";
+
 /** Whether a provider's usage is outside every spend cap. */
 export function spendIncluded(provider: string): boolean {
   return INCLUDED_PROVIDERS.has(provider);
