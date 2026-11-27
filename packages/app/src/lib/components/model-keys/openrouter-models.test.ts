@@ -3,6 +3,7 @@ import { ApiError } from "#lib/api/call.ts";
 import { OPENROUTER_KEY_REFUSED, type OpenRouterModel } from "#lib/api/openrouter.ts";
 import { formatUsd } from "#lib/utils/format.ts";
 import {
+  applyDraft,
   catalogueReader,
   changeCount,
   creditFailureLine,
@@ -19,6 +20,7 @@ import {
   refusalLines,
   sortModels,
   syncLine,
+  toggleDraft,
   visibleModels,
 } from "./openrouter-models";
 
@@ -105,9 +107,47 @@ describe("saving", () => {
 
   it("forgets a tick on a model a sync dropped, so it is no change", () => {
     const models = [model("a"), model("b", { enabled: true })];
-    const draft = draftInCatalogue(new Set(["b", "dropped"]), models);
-    expect([...draft]).toEqual(["b"]);
-    expect(changeCount(draft, new Set(["b"]))).toBe(0);
+    const saved = new Set(["b"]);
+    const draft = toggleDraft(null, saved, "dropped", true);
+    expect(draft).not.toBeNull();
+    const kept = draftInCatalogue(draft!, models);
+    expect([...kept.added]).toEqual([]);
+    expect(changeCount(applyDraft(saved, kept), saved)).toBe(0);
+  });
+
+  it("keeps ticks and unticks apart from what is saved", () => {
+    const saved = new Set(["a", "b"]);
+    let draft = toggleDraft(null, saved, "c", true);
+    draft = toggleDraft(draft, saved, "a", false);
+    expect([...applyDraft(saved, draft)].sort()).toEqual(["b", "c"]);
+    expect(changeCount(applyDraft(saved, draft), saved)).toBe(2);
+  });
+
+  it("drops back to no draft once the ticks match what is saved", () => {
+    const saved = new Set(["a"]);
+    const on = toggleDraft(null, saved, "b", true);
+    expect(toggleDraft(on, saved, "b", false)).toBeNull();
+    const off = toggleDraft(null, saved, "a", false);
+    expect(toggleDraft(off, saved, "a", true)).toBeNull();
+    expect(applyDraft(saved, null)).toEqual(saved);
+  });
+
+  it("keeps a model another admin enabled while a draft is open", () => {
+    const before = new Set(["a"]);
+    const draft = toggleDraft(null, before, "b", true);
+    // A refresh brings in "x", enabled elsewhere.
+    const after = new Set(["a", "x"]);
+    const models = [model("a"), model("b"), model("x")];
+    const choice = applyDraft(after, draftInCatalogue(draft!, models));
+    expect([...choice].sort()).toEqual(["a", "b", "x"]);
+    expect(idsToSave(choice, models)).toEqual(["a", "b", "x"]);
+  });
+
+  it("keeps an untick on a model another admin also turned off as no change", () => {
+    const draft = toggleDraft(null, new Set(["a", "b"]), "b", false);
+    const after = new Set(["a"]);
+    const choice = applyDraft(after, draftInCatalogue(draft!, [model("a"), model("b")]));
+    expect(changeCount(choice, after)).toBe(0);
   });
 
   it("sends the choice less models OpenRouter no longer lists", () => {

@@ -28,6 +28,7 @@ import RefreshCwIcon from "@lucide/svelte/icons/refresh-cw";
 import SearchIcon from "@lucide/svelte/icons/search";
 import TriangleAlertIcon from "@lucide/svelte/icons/triangle-alert";
 import {
+  applyDraft,
   type CatalogueRead,
   changeCount,
   draftInCatalogue,
@@ -35,12 +36,14 @@ import {
   formatContext,
   formatModelPrice,
   idsToSave,
+  type ModelDraft,
   type ModelFilter,
   offeredModels,
   openRouterErrorText,
   PAGE_SIZE,
   refusalLines,
   syncLine,
+  toggleDraft,
   visibleModels,
 } from "./openrouter-models.ts";
 
@@ -74,12 +77,15 @@ const catalogue = $derived(read.catalogue);
 /** The ids enabled as saved. */
 const saved = $derived(catalogue === null ? new Set<string>() : enabledIds(catalogue.models));
 /**
- * The unsaved choice, or null while there is none and the ticks follow what is saved. It lives
- * here, apart from the load's data, so a refresh of the catalogue keeps it.
+ * The unsaved ticks and unticks, or null while there are none. They live here, apart from the
+ * load's data, and sit on top of what is saved, so a refresh that brings in another admin's
+ * change keeps both.
  */
-let edits = $state.raw<ReadonlySet<string> | null>(null);
+let edits = $state.raw<ModelDraft | null>(null);
 const choice = $derived(
-  edits === null || catalogue === null ? saved : draftInCatalogue(edits, catalogue.models),
+  edits === null || catalogue === null
+    ? saved
+    : applyDraft(saved, draftInCatalogue(edits, catalogue.models)),
 );
 const changes = $derived(changeCount(choice, saved));
 
@@ -134,10 +140,7 @@ export function hasChanges(): boolean {
 }
 
 function toggle(id: string, on: boolean) {
-  const next = new Set(choice);
-  if (on) next.add(id);
-  else next.delete(id);
-  edits = changeCount(next, saved) === 0 ? null : next;
+  edits = toggleDraft(edits, saved, id, on);
   refusal = null;
 }
 

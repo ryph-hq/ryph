@@ -82,15 +82,54 @@ export function enabledIds(models: readonly OpenRouterModel[]): Set<string> {
 }
 
 /**
- * The unsaved choice, less any id the catalogue no longer has at all: a sync can drop a model
- * that was ticked but not saved, and its tick must not linger as a change with no row.
+ * The unsaved choice as ticks and unticks on top of what is saved, so a refresh that brings in
+ * another admin's change keeps it: their newly enabled model shows ticked, and Save keeps it.
+ */
+export type ModelDraft = { added: ReadonlySet<string>; removed: ReadonlySet<string> };
+
+/**
+ * The draft after ticking or unticking one model, or null when it no longer differs from what is
+ * saved. Ids that match the saved set already are dropped, so the draft holds only real changes.
+ */
+export function toggleDraft(
+  draft: ModelDraft | null,
+  saved: ReadonlySet<string>,
+  id: string,
+  on: boolean,
+): ModelDraft | null {
+  const added = new Set(draft?.added);
+  const removed = new Set(draft?.removed);
+  added.delete(id);
+  removed.delete(id);
+  if (on && !saved.has(id)) added.add(id);
+  if (!on && saved.has(id)) removed.add(id);
+  for (const a of added) if (saved.has(a)) added.delete(a);
+  for (const r of removed) if (!saved.has(r)) removed.delete(r);
+  return added.size === 0 && removed.size === 0 ? null : { added, removed };
+}
+
+/** The ticked ids: what is saved, plus the draft's ticks, less its unticks. */
+export function applyDraft(saved: ReadonlySet<string>, draft: ModelDraft | null): Set<string> {
+  const ids = new Set(saved);
+  if (draft === null) return ids;
+  for (const id of draft.added) ids.add(id);
+  for (const id of draft.removed) ids.delete(id);
+  return ids;
+}
+
+/**
+ * The draft, less any id the catalogue no longer has at all: a sync can drop a model that was
+ * ticked but not saved, and its tick must not linger as a change with no row.
  */
 export function draftInCatalogue(
-  draft: ReadonlySet<string>,
+  draft: ModelDraft,
   models: readonly Pick<OpenRouterModel, "id">[],
-): Set<string> {
+): ModelDraft {
   const ids = new Set(models.map((m) => m.id));
-  return new Set([...draft].filter((id) => ids.has(id)));
+  return {
+    added: new Set([...draft.added].filter((id) => ids.has(id))),
+    removed: new Set([...draft.removed].filter((id) => ids.has(id))),
+  };
 }
 
 /** How many ids differ between two sets: what the Save bar counts as changes. */
