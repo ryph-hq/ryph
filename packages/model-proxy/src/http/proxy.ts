@@ -58,20 +58,22 @@ import {
 import { authenticates, decide, type ProxiedRequest, type SpendState } from "../core/enforce.ts";
 import { makeUsageMeter, type UsageMeter } from "../core/metering.ts";
 import {
-  askForCost,
-  askForStreamUsage,
   DRAIN_MS,
+  ensureObjectField,
   estimatedInputTokens,
   estimatedTokens,
   FALLBACK_OUTPUT_TOKENS,
+  insertMember,
   MAX_DRAIN_BYTES,
   MAX_OUTPUT_FIELDS,
   requestedMaxOutput,
+  streams,
 } from "../core/usage_fallback.ts";
 import {
+  OPENROUTER_FILE_PARSER,
   REFUSED_TOP_LEVEL_FIELDS,
-  refusedForOpenRouter,
   refusedInBody,
+  vetBody,
 } from "../core/body_policy.ts";
 import { OPENROUTER } from "../core/openrouter.ts";
 import { modelOf, rawValue, topLevelMembers, type ValueSpan } from "../core/model_field.ts";
@@ -513,28 +515,19 @@ export function makeProxyHandler(deps: ProxyHandlerDeps): (req: Request) => Prom
     return problem.detail;
   };
 
-  /** The rates the caps count with, and OpenRouter's output caps for the estimate of a call
-   * that never reported its usage: both read from rows, both re-read once a minute. */
-  interface Catalogue {
-    overlay: PriceOverlay;
-    openRouterMaxOutput: ReadonlyMap<string, number>;
-  }
-  let catalogueCache: { catalogue: Catalogue; freshUntilMs: number } | null = null;
-  const catalogueAt = async (nowMs: number): Promise<Catalogue> => {
-    if (catalogueCache === null || nowMs >= catalogueCache.freshUntilMs) {
+  let overlayCache: { overlay: PriceOverlay; freshUntilMs: number } | null = null;
+  const overlayAt = async (nowMs: number): Promise<PriceOverlay> => {
+    if (overlayCache === null || nowMs >= overlayCache.freshUntilMs) {
       const [custom, openRouter] = await Promise.all([
         deps.store.listCustomProviders(),
-        deps.store.listOpenRouterModels(),
+        deps.store.listOpenRouterPrices(),
       ]);
-      catalogueCache = {
-        catalogue: {
-          overlay: priceOverlayFrom(custom, openRouter),
-          openRouterMaxOutput: new Map(openRouter.map((m) => [m.id, m.maxOutputTokens])),
-        },
+      overlayCache = {
+        overlay: priceOverlayFrom(custom, openRouter),
         freshUntilMs: nowMs + OVERLAY_TTL_MS,
       };
     }
-    return catalogueCache.catalogue;
+    return overlayCache.overlay;
   };
 
   /** What the meter says about this run's spend, seeding it from the store on first sight. */
@@ -826,8 +819,7 @@ export function makeProxyHandler(deps: ProxyHandlerDeps): (req: Request) => Prom
     // The caps are asked only of an authenticated purchase: an unknown token learns nothing
     // about the deployment's ceiling from a 401, and a models list is never counted.
     const judged = spends && virtualKey !== null && providerKey !== null && provider !== null;
-    const catalogue = judged ? await catalogueAt(nowMs) : undefined;
-    const overlay = catalogue?.overlay;
+    const overlay = judged ? await overlayAt(nowMs) : undefined;
     const request: ProxiedRequest = {
       model: named,
       spends,
@@ -895,14 +887,15 @@ export function makeProxyHandler(deps: ProxyHandlerDeps): (req: Request) => Prom
     // What the body asks the provider to do beyond one metered completion: a tool it runs on
     // its own side, an image or file it fetches by URL or reads from storage, a stored response.
     // A plan's body is held to the same rule after its own refusals (`preparePlanCall`).
+    // OpenRouter's body is held to its own rules as well: no fallback models, plugins or stored
+    // preset, and only the content parts it reads, every one inline.
+    let carriesFile = false;
     if (route?.shape && body !== null && members !== null && provider.id !== CHATGPT_PLAN) {
-      const present = presentMembers(body, members);
-      const refused = [
-        ...refusedInBody(body, route.shape, present),
-        // OpenRouter's own ways past the allowlist and the meter: fallback models, plugins,
-        // a stored preset.
-        ...(provider.id === OPENROUTER ? refusedForOpenRouter(present) : []),
-      ];
+      const vetted = vetBody(body, route.shape, presentMembers(body, members), {
+        openRouter: provider.id === OPENROUTER,
+      });
+      const refused = vetted.refused;
+      carriesFile = vetted.carriesFile;
       if (refused.length > 0) {
         deps.diag.debug("proxy.body_refused", { runId: decision.virtualKey.runId, refused });
         return bodyRefusal(refused);
@@ -913,23 +906,29 @@ export function makeProxyHandler(deps: ProxyHandlerDeps): (req: Request) => Prom
     // is charged. Read before the body is spliced below, while the walk's spans still fit it.
     const requestedOutput = body === null ? null : requestedMaxOutput(body, members);
     // OpenRouter reports what a call cost only when asked to: made to ask, streamed or not, so the
-    // row carries the bill rather than a list price. First, because it hands back the walk's
-    // spans moved to fit, which the stream splice below reads.
+    // row carries the bill rather than a list price. A file it parses with the free engine, never
+    // the per-page one (`OPENROUTER_FILE_PARSER`). Each splice walks the body again: the spans of
+    // the walk before it no longer fit.
     if (provider.id === OPENROUTER && body !== null && members !== null) {
-      const asked = askForCost(body, members);
-      if (asked !== null) {
-        body = asked.body;
-        members = asked.members;
+      const asked = ensureObjectField(body, members, "usage", "include");
+      const parsed = carriesFile
+        ? insertMember(asked ?? body, "plugins", OPENROUTER_FILE_PARSER)
+        : null;
+      if (asked !== null || parsed !== null) {
+        body = parsed ?? asked ?? body;
+        members = topLevelMembers(body, READ_MEMBERS);
       }
     }
     // A streamed Chat Completions call reports its usage only when it asks to: made to ask, so a
     // run cannot opt out of being priced by leaving the option off. A custom endpoint's model
     // declared not to take the option (pi's `supportsUsageInStreaming: false`) is sent as it
     // came, and charged the estimate.
-    if (route?.shape === "openai-chat" && body !== null && members !== null) {
+    if (
+      route?.shape === "openai-chat" && body !== null && members !== null && streams(body, members)
+    ) {
       const declared = provider.models.find((m) => m.id === named);
       if (declared?.compat?.supportsUsageInStreaming !== false) {
-        body = askForStreamUsage(body, members) ?? body;
+        body = ensureObjectField(body, members, "stream_options", "include_usage") ?? body;
       }
     }
 
@@ -1129,9 +1128,6 @@ export function makeProxyHandler(deps: ProxyHandlerDeps): (req: Request) => Prom
       input: estimatedInputTokens(body ?? new Uint8Array()),
       output: requestedOutput ??
         provider.models.find((m) => m.id === named)?.maxOutputTokens ??
-        (provider.id === OPENROUTER && named !== null
-          ? catalogue?.openRouterMaxOutput.get(named)
-          : undefined) ??
         FALLBACK_OUTPUT_TOKENS,
     });
 
@@ -1183,8 +1179,10 @@ export function makeProxyHandler(deps: ProxyHandlerDeps): (req: Request) => Prom
         providerKeyId: decision.providerKey.id,
         provider: provider.id,
         // What the provider says it served; the request's own name only when it said nothing
-        // (an error, a body that carried no usage at all).
-        model: metered.model ?? named,
+        // (an error, a body that carried no usage at all). OpenRouter's is always the request's:
+        // it answers with the id of whichever variant served the call, and the row must name the
+        // allowlisted id its catalogue prices.
+        model: provider.id === OPENROUTER ? named ?? metered.model : metered.model ?? named,
         status,
         inputTokens: tokens?.input ?? null,
         outputTokens: tokens?.output ?? null,
@@ -1370,8 +1368,8 @@ export function makeProxyHandler(deps: ProxyHandlerDeps): (req: Request) => Prom
       });
     }
 
-    // Anthropic's and OpenAI's headers come back by allowlist, so the organization behind the
-    // key stays here; every other provider's as they came, less the hop-by-hop ones.
+    // Anthropic's, OpenAI's and OpenRouter's headers come back by allowlist, so the account
+    // behind the key stays here; every other provider's as they came, less the hop-by-hop ones.
     const responseHeaders = returnedResponseHeaders(provider.id, upstream.headers) ??
       new Headers(upstream.headers);
     for (const name of STRIP_RESPONSE) responseHeaders.delete(name);

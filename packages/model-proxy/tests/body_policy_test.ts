@@ -3,7 +3,7 @@
 
 import { test } from "bun:test";
 import { assert, assertEquals } from "@std/assert";
-import { refusedInBody } from "../src/core/body_policy.ts";
+import { refusedInBody, vetBody } from "../src/core/body_policy.ts";
 import type { BodyShape } from "../src/core/endpoints.ts";
 import { topLevelMembers } from "../src/core/model_field.ts";
 
@@ -315,4 +315,54 @@ test("stored state and provider-side fields at the top level are refused", () =>
 test("a body nested past the limit is refused rather than walked", () => {
   const deep = `{"a":${"[".repeat(300)}${"]".repeat(300)}}`;
   assertEquals(refused("openai-chat", deep).length, 1);
+});
+
+test("OpenRouter's content parts: only text, image, file and audio, every one inline", () => {
+  const vet = (part: unknown, openRouter = true) => {
+    const bytes = enc.encode(JSON.stringify({
+      model: "m",
+      messages: [{ role: "user", content: [{ type: "text", text: "hi" }, part] }],
+    }));
+    return vetBody(bytes, "openai-chat", new Set(), { openRouter });
+  };
+  const pdf = "data:application/pdf;base64,JVBERi0xLjQK";
+  for (
+    const part of [
+      { type: "image_url", image_url: { url: PNG } },
+      { type: "input_audio", input_audio: { data: "UklGRiQAAABXQVZF", format: "wav" } },
+      { type: "file", file: { filename: "a.pdf", file_data: pdf } },
+    ]
+  ) {
+    assertEquals(vet(part).refused, [], JSON.stringify(part));
+  }
+  assertEquals(vet({ type: "file", file: { file_data: pdf } }).carriesFile, true);
+  assertEquals(vet({ type: "text", text: "x" }).carriesFile, false);
+
+  for (
+    const part of [
+      { type: "video_url", video_url: { url: "https://x.test/v.mp4" } },
+      { type: "refusal", refusal: "no" },
+      { text: "untyped" },
+      { type: "file", file: { file_data: "https://x.test/a.pdf" } },
+      { type: "file", file: { file_data: " HTTP://x.test/a.pdf" } },
+      { type: "file", file: { filename: "a.pdf" } },
+      { type: "file", file: { file_data: { url: "https://x.test" } } },
+      { type: "input_audio", input_audio: { data: "https://x.test/a.wav" } },
+      { type: "input_audio", input_audio: { data: "data:audio/wav;base64,UklG" } },
+      { type: "input_audio", input_audio: { format: "wav" } },
+    ]
+  ) {
+    const { refused } = vet(part);
+    assertEquals(refused.length, 1, JSON.stringify(part));
+    assert(refused[0].startsWith("messages[0].content[1]: "), refused[0]);
+  }
+  // A file by id is refused for every provider, as it was.
+  assertEquals(vet({ type: "file", file: { file_id: "f-1" } }, false).refused.length, 1);
+  // The OpenRouter-only rules stay OpenRouter's.
+  assertEquals(vet({ type: "video_url", video_url: { url: "https://x.test" } }, false).refused, []);
+  // OpenRouter's own top-level fields, beside the shape's.
+  const top = vetBody(enc.encode("{}"), "openai-chat", new Set(["plugins", "web_search_options"]), {
+    openRouter: true,
+  });
+  assertEquals(top.refused.length, 2);
 });

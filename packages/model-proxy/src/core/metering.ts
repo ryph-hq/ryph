@@ -31,8 +31,9 @@
 // - the MODEL comes back with the tokens, off the same payloads: what a call cost is a fact
 //   about the response, not about what the caller asked for
 // - a COST the response states is read only when the caller says the provider's figure is its
-//   bill (`reportsCost`: OpenRouter's `usage.cost`, the last usage object in its JSON body or
-//   stream); for every other provider money is the price list's
+//   bill (`reportsCost`: OpenRouter's `usage.cost`, plus `cost_details.upstream_inference_cost`
+//   on a BYOK call, off the last usage object in its JSON body or stream); for every other
+//   provider money is the price list's
 
 import type { Dialect } from "./registry.ts";
 import type { TokenCounts } from "./pricing.ts";
@@ -90,6 +91,9 @@ type Json = Record<string, unknown>;
 const isObject = (value: unknown): value is Json =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
+const usd = (value: unknown): number | null =>
+  typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
+
 const count = (value: unknown): number | null =>
   typeof value === "number" && Number.isFinite(value) && value >= 0 ? Math.round(value) : null;
 
@@ -127,8 +131,15 @@ export function makeUsageMeter(
     // last of them on `message_delta`.
     if (tokens !== null && (dialect !== "anthropic-messages" || closing)) final = true;
     if (opts.reportsCost === true) {
-      const cost = usage.cost;
-      if (typeof cost === "number" && Number.isFinite(cost) && cost >= 0) costUsd = cost;
+      const cost = usd(usage.cost);
+      if (cost !== null) {
+        // A call on the account's own provider key (BYOK) is billed twice: `cost` is only
+        // OpenRouter's fee, and what the provider charged that key is the upstream cost beside it.
+        const upstream = usage.is_byok === true && isObject(usage.cost_details)
+          ? usd(usage.cost_details.upstream_inference_cost)
+          : null;
+        costUsd = cost + (upstream ?? 0);
+      }
     }
   };
 

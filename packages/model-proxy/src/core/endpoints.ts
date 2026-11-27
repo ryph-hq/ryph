@@ -21,7 +21,7 @@
 //   fine-tuning and the account's own key-info endpoints (OpenRouter's `/api/v1/auth/key`,
 //   LiteLLM's `/key/info`) just as OpenAI's does, so a run gets the same default deny
 // - a ChatGPT plan keeps its own route table and header list (core/chatgpt_plan.ts)
-// - OpenRouter is a built-in: its route table and header list are here, like OpenAI's
+// - OpenRouter is a built-in: its route table and header lists are here, like OpenAI's
 //
 // Where the list comes from (re-check it whenever a harness version moves):
 // - pi (images/harness, pi-coding-agent 1.6.1): `POST /v1/messages` for Anthropic, and for
@@ -315,38 +315,58 @@ export function forwardedRequestHeaders(
   return { headers, droppedBetas };
 }
 
-/** The upstream's response headers a run sees from Anthropic or OpenAI, exactly. */
-const RETURNED_RESPONSE_HEADERS = new Set([
-  "content-type",
-  "cache-control",
-  "date",
-  // The ids a provider's support asks for, and the SDKs log.
-  "request-id",
-  "x-request-id",
-  // What the SDKs' retry logic reads.
-  "retry-after",
-  "retry-after-ms",
-  "x-should-retry",
-  "openai-processing-ms",
-  "openai-version",
-]);
+/** The upstream's response headers a run sees, exactly, by provider. */
+const RETURNED_RESPONSE_HEADERS: Record<string, ReadonlySet<string>> = {
+  ...Object.fromEntries(["anthropic", "openai"].map((id) => [
+    id,
+    new Set([
+      "content-type",
+      "cache-control",
+      "date",
+      // The ids a provider's support asks for, and the SDKs log.
+      "request-id",
+      "x-request-id",
+      // What the SDKs' retry logic reads.
+      "retry-after",
+      "retry-after-ms",
+      "x-should-retry",
+      "openai-processing-ms",
+      "openai-version",
+    ]),
+  ])),
+  // OpenRouter answers with its own cookies and account headers besides; a run sees what the
+  // OpenAI SDK reads, and the id OpenRouter's generation lookup and its support key on.
+  [OPENROUTER]: new Set([
+    "content-type",
+    "cache-control",
+    "date",
+    "x-generation-id",
+    "x-request-id",
+    "retry-after",
+    "retry-after-ms",
+    "x-should-retry",
+  ]),
+};
 
 /** Rate-limit headers, which the SDKs back off on. They describe the key's limits, not whose
  * key it is. */
 const RETURNED_RESPONSE_PREFIXES = ["anthropic-ratelimit-", "x-ratelimit-"];
 
 /**
- * The response headers handed back to a run from Anthropic or OpenAI: an allowlist, so the
- * `openai-organization`, `openai-project` and `anthropic-organization-id` a provider answers
- * with (and anything it adds later) stay here. Null for every other provider, whose headers
- * are relayed as before.
+ * The response headers handed back to a run from Anthropic, OpenAI or OpenRouter: an allowlist,
+ * so the `openai-organization`, `openai-project` and `anthropic-organization-id` a provider
+ * answers with, OpenRouter's cookies (and anything any of them adds later) stay here. Null for
+ * every other provider, whose headers are relayed as before.
  */
 export function returnedResponseHeaders(providerId: string, upstream: Headers): Headers | null {
-  if (providerId !== "anthropic" && providerId !== "openai") return null;
+  const allowed = Object.hasOwn(RETURNED_RESPONSE_HEADERS, providerId)
+    ? RETURNED_RESPONSE_HEADERS[providerId]
+    : null;
+  if (allowed === null) return null;
   const headers = new Headers();
   upstream.forEach((value, name) => {
     if (
-      RETURNED_RESPONSE_HEADERS.has(name) ||
+      allowed.has(name) ||
       RETURNED_RESPONSE_PREFIXES.some((prefix) => name.startsWith(prefix))
     ) {
       headers.set(name, value);

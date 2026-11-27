@@ -3,7 +3,7 @@
 // is made to ask for, and that cost stored as the row's spend.
 
 import { test } from "bun:test";
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertAlmostEquals, assertEquals } from "@std/assert";
 import { makeProxyHandler } from "../src/http/proxy.ts";
 import { makeCredentialIssuer } from "../src/core/service.ts";
 import { catalogueOf, OPENROUTER } from "../src/core/openrouter.ts";
@@ -21,6 +21,7 @@ async function makeSlice(opts: {
   allowedModels?: string[] | "*";
   spendUsd?: number;
   upstream?: (req: Request) => Response | Promise<Response>;
+  now?: () => Date;
 } = {}) {
   const store = memoryKeyStore();
   await store.upsertOpenRouterCatalogue(
@@ -70,7 +71,7 @@ async function makeSlice(opts: {
     resolveHost: publicDns,
     store,
     decrypt: (sealed) => Promise.resolve(sealed.replace(/^sealed:/, "")),
-    now: () => new Date(T0),
+    now: opts.now ?? (() => new Date(T0)),
     diag: { debug() {}, warn() {} },
     limits: { meter: makeSpendMeter({ backstopMs: 30_000 }), gauge: null },
     upstreamFetch: (async (input: URL | Request | string, init?: RequestInit) => {
@@ -254,4 +255,163 @@ test("under a spend cap an unpriced OpenRouter model is refused, a priced one pa
   assertEquals(passed.status, 200);
   await passed.body?.cancel();
   assertEquals(seen.length, 1);
+});
+
+test("a BYOK call's spend is OpenRouter's fee and the upstream cost, JSON or streamed", async () => {
+  const usage = {
+    prompt_tokens: 1_000,
+    completion_tokens: 100,
+    cost: 0.0001,
+    is_byok: true,
+    cost_details: { upstream_inference_cost: 0.002 },
+  };
+  const json = await makeSlice({
+    upstream: () => Response.json({ model: "openai/gpt-6", choices: [], usage }),
+  });
+  await (await json.call({ model: "openai/gpt-6", messages: [] })).text();
+  assertAlmostEquals((await json.rows())[0].costUsd!, 0.0021);
+
+  const streamed = await makeSlice({
+    upstream: () =>
+      new Response(
+        `data: ${JSON.stringify({ model: "openai/gpt-6", choices: [], usage })}\n\n` +
+          "data: [DONE]\n\n",
+        { headers: { "content-type": "text/event-stream" } },
+      ),
+  });
+  await (await streamed.call({ model: "openai/gpt-6", stream: true, messages: [] })).text();
+  assertAlmostEquals((await streamed.rows())[0].costUsd!, 0.0021);
+
+  // Not BYOK, or no upstream figure that is one: the fee is the whole bill.
+  for (
+    const over of [
+      { is_byok: false },
+      { cost_details: { upstream_inference_cost: null } },
+      { cost_details: { upstream_inference_cost: -1 } },
+    ]
+  ) {
+    const slice = await makeSlice({
+      upstream: () =>
+        Response.json({ model: "openai/gpt-6", choices: [], usage: { ...usage, ...over } }),
+    });
+    await (await slice.call({ model: "openai/gpt-6", messages: [] })).text();
+    assertEquals((await slice.rows())[0].costUsd, 0.0001, JSON.stringify(over));
+  }
+});
+
+test("the live spend meter counts the bill: one above list price refuses the next capped call", async () => {
+  let now = new Date(T0);
+  const { call, seen } = await makeSlice({
+    spendUsd: 1,
+    now: () => now,
+    upstream: () =>
+      Response.json({
+        model: "openai/gpt-6",
+        choices: [],
+        // $0.0035 at list price; billed $1.50.
+        usage: { prompt_tokens: 1_000, completion_tokens: 100, cost: 1.5 },
+      }),
+  });
+  const first = await call({ model: "openai/gpt-6", messages: [] });
+  assertEquals(first.status, 200);
+  await first.text();
+  // Past the cap, the meter refuses once the orchestrator's grace to cancel the run is over.
+  now = new Date(Date.parse(T0) + 31_000);
+  const next = await call({ model: "openai/gpt-6", messages: [] });
+  assertEquals(next.status, 403);
+  assertEquals((await next.json()).code, "limit_reached");
+  assertEquals(seen.length, 1);
+});
+
+test("the usage row names the model the run asked for, not the variant OpenRouter served", async () => {
+  const { call, rows } = await makeSlice({
+    upstream: () =>
+      Response.json({
+        model: "openai/gpt-6-20261101",
+        choices: [],
+        usage: { prompt_tokens: 1, completion_tokens: 1, cost: 0.01 },
+      }),
+  });
+  await (await call({ model: "openai/gpt-6", messages: [] })).text();
+  assertEquals((await rows())[0].model, "openai/gpt-6");
+});
+
+test("OpenRouter's response headers come back by allowlist", async () => {
+  const { call } = await makeSlice({
+    upstream: () =>
+      Response.json({ model: "openai/gpt-6", choices: [] }, {
+        headers: {
+          "x-generation-id": "gen-123",
+          "x-ratelimit-remaining": "99",
+          "retry-after": "2",
+          "set-cookie": "__cf_bm=abc; path=/",
+          "x-openrouter-account": "acct-1",
+          "cf-ray": "abc-AMS",
+        },
+      }),
+  });
+  const res = await call({ model: "openai/gpt-6", messages: [] });
+  await res.text();
+  assertEquals(res.headers.get("x-generation-id"), "gen-123");
+  assertEquals(res.headers.get("x-ratelimit-remaining"), "99");
+  assertEquals(res.headers.get("retry-after"), "2");
+  assert(res.headers.get("content-type")?.includes("application/json"));
+  assertEquals(res.headers.get("set-cookie"), null);
+  assertEquals(res.headers.get("x-openrouter-account"), null);
+  assertEquals(res.headers.get("cf-ray"), null);
+});
+
+test("an OpenRouter message carries only inline parts OpenRouter reads", async () => {
+  const { call, seen } = await makeSlice();
+  const pdf = "data:application/pdf;base64,JVBERi0xLjQK";
+  const message = (...content: unknown[]) => ({
+    model: "openai/gpt-6",
+    messages: [{ role: "user", content }],
+  });
+  for (
+    const part of [
+      { type: "video_url", video_url: { url: "https://attacker.test/v.mp4" } },
+      { type: "file", file: { filename: "a.pdf", file_data: "https://attacker.test/a.pdf" } },
+      { type: "file", file: { filename: "a.pdf" } },
+      { type: "file", file: { file_id: "file-123" } },
+      { type: "input_audio", input_audio: { data: "https://attacker.test/a.wav", format: "wav" } },
+      { type: "image_url", image_url: { url: "https://attacker.test/i.png" } },
+      { text: "no type" },
+    ]
+  ) {
+    const res = await call(message({ type: "text", text: "look" }, part));
+    assertEquals(res.status, 400, JSON.stringify(part));
+    const body = await res.json();
+    assertEquals(body.code, "body_not_allowed");
+    assert(body.refused[0].startsWith("messages[0].content[1]"), body.refused[0]);
+  }
+  assertEquals(seen.length, 0);
+
+  // Inline text, image, audio and file pass; a file part has the free PDF parser named for it.
+  const inline = await call(message(
+    { type: "text", text: "look" },
+    { type: "image_url", image_url: { url: "data:image/png;base64,iVBORw0KGgo=" } },
+    { type: "input_audio", input_audio: { data: "UklGRiQAAABXQVZF", format: "wav" } },
+    { type: "file", file: { filename: "a.pdf", file_data: pdf } },
+  ));
+  assertEquals(inline.status, 200);
+  await inline.text();
+  const sent = JSON.parse(seen[0].body);
+  assertEquals(sent.plugins, [{ id: "file-parser", pdf: { engine: "pdf-text" } }]);
+  assertEquals(sent.usage, { include: true });
+
+  // No file, no plugin; and a tool's JSON Schema is not a message.
+  const plain = await call({
+    ...message({ type: "text", text: "hi" }),
+    tools: [{
+      type: "function",
+      function: {
+        name: "t",
+        parameters: { examples: [{ content: [{ type: "video_url" }] }] },
+      },
+    }],
+  });
+  assertEquals(plain.status, 200);
+  await plain.text();
+  assertEquals(JSON.parse(seen[1].body).plugins, undefined);
 });

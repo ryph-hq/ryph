@@ -75,7 +75,8 @@ const REFUSED_TOP_LEVEL: Record<BodyShape, readonly string[]> = {
  * - `models`: a fallback list OpenRouter tries when the named model fails — models the allowlist
  *   never saw, at prices the cap never counted
  * - `plugins`: web search, file parsing and the like, run on OpenRouter's side and billed per
- *   request, not in the tokens metered here
+ *   request, not in the tokens metered here (the proxy names the one file parser it allows itself:
+ *   `OPENROUTER_FILE_PARSER`)
  * - `preset`: a configuration stored in the OpenRouter account, which can name its own models
  *   and plugins
  * A model id's own suffixes (`:online`, `@preset/…`) need no rule: the allowlist is exact ids.
@@ -86,18 +87,32 @@ const OPENROUTER_REFUSED: Readonly<Record<string, string>> = {
   preset: "a preset stored in the OpenRouter account",
 };
 
-export const OPENROUTER_REFUSED_FIELDS: readonly string[] = Object.keys(OPENROUTER_REFUSED);
+const OPENROUTER_REFUSED_FIELDS: readonly string[] = Object.keys(OPENROUTER_REFUSED);
+
+/**
+ * The content parts an OpenRouter message may carry. OpenRouter fetches what a part names by URL
+ * (an image, a PDF, a video, audio) from its own side, at an address the run picked; so every
+ * part it reads is held to inline bytes below, and a part type not here (`video_url`, and
+ * whatever it adds next) is refused rather than trusted to be harmless.
+ */
+const OPENROUTER_CONTENT_PARTS = new Set(["text", "image_url", "file", "input_audio"]);
+
+/** Where a message's content part sits: `messages[i].content[j]`, and nowhere else (a tool's
+ * JSON Schema can hold a `content` array of typed objects too). */
+const MESSAGE_PART = /^messages\[\d+\]\.content\[\d+\]$/;
+
+/**
+ * The plugin the proxy itself adds to an OpenRouter body that carries a file: the file parser,
+ * on its free `pdf-text` engine. Left to itself OpenRouter parses a PDF for a model that cannot
+ * read one with a paid OCR engine, billed per page on OpenRouter's side and counted by no cap
+ * before the bill arrives.
+ */
+export const OPENROUTER_FILE_PARSER = '[{"id":"file-parser","pdf":{"engine":"pdf-text"}}]';
 
 /** Every top-level field any shape refuses, for the walk that finds them. */
 export const REFUSED_TOP_LEVEL_FIELDS: readonly string[] = [
   ...new Set([...Object.values(REFUSED_TOP_LEVEL).flat(), ...OPENROUTER_REFUSED_FIELDS]),
 ];
-
-/** What an OpenRouter body asks for that `OPENROUTER_REFUSED_FIELDS` refuses, each named. */
-export function refusedForOpenRouter(present: ReadonlySet<string>): string[] {
-  return OPENROUTER_REFUSED_FIELDS.filter((field) => present.has(field))
-    .map((field) => `${field} (${OPENROUTER_REFUSED[field]})`);
-}
 
 /** Anthropic media sources that carry their content inline. `url` has the provider fetch it,
  * `file` reads the Files API. */
@@ -108,8 +123,8 @@ const INLINE_SOURCES = new Set(["base64", "text", "content"]);
 const REFUSED_ITEM_TYPES = new Set(["item_reference", "container_upload"]);
 
 const WATCH = {
-  strings: new Set(["type", "image_url", "url", "file_id", "file_url"]),
-  children: new Set(["source", "image_url", "file", "definition"]),
+  strings: new Set(["type", "image_url", "url", "file_id", "file_url", "file_data", "data"]),
+  children: new Set(["source", "image_url", "file", "definition", "input_audio"]),
 };
 
 /** Whether a URL, as a prefix, is a `data:` URL: the only kind that carries its bytes along. A
@@ -120,19 +135,49 @@ function isDataUrl(prefix: string): boolean {
   return prefix.slice(i, i + 5).toLowerCase() === "data:";
 }
 
-/**
- * What a model call's body asks for that the proxy does not forward, each named with where it
- * is; empty when nothing. `topLevel` is the set of top-level member names the body carries
- * with a non-null value.
- */
+/** Whether a string, as a prefix, is bare base64: no scheme, so nothing a provider would fetch. */
+function isBase64(prefix: string): boolean {
+  return /^[A-Za-z0-9+/=\s]*$/.test(prefix);
+}
+
+/** What a body was found to carry, beside what it may not. */
+export interface BodyVetting {
+  refused: string[];
+  /** Whether a message carries a `file` part (Chat Completions). */
+  carriesFile: boolean;
+}
+
+/** `vetBody`'s refusals alone. */
 export function refusedInBody(
   bytes: Uint8Array,
   shape: BodyShape,
   topLevel: ReadonlySet<string>,
+  opts: { openRouter?: boolean } = {},
 ): string[] {
+  return vetBody(bytes, shape, topLevel, opts).refused;
+}
+
+/**
+ * What a model call's body asks for that the proxy does not forward, each named with where it
+ * is (empty when nothing), and whether it carries a file. `topLevel` is the set of top-level
+ * member names the body carries with a non-null value. `openRouter` holds it to OpenRouter's
+ * rules as well: its own top-level fields, and only the content parts it reads, inline.
+ */
+export function vetBody(
+  bytes: Uint8Array,
+  shape: BodyShape,
+  topLevel: ReadonlySet<string>,
+  opts: { openRouter?: boolean } = {},
+): BodyVetting {
   const refused: string[] = [];
+  let carriesFile = false;
   for (const field of REFUSED_TOP_LEVEL[shape]) {
     if (topLevel.has(field)) refused.push(`${field} (stored or provider-side state)`);
+  }
+  if (opts.openRouter === true) {
+    for (const field of OPENROUTER_REFUSED_FIELDS) {
+      if (topLevel.has(field)) refused.push(`${field} (${OPENROUTER_REFUSED[field]})`);
+    }
   }
   const clientTools = CLIENT_TOOL_TYPES[shape];
   const refuse = (seen: ObjectSeen, what: string) => {
@@ -144,6 +189,13 @@ export function refusedInBody(
     // or `tool_search_output` item's, a namespace's.
     if (seen.inArray && seen.key === "tools" && !clientTools.has(type ?? ABSENT)) {
       refuse(seen, `tool type ${JSON.stringify(type ?? null)} runs on the provider's side`);
+    }
+    if (
+      opts.openRouter === true && seen.inArray && seen.key === "content" &&
+      !OPENROUTER_CONTENT_PARTS.has(type ?? ABSENT) && MESSAGE_PART.test(seen.path())
+    ) {
+      refuse(seen, `a content part of type ${JSON.stringify(type ?? null)}, not one ryph forwards`);
+      return;
     }
     if (type === undefined) return;
     if (REFUSED_ITEM_TYPES.has(type)) {
@@ -194,13 +246,31 @@ export function refusedInBody(
         return;
       }
       case "file": {
-        if (seen.children.get("file")?.has("file_id")) {
+        carriesFile = true;
+        const file = seen.children.get("file");
+        if (file?.has("file_id")) {
           refuse(seen, "a file by file_id: send it as file_data");
+          return;
+        }
+        // OpenRouter reads `file_data` as a URL to fetch as readily as a data: URL.
+        const data = file?.get("file_data");
+        if (opts.openRouter === true && (data === undefined || !isDataUrl(data))) {
+          refuse(seen, "a file not sent inline: send it as a data: URL in file_data");
+        }
+        return;
+      }
+      case "input_audio": {
+        const data = seen.children.get("input_audio")?.get("data");
+        if (
+          opts.openRouter === true &&
+          (data === undefined || data === NOT_A_STRING || !isBase64(data))
+        ) {
+          refuse(seen, "audio not sent inline: send it as base64 in data");
         }
         return;
       }
     }
   });
   if (!ok) refused.push(`the body nests more than ${MAX_BODY_DEPTH} levels deep`);
-  return refused;
+  return { refused, carriesFile };
 }

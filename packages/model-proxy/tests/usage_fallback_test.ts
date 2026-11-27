@@ -4,12 +4,13 @@
 import { test } from "bun:test";
 import { assertEquals } from "@std/assert";
 import {
-  askForCost,
-  askForStreamUsage,
+  ensureObjectField,
   estimatedInputTokens,
   estimatedTokens,
+  insertMember,
   MEDIA_MIN_TOKENS,
   requestedMaxOutput,
+  streams,
 } from "../src/core/usage_fallback.ts";
 import { topLevelMembers } from "../src/core/model_field.ts";
 
@@ -23,9 +24,12 @@ const FIELDS = new Set([
   "max_completion_tokens",
 ]);
 
+/** The proxy's stream splice: only a streamed body is made to ask. */
 function asked(body: string): unknown {
   const bytes = enc.encode(body);
-  const out = askForStreamUsage(bytes, topLevelMembers(bytes, FIELDS)!);
+  const members = topLevelMembers(bytes, FIELDS)!;
+  if (!streams(bytes, members)) return null;
+  const out = ensureObjectField(bytes, members, "stream_options", "include_usage");
   return out === null ? null : JSON.parse(dec.decode(out));
 }
 
@@ -90,19 +94,13 @@ test("what a response did report stands; only what it did not is estimated", () 
 
 function costAsked(body: string): unknown {
   const bytes = enc.encode(body);
-  const members = topLevelMembers(bytes, new Set([...FIELDS, "usage"]))!;
-  const out = askForCost(bytes, members);
-  if (out === null) return null;
-  // The spans handed back fit the new body: each still points at its member's own value.
-  const text = dec.decode(out.body);
-  for (const [name, span] of out.members) {
-    assertEquals(
-      JSON.parse(text.slice(span.start, span.end)),
-      (JSON.parse(text) as Record<string, unknown>)[name],
-      name,
-    );
-  }
-  return JSON.parse(text);
+  const out = ensureObjectField(
+    bytes,
+    topLevelMembers(bytes, new Set([...FIELDS, "usage"]))!,
+    "usage",
+    "include",
+  );
+  return out === null ? null : JSON.parse(dec.decode(out));
 }
 
 test("an OpenRouter body is made to ask for its cost, spliced in place", () => {
@@ -126,14 +124,10 @@ test("an OpenRouter body is made to ask for its cost, spliced in place", () => {
   assertEquals(costAsked('{"usage":[1]}'), null);
 });
 
-test("the cost splice and the stream splice compose on one walk", () => {
-  const bytes = enc.encode('{"usage":{"x":1},"model":"m","stream":true,"stream_options":null}');
-  const first = askForCost(bytes, topLevelMembers(bytes, new Set([...FIELDS, "usage"]))!)!;
-  const second = askForStreamUsage(first.body, first.members)!;
-  assertEquals(JSON.parse(dec.decode(second)), {
-    usage: { x: 1, include: true },
-    model: "m",
-    stream: true,
-    stream_options: { include_usage: true },
-  });
+test("a member is inserted first, with a comma only when one follows", () => {
+  const inserted = (body: string) =>
+    JSON.parse(dec.decode(insertMember(enc.encode(body), "plugins", '[{"id":"x"}]')!));
+  assertEquals(inserted('{"model":"m"}'), { plugins: [{ id: "x" }], model: "m" });
+  assertEquals(inserted(" { } "), { plugins: [{ id: "x" }] });
+  assertEquals(insertMember(enc.encode("[1]"), "plugins", "[]"), null);
 });
