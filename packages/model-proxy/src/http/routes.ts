@@ -39,7 +39,12 @@ import {
   toAdminProviderSpec,
   toPublicProviderSpec,
 } from "../core/registry.ts";
-import { listProviderSpecs, resolveProvider } from "../core/service.ts";
+import {
+  enabledModelsOf,
+  listProviderSpecs,
+  notEnabledForOpenRouter,
+  resolveProvider,
+} from "../core/service.ts";
 import type { GuardedKeyWrite, KeyStore } from "../ports/key_store.ts";
 import { mintId } from "@ryph/sealed";
 import {
@@ -67,7 +72,7 @@ const PATHS = {
 
 import { USAGE_PATHS } from "./usage.ts";
 import { PLAN_PATHS } from "./chatgpt_plan.ts";
-import { OPENROUTER_KEY_REFUSED, OPENROUTER_PATHS, syncStaleInBackground } from "./openrouter.ts";
+import { OPENROUTER_PATHS, openRouterKeyRefusal, syncStaleInBackground } from "./openrouter.ts";
 import type { OpenRouterCatalogue } from "../core/openrouter_catalogue.ts";
 import { OPENROUTER } from "../core/openrouter.ts";
 import {
@@ -174,14 +179,8 @@ export function providerKeyRoutes(deps: ProviderKeyRoutesDeps): Route[] {
     try {
       return { refused: null, extra: { openrouter: await deps.openRouter.api.keyInfo(secret) } };
     } catch (err) {
-      if (err instanceof OpenRouterApiError && (err.status === 401 || err.status === 403)) {
-        return {
-          refused: json(400, {
-            error: "OpenRouter didn't accept this key",
-            code: OPENROUTER_KEY_REFUSED,
-          }),
-        };
-      }
+      const refused = openRouterKeyRefusal(err, 400);
+      if (refused !== null) return { refused };
       deps.openRouter.diag.warn("openrouter.key_check_failed", {
         status: err instanceof OpenRouterApiError ? err.status : null,
       });
@@ -564,6 +563,17 @@ export function providerKeyRoutes(deps: ProviderKeyRoutesDeps): Route[] {
     if (provider === null) return json(400, { error: "no such provider" });
     if (provider.archivedAt !== null) {
       return json(400, { error: "that model endpoint is archived" });
+    }
+    // And the models, where the provider narrows them (OpenRouter's enabled ones): a policy
+    // naming one it does not serve would have every consumer's mint refused.
+    const served = enabledModelsOf(provider);
+    if (served !== null) {
+      const named = [
+        body.data.model,
+        ...(body.data.allowedModels === "*" ? [] : body.data.allowedModels),
+      ];
+      const missing = named.find((model) => !served.includes(model));
+      if (missing !== undefined) return json(400, { error: notEnabledForOpenRouter(missing) });
     }
     const policy = {
       providerKeyId: key.id,

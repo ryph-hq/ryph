@@ -181,7 +181,6 @@ export function setup(deps: ModelProxySetupDeps): ModelProxySetup {
         catalogue,
         api: openRouter,
         decrypt: sealer.openKey,
-        authenticate: deps.authenticate,
         authenticateManage: deps.authenticateManage,
         now,
         diag: deps.proxyDiag,

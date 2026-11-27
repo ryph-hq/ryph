@@ -13,7 +13,8 @@ import { openRouterApi } from "../src/adapters/openrouter/api.ts";
 import { OpenRouterApiError } from "../src/ports/openrouter_api.ts";
 import { openRouterRoutes } from "../src/http/openrouter.ts";
 import { disabledProviderKeyRoutes, providerKeyRoutes } from "../src/http/routes.ts";
-import { listProviderSpecs } from "../src/core/service.ts";
+import { listProviderSpecs, makePlatformCredentialIssuer } from "../src/core/service.ts";
+import { sha256Hex } from "@ryph/sealed";
 import { toPublicProviderSpec } from "../src/core/registry.ts";
 import type { KeyStore } from "../src/ports/key_store.ts";
 import { memoryKeyStore } from "./memory_store.ts";
@@ -39,7 +40,6 @@ test("catalogueOf: prices per million, flags from the parameters, routers left o
   assertEquals([sonnet.tools, sonnet.reasoning, sonnet.vision], [true, false, false]);
   assertEquals([gpt.tools, gpt.reasoning, gpt.vision], [true, true, true]);
   assertEquals(noTools.tools, false);
-  assertEquals(sonnet.rawPricing, { prompt: "0.000003", completion: "0.000015", request: "0" });
 });
 
 test("catalogueOf: a price of -1 or one that is no number is unpriced, never free", () => {
@@ -92,6 +92,19 @@ test("catalogueOf: skips what it cannot describe instead of failing the sync", (
     ],
   });
   assertEquals(rows.map((r) => [r.id, r.label]), [["dup/one", "Model dup/one"]]);
+});
+
+test("catalogueOf: one absurd figure is clamped, never a row the store cannot hold", () => {
+  const [row] = catalogueOf({
+    data: [listedModel("x/huge", {
+      context_length: 1e15,
+      top_provider: { max_completion_tokens: 1e12 },
+    })],
+  });
+  assertEquals(row.contextLength, 100_000_000);
+  assertEquals(row.maxOutputTokens, 65_536);
+  // Under one token is no context length at all.
+  assertEquals(catalogueOf({ data: [listedModel("x/tiny", { context_length: 0.5 })] }), []);
 });
 
 test("openRouterModelForRun: tells pi the thinking format, the cap and the price", () => {
@@ -156,6 +169,28 @@ test("the adapter asks openrouter.ai's two routes with the attribution headers",
   assertEquals(unreachable.status, null);
 });
 
+test("the adapter reads at most 16 MB of an answer", async () => {
+  const api = openRouterApi({
+    fetch: (() =>
+      Promise.resolve(
+        new Response(
+          new ReadableStream({
+            pull(controller) {
+              controller.enqueue(new Uint8Array(1024 * 1024).fill(0x20));
+            },
+          }),
+          { headers: { "content-type": "application/json" } },
+        ),
+      )) as unknown as typeof fetch,
+  });
+  const err = await api.listModels().catch((e) => e);
+  assert(err instanceof OpenRouterApiError);
+  assertEquals(
+    err.message,
+    `OpenRouter answered its model list with more than ${16 * 1024 * 1024} bytes`,
+  );
+});
+
 // ── the sync ────────────────────────────────────────────────────────────────────────────────
 
 test("a sync writes the catalogue; a failed one keeps it and says why", async () => {
@@ -212,6 +247,81 @@ test("syncs run one at a time, and a stale check syncs only when it should", asy
   assertEquals(api.calls.models, 4);
 });
 
+test("a short list keeps enabled models; one half gone fails unless forced", async () => {
+  const store = memoryKeyStore();
+  const ten = Array.from({ length: 10 }, (_, i) => listedModel(`m/${i}`));
+  const api = fakeOpenRouter({ models: { data: ten } });
+  let now = NOW;
+  const catalogue = makeOpenRouterCatalogue({ store, api, now: () => now, diag: quiet });
+  await catalogue.sync();
+  await store.setOpenRouterEnabled(["m/0", "m/1"], NOW.toISOString());
+  const usable = async () => (await store.listUsableOpenRouterModels()).map((m) => m.id);
+  const listed = async () =>
+    (await store.listOpenRouterModels()).filter((m) => m.listed).map((m) => m.id);
+
+  // A list that left out the two enabled models and two others: the others are unlisted, the
+  // enabled ones stay for now.
+  now = new Date(NOW.getTime() + 1_000);
+  api.models = { data: ten.slice(2, 8) };
+  assertEquals((await catalogue.sync()).error, null);
+  assertEquals(await usable(), ["m/0", "m/1"]);
+  assertEquals((await listed()).length, 8);
+
+  // A list of two after eight listed is a failed sync: nothing is written.
+  now = new Date(NOW.getTime() + 2_000);
+  api.models = { data: ten.slice(2, 4) };
+  const refused = await catalogue.sync();
+  assertEquals(refused.syncedAt, new Date(NOW.getTime() + 1_000).toISOString());
+  assertEquals(
+    refused.error,
+    "OpenRouter's model list had 2 usable models, down from 8, so the old list was kept",
+  );
+  assertEquals((await listed()).length, 8);
+
+  // Forced, the list is taken: the enabled models' second miss in a row unlists them.
+  const forced = await catalogue.sync({ force: true });
+  assertEquals(forced.error, null);
+  assertEquals(await usable(), []);
+  assertEquals(await listed(), ["m/2", "m/3"]);
+});
+
+test("a list past the cap fails, and so does a write, with a short error", async () => {
+  const store = memoryKeyStore();
+  const api = fakeOpenRouter({
+    models: { data: Array.from({ length: 5_001 }, (_, i) => listedModel(`m/${i}`)) },
+  });
+  const catalogue = makeOpenRouterCatalogue({ store, api, now: () => NOW, diag: quiet });
+  const tooMany = await catalogue.sync();
+  assertEquals(
+    tooMany.error,
+    "OpenRouter's model list had 5001 models, more than the 5000 a sync takes",
+  );
+  assertEquals(await store.listOpenRouterModels(), []);
+
+  // A store whose write fails with the whole statement in its message: the admin is told the
+  // write failed, and nothing of the statement.
+  const failing: KeyStore = {
+    ...store,
+    upsertOpenRouterCatalogue: () =>
+      Promise.reject(
+        new Error('insert into "openrouter_models" ("id", ...) values ($1, ...) params: a/b,...'),
+      ),
+  };
+  api.models = MODELS_BODY;
+  const { call } = makeApi({ store: failing, api });
+  const res = await call("POST", "/v1/openrouter/sync");
+  assertEquals(res.status, 502);
+  const body = await res.json();
+  assertEquals(
+    body.error,
+    "could not sync OpenRouter's models: could not save OpenRouter's model list",
+  );
+  assertEquals(
+    (await failing.getOpenRouterSync())?.error,
+    "could not save OpenRouter's model list",
+  );
+});
+
 // ── the routes ──────────────────────────────────────────────────────────────────────────────
 
 const ADMIN = "admin-secret";
@@ -247,7 +357,6 @@ function makeApi(opts: { store?: KeyStore; api?: ReturnType<typeof fakeOpenRoute
       catalogue,
       api,
       decrypt: (sealed) => Promise.resolve(sealed.replace(/^sealed:/, "")),
-      authenticate,
       authenticateManage,
       now: () => NOW,
       diag: quiet,
@@ -299,7 +408,9 @@ test("the catalogue routes are the admin's, and the enabled set is held to the c
     error: null,
     syncing: false,
   });
-  assert(!("rawPricing" in body.models[0]));
+  // The sync's bookkeeping stays out of the picker.
+  assert(!("missedSyncs" in body.models[0]));
+  assert(!("updatedAt" in body.models[0]));
 
   const refused = await call("PUT", "/v1/openrouter/models/enabled", {
     ids: ["anthropic/claude-sonnet-5", "acme/no-tools", "nope/never", "openrouter/auto"],
@@ -324,8 +435,11 @@ test("an unlisted model cannot be enabled again, but an enabled one stays in the
   const { call, catalogue, api } = makeApi();
   await catalogue.sync();
   await call("PUT", "/v1/openrouter/models/enabled", { ids: ["openai/gpt-6"] });
+  // Gone from two lists in a row, the enabled model is unlisted. (The lists are a third of the
+  // last one, which only a forced sync takes.)
   api.models = { data: [listedModel("anthropic/claude-sonnet-5")] };
-  await catalogue.sync();
+  await catalogue.sync({ force: true });
+  await catalogue.sync({ force: true });
 
   const models = (await (await call("GET", "/v1/openrouter/models")).json()).models;
   assertEquals(models.map((m: { id: string; listed: boolean }) => [m.id, m.listed]), [
@@ -378,6 +492,73 @@ test("the provider list offers OpenRouter's enabled, listed models with their pr
   );
 });
 
+test("the platform policy is held to the enabled set, and a change to the set revokes its keys", async () => {
+  const { call, store, catalogue } = makeApi();
+  await catalogue.sync();
+  await call("PUT", "/v1/openrouter/models/enabled", { ids: ["openai/gpt-6"] });
+  await store.createProviderKey({
+    id: "pk-or",
+    provider: OPENROUTER,
+    label: "team",
+    last4: "abcd",
+    encryptedSecret: "sealed:sk-or-team",
+    archivedAt: null,
+    createdAt: NOW.toISOString(),
+    updatedAt: NOW.toISOString(),
+  });
+
+  // The default model, or one the allowlist names, that is not enabled: refused, named.
+  for (
+    const policy of [
+      { allowedModels: "*", model: "anthropic/claude-sonnet-5" },
+      { allowedModels: ["openai/gpt-6", "anthropic/claude-sonnet-5"], model: "openai/gpt-6" },
+    ]
+  ) {
+    const res = await call("PUT", "/v1/platform-model-policy", {
+      providerKeyId: "pk-or",
+      ...policy,
+    });
+    assertEquals(res.status, 400, JSON.stringify(policy));
+    assertEquals(
+      (await res.json()).error,
+      'model "anthropic/claude-sonnet-5" isn\'t enabled for OpenRouter — enable it under Model keys',
+    );
+  }
+  const saved = await call("PUT", "/v1/platform-model-policy", {
+    providerKeyId: "pk-or",
+    allowedModels: "*",
+    model: "openai/gpt-6",
+  });
+  assertEquals(saved.status, 200);
+
+  const issuer = makePlatformCredentialIssuer({ store, now: () => NOW });
+  const live = async (token: string) =>
+    (await store.getVirtualKeyByTokenHash(await sha256Hex(token)))?.revokedAt === null;
+
+  // "*" is the enabled set: enabling another model changes what the platform may call, and the
+  // credential minted under the old set is killed.
+  const first = await issuer.issue("memory");
+  assertEquals(first.allowedModels, ["openai/gpt-6"]);
+  await call("PUT", "/v1/openrouter/models/enabled", {
+    ids: ["openai/gpt-6", "anthropic/claude-sonnet-5"],
+  });
+  assert(!(await live(first.token)));
+
+  // A policy that names its models is moved only by a change to those.
+  await store.savePlatformPolicy({
+    providerKeyId: "pk-or",
+    provider: OPENROUTER,
+    allowedModels: ["openai/gpt-6"],
+    model: "openai/gpt-6",
+    updatedAt: NOW.toISOString(),
+  });
+  const second = await issuer.issue("memory");
+  await call("PUT", "/v1/openrouter/models/enabled", { ids: ["openai/gpt-6"] });
+  assert(await live(second.token), "sonnet was never the policy's");
+  await call("PUT", "/v1/openrouter/models/enabled", { ids: [] });
+  assert(!(await live(second.token)));
+});
+
 test("the provider list syncs a stale catalogue in the background, only with a live key", async () => {
   const { call, store, api } = makeApi();
   await call("GET", "/v1/providers", undefined, USER);
@@ -424,7 +605,11 @@ test("a key's credit is read live with the key itself, and refusals say which ki
   api.keys.set("sk-or-good", KEY_INFO);
   api.keys.set("sk-or-down", new OpenRouterApiError("could not reach", null));
 
-  const good = await call("GET", "/v1/provider-keys/good/openrouter", undefined, USER);
+  // The account's credit is the admin's to read.
+  const user = await call("GET", "/v1/provider-keys/good/openrouter", undefined, USER);
+  assertEquals(user.status, 403);
+  assertEquals(api.calls.keys, []);
+  const good = await call("GET", "/v1/provider-keys/good/openrouter");
   assertEquals(good.status, 200);
   assertEquals(await good.json(), KEY_INFO);
   assertEquals(api.calls.keys, ["sk-or-good"]);

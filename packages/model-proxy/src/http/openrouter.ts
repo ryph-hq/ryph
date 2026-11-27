@@ -3,8 +3,11 @@
 //
 // Invariants:
 // - choosing the enabled models is a spending decision, so it is ADMIN-gated, like registering a
-//   key; so is reading the whole catalogue, which only the admin's picker needs. Every signed-in
-//   user still sees the ENABLED models, in the provider list
+//   key; so is reading the whole catalogue, which only the admin's picker needs, and a key's
+//   credit, which is the account's. Every signed-in user still sees the ENABLED models, in the
+//   provider list
+// - a change to the enabled set that changes what the platform's policy may call kills the
+//   platform's credentials, as saving the policy does: each consumer re-mints under the new set
 // - only a model OpenRouter lists, that takes tools, can be enabled: pi drives an agent through
 //   tool calls, and a model without them would fail every run on its first turn
 // - a key's credit is read live from OpenRouter with the key itself, and never stored
@@ -13,13 +16,13 @@
 import { json, parseBody, type Route, route } from "@ryph/shared/http";
 import type { SealBinding } from "@ryph/sealed";
 import { BUILTIN_PROVIDERS } from "../core/registry.ts";
-import { OPENROUTER, type OpenRouterModel } from "../core/openrouter.ts";
+import { narrowedModels, OPENROUTER, type OpenRouterModel } from "../core/openrouter.ts";
 import type { OpenRouterCatalogue } from "../core/openrouter_catalogue.ts";
 import { providerKeyBinding } from "../core/sealing.ts";
 import { NO_SECRET } from "../core/types.ts";
 import type { KeyStore } from "../ports/key_store.ts";
 import { type OpenRouterApi, OpenRouterApiError } from "../ports/openrouter_api.ts";
-import { SetOpenRouterEnabledSchema } from "../schema.ts";
+import { SetOpenRouterEnabledSchema, SyncOpenRouterSchema } from "../schema.ts";
 
 /** OpenRouter's paths, shared by the live routes and their disabled stand-ins. */
 export const OPENROUTER_PATHS = {
@@ -35,10 +38,10 @@ export const OPENROUTER_KEY_REFUSED = "openrouter_key_refused";
 /** The marker on "the secret must be entered again"; the same value routes.ts answers with. */
 const SECRET_REQUIRED = "secret_required";
 
-/** One catalogue model as the admin's picker reads it: everything but OpenRouter's raw pricing. */
-export type OpenRouterModelView = Omit<OpenRouterModel, "rawPricing" | "updatedAt">;
+/** One catalogue model as the admin's picker reads it: everything but the sync's bookkeeping. */
+export type OpenRouterModelView = Omit<OpenRouterModel, "missedSyncs" | "updatedAt">;
 
-function viewOf({ rawPricing: _raw, updatedAt: _at, ...model }: OpenRouterModel) {
+function viewOf({ missedSyncs: _missed, updatedAt: _at, ...model }: OpenRouterModel) {
   return model satisfies OpenRouterModelView;
 }
 
@@ -63,11 +66,25 @@ export function syncStaleInBackground(
   })().catch((err) => diag.warn("openrouter.background_sync_failed", { err: String(err) }));
 }
 
+/**
+ * The answer for a key OpenRouter refused, at the status the caller picks (a save is the caller's
+ * mistake, a 400; a read of a saved key is OpenRouter's answer, a 502); null when the failure was
+ * anything else, which says nothing about the key.
+ */
+export function openRouterKeyRefusal(err: unknown, status: number): Response | null {
+  if (err instanceof OpenRouterApiError && (err.status === 401 || err.status === 403)) {
+    return json(status, {
+      error: "OpenRouter didn't accept this key",
+      code: OPENROUTER_KEY_REFUSED,
+    });
+  }
+  return null;
+}
+
 /** How a key-status read went wrong, as the answer to send. */
 export function keyInfoRefusal(err: unknown): Response {
-  if (err instanceof OpenRouterApiError && (err.status === 401 || err.status === 403)) {
-    return json(502, { error: "OpenRouter didn't accept this key", code: OPENROUTER_KEY_REFUSED });
-  }
+  const refused = openRouterKeyRefusal(err, 502);
+  if (refused !== null) return refused;
   if (err instanceof OpenRouterApiError && err.status === null) {
     return json(503, { error: "could not reach OpenRouter" });
   }
@@ -84,9 +101,7 @@ export interface OpenRouterRoutesDeps {
   api: OpenRouterApi;
   /** Opens a provider key's sealed secret, bound to it (`providerKeyBinding`). */
   decrypt(sealed: string, binding: SealBinding): Promise<string>;
-  /** The user-surface gate (`models:read`). */
-  authenticate(req: Request): Promise<Response | null>;
-  /** The admin gate (`models:manage`). */
+  /** The admin gate (`models:manage`), which every route here is behind. */
   authenticateManage(req: Request): Promise<Response | null>;
   now(): Date;
   diag: { warn(event: string, data?: Record<string, unknown>): void };
@@ -148,14 +163,38 @@ export function openRouterRoutes(deps: OpenRouterRoutesDeps): Route[] {
         noTools,
       });
     }
-    await store.setOpenRouterEnabled(body.data.ids, deps.now().toISOString());
+    const at = deps.now().toISOString();
+    const platform = await store.getPlatformPolicy();
+    const before = platform?.provider === OPENROUTER
+      ? await platformModels(platform.allowedModels)
+      : null;
+    await store.setOpenRouterEnabled(body.data.ids, at);
+    // The platform's credentials carry the enabled set as it was when they were minted. When the
+    // change moves what its policy may call, they are killed, as a policy edit kills them: the
+    // consumers re-mint under the new set — or are refused, saying which model is off.
+    if (platform !== null && before !== null) {
+      const after = await platformModels(platform.allowedModels);
+      if (after.join("\n") !== before.join("\n")) {
+        await store.revokePlatformVirtualKeys(at);
+      }
+    }
     return json(200, await catalogueBody());
+  };
+
+  /** What the platform policy's allowlist comes to under the enabled set as it stands. */
+  const platformModels = async (allowed: readonly string[] | "*"): Promise<string[]> => {
+    const usable = (await store.listUsableOpenRouterModels()).map((m) => ({ id: m.id }));
+    return narrowedModels(usable, allowed).map((m) => m.id);
   };
 
   const syncNow = async (req: Request): Promise<Response> => {
     const denied = await deps.authenticateManage(req);
     if (denied) return denied;
-    const state = await catalogue.sync();
+    // An empty body is a plain sync; `{"force": true}` takes a list the sync would refuse for
+    // shrinking by more than half.
+    const body = await parseBody(req, SyncOpenRouterSchema, { emptyIs: {} });
+    if (!body.ok) return body.res;
+    const state = await catalogue.sync({ force: body.data.force });
     const answer = await catalogueBody();
     if (state.error !== null) {
       return json(502, { error: `could not sync OpenRouter's models: ${state.error}`, ...answer });
@@ -164,7 +203,7 @@ export function openRouterRoutes(deps: OpenRouterRoutesDeps): Route[] {
   };
 
   const keyStatus = async (req: Request, params: Record<string, string>): Promise<Response> => {
-    const denied = await deps.authenticate(req);
+    const denied = await deps.authenticateManage(req);
     if (denied) return denied;
     const key = await store.getProviderKey(params.id);
     if (key === null) return json(404, { error: "no such provider key" });
