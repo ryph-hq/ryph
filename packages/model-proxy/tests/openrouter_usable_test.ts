@@ -136,3 +136,70 @@ test("a reread out when the cache is invalidated does not fill it", async () => 
   assertEquals((await out).map((m) => m.id), ["a/one"]);
   assertEquals(await usable.get(), [], "the next call reads again");
 });
+
+test("callers that find the cache stale share one read, but never one from before a change", async () => {
+  const s = countingStore();
+  let now = T0;
+  const usable = makeUsableOpenRouterModels({ store: s.store, now: () => new Date(now) });
+  s.set(["a/one"]);
+
+  // A burst on an empty cache, and again when it expires: one read each.
+  let release = s.holdReads();
+  const burst = Array.from({ length: 50 }, () => usable.get());
+  release();
+  for (const models of await Promise.all(burst)) assertEquals(models.map((m) => m.id), ["a/one"]);
+  assertEquals(s.reads(), 1);
+  now = T0 + USABLE_TTL_MS;
+  release = s.holdReads();
+  const expired = Array.from({ length: 50 }, () => usable.get());
+  release();
+  await Promise.all(expired);
+  assertEquals(s.reads(), 2);
+
+  // A read out when the model is turned off: callers after the change do not join it.
+  usable.invalidate();
+  release = s.holdReads();
+  const before = usable.get();
+  s.set([]);
+  usable.invalidate();
+  const after = Array.from({ length: 10 }, () => usable.get());
+  release();
+  assertEquals((await before).map((m) => m.id), ["a/one"]);
+  for (const models of await Promise.all(after)) assertEquals(models, []);
+  assertEquals(s.reads(), 4, "the old read, and one after the change");
+  assertEquals(await usable.get(), [], "and that one is what is cached");
+  assertEquals(s.reads(), 4);
+});
+
+test("a failing store is asked once a second, however many calls are refused", async () => {
+  const s = countingStore();
+  let now = T0;
+  const usable = makeUsableOpenRouterModels({ store: s.store, now: () => new Date(now) });
+  let down = true;
+  let asked = 0;
+  const list = s.store.listUsableOpenRouterModels;
+  s.store.listUsableOpenRouterModels = () => {
+    asked += 1;
+    return down ? Promise.reject(new Error("down")) : list();
+  };
+
+  const failures = async (calls: Array<() => Promise<unknown>>) =>
+    (await Promise.allSettled(calls.map((call) => call())))
+      .filter((r) => r.status === "rejected").length;
+  // Every call on an empty cache, and every refusal's reread, for a second: one query.
+  const calls = Array.from({ length: 50 }, (_, i) => i % 2 === 0 ? usable.get : usable.reread);
+  assertEquals(await failures(calls), 50);
+  for (let i = 0; i < 50; i++) await usable.reread().catch(() => {});
+  for (let i = 0; i < 50; i++) await usable.get().catch(() => {});
+  assertEquals(asked, 1);
+
+  // A second on, one more; and once the store is back, it answers.
+  now = T0 + REREAD_EVERY_MS;
+  assertEquals(await failures(calls), 50);
+  assertEquals(asked, 2);
+  down = false;
+  s.set(["a/one"]);
+  now = T0 + 2 * REREAD_EVERY_MS;
+  assertEquals((await usable.get()).map((m) => m.id), ["a/one"]);
+  assertEquals(asked, 3);
+});

@@ -17,8 +17,12 @@
 //   they cannot be made to pay it on every call: rereads in flight are shared, at most one starts
 //   per `REREAD_EVERY_MS`, and a reread never drops the cache first, so a run looping on a model
 //   that is off costs the store one query a second and costs every other caller nothing
-// - a read that began before an invalidation never puts its answer in the cache: it may predate
-//   the change
+// - a read that began before an invalidation never puts its answer in the cache, and no caller
+//   after the invalidation is handed it: it may predate the change
+// - one store read at a time per generation: callers who find the cache stale or empty (a burst
+//   of calls when it expires or is invalidated) share the read in flight
+// - a store that fails is asked at most once per `REREAD_EVERY_MS`: until then every caller gets
+//   the last failure, so refused calls against a failing store cost it nothing more
 // - issuing a credential never reads this: it reads the store, so a run is never issued a model
 //   that was turned off a minute ago
 
@@ -51,11 +55,36 @@ export function makeUsableOpenRouterModels(deps: {
   const ttlMs = deps.ttlMs ?? USABLE_TTL_MS;
   let cached: { models: OpenRouterModel[]; freshUntilMs: number } | null = null;
   let generation = 0;
-  /** Reads the store, and caches the answer unless an invalidation came while it was out. */
-  const read = async (nowMs: number) => {
+  /** The store read in flight, and the generation it began in. */
+  let reading: { generation: number; models: Promise<OpenRouterModel[]> } | null = null;
+  /** The last read's failure, and when that read began: what callers get until it may retry. */
+  let failed: { error: unknown; atMs: number } | null = null;
+  /** Reads the store, or joins the read of this generation in flight, and caches the answer
+   * unless an invalidation came while it was out. */
+  const read = (nowMs: number): Promise<OpenRouterModel[]> => {
+    if (reading !== null && reading.generation === generation) return reading.models;
+    if (failed !== null && nowMs - failed.atMs < REREAD_EVERY_MS) {
+      return Promise.reject(failed.error);
+    }
     const started = generation;
-    const models = await deps.store.listUsableOpenRouterModels();
-    if (started === generation) cached = { models, freshUntilMs: nowMs + ttlMs };
+    const models = (async () => {
+      try {
+        const models = await deps.store.listUsableOpenRouterModels();
+        if (started === generation) {
+          cached = { models, freshUntilMs: nowMs + ttlMs };
+          failed = null;
+        }
+        return models;
+      } catch (error) {
+        if (started === generation) failed = { error, atMs: nowMs };
+        throw error;
+      }
+    })();
+    reading = { generation: started, models };
+    // Let go once it settles, however it does; the failure itself is the callers'.
+    models.finally(() => {
+      if (reading?.models === models) reading = null;
+    }).catch(() => {});
     return models;
   };
   const get = async () => {
@@ -66,19 +95,17 @@ export function makeUsableOpenRouterModels(deps: {
   const invalidate = () => {
     generation += 1;
     cached = null;
+    // A failure is the old generation's too: the change may be what mends it.
+    failed = null;
   };
-  let rereading: Promise<OpenRouterModel[]> | null = null;
   let lastRereadMs = -Infinity;
   const reread = (): Promise<OpenRouterModel[]> => {
-    if (rereading !== null) return rereading;
     const nowMs = deps.now().getTime();
+    // A read in flight answers it, as a reread in flight always has: it began a moment ago.
+    if (reading !== null && reading.generation === generation) return reading.models;
     if (nowMs - lastRereadMs < REREAD_EVERY_MS) return get();
     lastRereadMs = nowMs;
-    const pending = read(nowMs).finally(() => {
-      if (rereading === pending) rereading = null;
-    });
-    rereading = pending;
-    return pending;
+    return read(nowMs);
   };
   return { get, invalidate, reread };
 }
