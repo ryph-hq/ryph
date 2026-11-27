@@ -48,6 +48,7 @@ export {
   type CredentialIssuerDeps,
   CredentialRefusedError,
   type CredentialScope,
+  enabledModelsOf,
   listProviderSpecs,
   makeCredentialIssuer,
   makePlatformCredentialIssuer,

@@ -193,3 +193,19 @@ export function openRouterModelForRun(row: OpenRouterCatalogueEntry): DeclaredMo
 export function usableOpenRouterModels(rows: readonly OpenRouterModel[]): OpenRouterModel[] {
   return rows.filter((row) => row.enabled && row.listed);
 }
+
+/**
+ * The models a credential may use: a policy's allowlist narrowed to the usable ones, in the
+ * policy's order — or every usable one for `"*"`. Narrowed at issue time and frozen onto the
+ * credential, so a model disabled while a run holds one stays usable to that run; the next run
+ * no longer gets it.
+ */
+export function effectiveOpenRouterModels(
+  rows: readonly OpenRouterModel[],
+  allowed: readonly string[] | "*",
+): OpenRouterModel[] {
+  const usable = usableOpenRouterModels(rows);
+  if (allowed === "*") return usable;
+  const byId = new Map(usable.map((row) => [row.id, row]));
+  return [...new Set(allowed)].flatMap((id) => byId.get(id) ?? []);
+}

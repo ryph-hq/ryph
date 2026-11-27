@@ -4,6 +4,8 @@
 
 import { MAX_JSON_BODY_BYTES } from "@ryph/shared/http";
 import { test } from "bun:test";
+import { catalogueOf } from "../src/core/openrouter.ts";
+import { listedModel } from "./fake_openrouter.ts";
 import { assert, assertEquals } from "@std/assert";
 import { internalCredentialRoutes } from "../src/http/internal.ts";
 import { makeServiceGate } from "@ryph/sealed";
@@ -117,7 +119,7 @@ test("the key lookup answers metadata only, and 404s an unknown id", async () =>
 
   const found = await call(handler, "GET", "/internal/v1/provider-keys/pk-1");
   assertEquals(found.status, 200);
-  // Exactly the five fields the control plane's policy check reads — the dialect among them,
+  // Exactly the six fields the control plane's policy check reads — the dialect among them,
   // because a provider id may now be a slug an admin typed and says nothing about the wire
   // shape, and BOTH archived timestamps, because the endpoint behind a live key can be
   // withdrawn on its own. No label, no last4, and above all no sealed secret: the control plane
@@ -128,6 +130,7 @@ test("the key lookup answers metadata only, and 404s an unknown id", async () =>
     dialect: "anthropic-messages",
     providerArchivedAt: null,
     archivedAt: null,
+    models: null,
   });
 
   const missing = await call(handler, "GET", "/internal/v1/provider-keys/pk-nope");
@@ -161,7 +164,19 @@ test("a key's dialect comes off the provider it names, custom or built-in", asyn
     dialect: "openai-completions",
     providerArchivedAt: NOW.toISOString(),
     archivedAt: null,
+    models: null,
   });
+
+  // An OpenRouter key answers the models a policy may name: enabled, and still listed.
+  await store.upsertOpenRouterCatalogue(
+    catalogueOf({ data: [listedModel("a/one"), listedModel("b/two"), listedModel("c/three")] }),
+    NOW.toISOString(),
+  );
+  await store.setOpenRouterEnabled(["a/one", "c/three"], NOW.toISOString());
+  await store.createProviderKey(providerKey({ id: "pk-or", provider: "openrouter" }));
+  const openrouter = await (await call(handler, "GET", "/internal/v1/provider-keys/pk-or")).json();
+  assertEquals(openrouter.dialect, "openai-completions");
+  assertEquals(openrouter.models, ["a/one", "c/three"]);
 
   // A key for a provider this deployment has no idea about is config drift, not a 404.
   await store.createProviderKey(providerKey({ id: "pk-drift", provider: "vanished" }));

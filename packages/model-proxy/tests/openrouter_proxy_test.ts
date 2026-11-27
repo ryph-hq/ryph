@@ -153,7 +153,8 @@ test("a streamed call asks for both its usage and its cost", async () => {
 });
 
 test("an OpenRouter body may not route around the allowlist or the meter", async () => {
-  const { call, seen } = await makeSlice({ allowedModels: ["openai/gpt-6"] });
+  // A policy of "*": the credential still holds only the enabled models.
+  const { call, seen } = await makeSlice();
   for (
     const extra of [
       { models: ["openai/gpt-6", "x-ai/grok-9"] },

@@ -105,11 +105,14 @@ export function httpModelAccess(opts: HttpModelAccessOptions): ModelAccess {
           dialect?: unknown;
           providerArchivedAt?: unknown;
           archivedAt?: unknown;
+          models?: unknown;
         }
         | null;
       if (
         typeof body?.id !== "string" || typeof body.provider !== "string" ||
-        typeof body.dialect !== "string" || !Object.hasOwn(DIALECTS, body.dialect)
+        typeof body.dialect !== "string" || !Object.hasOwn(DIALECTS, body.dialect) ||
+        (body.models !== undefined && body.models !== null &&
+          (!Array.isArray(body.models) || !body.models.every((m) => typeof m === "string")))
       ) {
         // A dialect this build does not know is malformed and not a maybe: the caller decides
         // whether a harness can drive the key from it, and a string nothing can match would
@@ -126,6 +129,9 @@ export function httpModelAccess(opts: HttpModelAccessOptions): ModelAccess {
           ? body.providerArchivedAt
           : null,
         archivedAt: typeof body.archivedAt === "string" ? body.archivedAt : null,
+        // Absent is what a proxy that narrows nothing means. A list that is not all strings is
+        // malformed above, never read as "no narrowing": that would wave every model through.
+        models: Array.isArray(body.models) ? body.models as string[] : null,
       };
     },
 

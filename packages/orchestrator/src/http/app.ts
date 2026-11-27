@@ -211,6 +211,9 @@ export interface ModelAccess {
       providerArchivedAt: string | null;
       /** When the KEY itself was archived. */
       archivedAt: string | null;
+      /** The models the provider holds every policy to — OpenRouter's enabled ones — or null for
+       * a provider whose models nothing narrows. */
+      models: string[] | null;
     } | null
   >;
   issueRunCredentials(scope: {

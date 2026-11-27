@@ -69,6 +69,7 @@ function fakeModelAccess(
     dialect: Dialect;
     providerArchivedAt?: string | null;
     archivedAt: string | null;
+    models?: string[] | null;
   } = {
     id: "pk-1",
     provider: "anthropic",
@@ -81,7 +82,8 @@ function fakeModelAccess(
   /** What the proxy would answer the sweep and the door: set by a test, read by the fake. */
   const spend = { byRun: new Map<string, number>(), ceilingReached: false };
   const modelAccess: ModelAccess = {
-    getKey: (id) => Promise.resolve(id === key.id ? { providerArchivedAt: null, ...key } : null),
+    getKey: (id) =>
+      Promise.resolve(id === key.id ? { providerArchivedAt: null, models: null, ...key } : null),
     issueRunCredentials(scope) {
       issued.push({ ...scope });
       return Promise.resolve({
@@ -656,6 +658,77 @@ test("an agent may not be created against an ARCHIVED model endpoint", async () 
   const body = await refused.json();
   assert(body.error.includes("cloudflare-workers-ai"), body.error);
   assert(body.error.includes("archived"), body.error);
+});
+
+test("an OpenRouter policy may name only the models an admin enabled", async () => {
+  // OpenRouter narrows every run to the enabled models at issue time; a policy naming one that
+  // is not enabled would have it narrowed away at boot, so the form refuses it instead.
+  const { modelAccess } = fakeModelAccess({
+    id: "pk-or",
+    provider: "openrouter",
+    dialect: "openai-completions",
+    archivedAt: null,
+    models: ["openai/gpt-6", "anthropic/claude-sonnet-5"],
+  });
+  const { handler } = buildApp({ modelAccess });
+  const policy = (over: Record<string, unknown>) => ({
+    ...PI_AGENT,
+    modelPolicy: {
+      ...PI_AGENT.modelPolicy,
+      providerKeyId: "pk-or",
+      provider: "openrouter",
+      allowedModels: ["openai/gpt-6"],
+      defaultModel: "openai/gpt-6",
+      ...over,
+    },
+  });
+
+  const listed = await post(
+    handler,
+    "/v1/agents",
+    policy({
+      allowedModels: ["openai/gpt-6", "x-ai/grok-9"],
+    }),
+  );
+  assertEquals(listed.status, 400);
+  assertEquals(
+    (await listed.json()).error,
+    'model "x-ai/grok-9" isn\'t enabled for OpenRouter — enable it under Model keys',
+  );
+
+  const byDefault = await post(
+    handler,
+    "/v1/agents",
+    policy({
+      allowedModels: "*",
+      defaultModel: "x-ai/grok-9",
+    }),
+  );
+  assertEquals(byDefault.status, 400);
+  assert((await byDefault.json()).error.includes("x-ai/grok-9"));
+
+  assertEquals((await post(handler, "/v1/agents", policy({}))).status, 201);
+  assertEquals(
+    (await post(handler, "/v1/agents", policy({ allowedModels: "*", defaultModel: null })))
+      .status,
+    201,
+  );
+
+  // Nothing enabled at all: even "*" has nothing to run on.
+  const none = fakeModelAccess({
+    id: "pk-or",
+    provider: "openrouter",
+    dialect: "openai-completions",
+    archivedAt: null,
+    models: [],
+  });
+  const empty = await post(
+    buildApp({ modelAccess: none.modelAccess }).handler,
+    "/v1/agents",
+    policy({ allowedModels: "*", defaultModel: null }),
+  );
+  assertEquals(empty.status, 400);
+  assert((await empty.json()).error.includes("no model is enabled"));
 });
 
 test("without model access configured, an agent with a policy is refused", async () => {

@@ -12,12 +12,20 @@
 //   this service never reads live agent policy
 // - issuing against an archived or unknown provider key throws: better a boot failure the
 //   runner reports upstream than a run that starts and can never call a model
+// - an OPENROUTER credential is narrowed to the models an admin enabled, at issue time: its
+//   allowlist is the policy's ∩ the enabled set ("*" is the enabled set), frozen onto the virtual
+//   key, and none left is a refusal
 
 import type { AllowedModels, PlatformModelPolicy } from "./types.ts";
 import { platformPrincipal, secretCleared } from "./types.ts";
 import type { DeclaredModel, Dialect, ProviderSpec } from "./registry.ts";
 import { CHATGPT_PLAN, PLAN_LOCAL_ONLY, type PlanModel } from "./chatgpt_plan.ts";
-import { OPENROUTER, openRouterModelForRun, usableOpenRouterModels } from "./openrouter.ts";
+import {
+  effectiveOpenRouterModels,
+  OPENROUTER,
+  openRouterModelForRun,
+  usableOpenRouterModels,
+} from "./openrouter.ts";
 import {
   BUILTIN_PROVIDERS,
   customProviderSpec,
@@ -91,6 +99,18 @@ export async function listProviderSpecs(
 }
 
 /**
+ * The models a provider limits every policy to, for the control plane's policy check: OpenRouter's
+ * enabled and listed ids, and null for every other provider, whose models no row narrows.
+ */
+export async function enabledModelsOf(
+  store: KeyStore,
+  providerId: string,
+): Promise<string[] | null> {
+  if (providerId !== OPENROUTER) return null;
+  return usableOpenRouterModels(await store.listOpenRouterModels()).map((row) => row.id);
+}
+
+/**
  * The models a plan key's run is told about: the account's own list, or — when it was never
  * fetched — the run's own allowlist, which is at least what the run may name. Empty only for a
  * key with no list and a run allowed everything, which the issuer refuses: pi cannot select a
@@ -147,6 +167,10 @@ export interface CredentialIssuerDeps {
 
 const DEFAULT_TTL_MS = 12 * 60 * 60 * 1000;
 
+/** The refusal for an OpenRouter scope that leaves no model a run may use. */
+const NO_OPENROUTER_MODEL =
+  "none of this agent's models is enabled for OpenRouter — enable them under Model keys";
+
 /** The refusal for a key holding no secret: it must be entered again (`secretCleared`). */
 const NEEDS_SECRET = (keyId: string) =>
   `provider key "${keyId}" must have its secret entered again under Model keys: its endpoint ` +
@@ -200,6 +224,21 @@ export function makeCredentialIssuer(deps: CredentialIssuerDeps): CredentialIssu
         );
       }
 
+      // OpenRouter serves hundreds of models from the one key; a run gets the ones the admin
+      // enabled, out of those its policy names. The credential's allowlist is that narrowed list,
+      // so "*" never reaches past the enabled set.
+      let allowedModels = scope.allowedModels;
+      let openRouterModels: DeclaredModel[] | null = null;
+      if (provider.id === OPENROUTER) {
+        const effective = effectiveOpenRouterModels(
+          await deps.store.listOpenRouterModels(),
+          scope.allowedModels,
+        );
+        if (effective.length === 0) throw new CredentialRefusedError(NO_OPENROUTER_MODEL);
+        allowedModels = effective.map((row) => row.id);
+        openRouterModels = effective.map(openRouterModelForRun);
+      }
+
       const at = deps.now();
       // prefixed, so one read as it flashes past in a debug session is recognizably a ryph run
       // credential and not a real provider key
@@ -211,7 +250,7 @@ export function makeCredentialIssuer(deps: CredentialIssuerDeps): CredentialIssu
         taskId: scope.taskId,
         providerKeyId: scope.providerKeyId,
         tokenHash: await sha256Hex(token),
-        allowedModels: scope.allowedModels,
+        allowedModels,
         spendUsd: scope.spendUsd ?? null,
         callsInFlight: scope.callsInFlight ?? null,
         expiresAt: new Date(at.getTime() + ttlMs).toISOString(),
@@ -237,6 +276,15 @@ export function makeCredentialIssuer(deps: CredentialIssuerDeps): CredentialIssu
           id: provider.id,
           dialect: provider.dialect,
           models,
+        });
+      } else if (openRouterModels !== null) {
+        // OpenRouter rides it too: pi's own `openrouter` entry knows models we have not enabled
+        // and detects OpenRouter by a base URL that is the proxy's here, so the run is told the
+        // enabled models and their thinking format outright.
+        env[MODEL_PROVIDER_CONFIG_ENV] = JSON.stringify({
+          id: provider.id,
+          dialect: provider.dialect,
+          models: openRouterModels,
         });
       } else if (!provider.builtin) {
         env[MODEL_PROVIDER_CONFIG_ENV] = JSON.stringify({
@@ -335,6 +383,22 @@ export function makePlatformCredentialIssuer(
   return {
     async issue(consumer) {
       const { policy, provider } = await resolvePlatformPolicy(deps.store);
+      // The same narrowing a run's OpenRouter credential gets, and the policy's own model must
+      // be among what is left: a consumer calls it by default.
+      let allowedModels = policy.allowedModels;
+      if (provider.id === OPENROUTER) {
+        const effective = effectiveOpenRouterModels(
+          await deps.store.listOpenRouterModels(),
+          policy.allowedModels,
+        ).map((row) => row.id);
+        if (!effective.includes(policy.model)) {
+          throw new CredentialRefusedError(
+            `the platform's model "${policy.model}" isn't enabled for OpenRouter — enable it ` +
+              "under Model keys",
+          );
+        }
+        allowedModels = effective;
+      }
       const at = deps.now();
       // EXACTLY ONE live credential per consumer. A consumer re-mints on every restart, every
       // expiry and every 401, and without this each of those left the previous key alive until
@@ -349,7 +413,7 @@ export function makePlatformCredentialIssuer(
         taskId: null,
         providerKeyId: policy.providerKeyId,
         tokenHash: await sha256Hex(token),
-        allowedModels: policy.allowedModels,
+        allowedModels,
         spendUsd: null,
         callsInFlight: null,
         expiresAt,
@@ -361,7 +425,7 @@ export function makePlatformCredentialIssuer(
         provider: provider.id,
         dialect: provider.dialect,
         model: policy.model,
-        allowedModels: policy.allowedModels,
+        allowedModels,
         expiresAt,
         basePath: provider.clientBasePath,
       };
