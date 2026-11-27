@@ -29,6 +29,10 @@
 //   JSON Schema with a `file_id` or `url` property, or a tool call's arguments, is not judged
 // - unknown is refused: a tool type, a media source type or a URL scheme this does not know
 //   fails closed, and the provider's own refusal is never what is relied on
+// - OpenRouter's parts are found by where they sit, a message's `content` or `images` list, and
+//   held to a closed set: what a message's `content` is (text or a list), which part types, and
+//   which members a part's `file` or `input_audio` carries. Anything else could be read by
+//   OpenRouter beside the inline bytes the rules check
 
 import type { BodyShape } from "./endpoints.ts";
 import { NOT_A_STRING, type ObjectSeen, visitObjects } from "./model_field.ts";
@@ -106,9 +110,35 @@ const OPENROUTER_REFUSED_FIELDS: readonly string[] = Object.keys(OPENROUTER_REFU
  */
 const OPENROUTER_CONTENT_PARTS = new Set(["text", "image_url", "file", "input_audio"]);
 
-/** Where a message's content part sits: `messages[i].content[j]`, and nowhere else (a tool's
- * JSON Schema can hold a `content` array of typed objects too). */
-const MESSAGE_PART = /^messages\[\d+\]\.content\[\d+\]$/;
+/** Where a message's content part sits: `messages[i].content[j]`, or an image an assistant
+ * message carries back (`messages[i].images[j]`), and nowhere else (a tool's JSON Schema can hold
+ * a `content` array of typed objects too). */
+const MESSAGE_PART = /^messages\[\d+\]\.(?:content|images)\[\d+\]$/;
+
+/** What a message's `images` may be on OpenRouter: a list of parts. */
+const LIST_OR_NULL = new Set(["array", "null"]);
+
+/** A JSON kind as a refusal names it. */
+function kindName(kind: string): string {
+  return kind === "object" || kind === "array" ? `an ${kind}` : `a ${kind}`;
+}
+
+/** Where a message sits. */
+const MESSAGE = /^messages\[\d+\]$/;
+
+/** What a message's `content` may be on OpenRouter: text, or a list of parts. An object would be
+ * one part that no part rule sees, since the rules look at the elements of a list. */
+const OPENROUTER_CONTENT_KINDS = new Set(["string", "array", "null"]);
+
+/** The members a part's payload may carry on OpenRouter, by the part's payload: anything else
+ * (a `url` beside `file_data`, say) is something OpenRouter may read that no rule here checks. */
+const OPENROUTER_PART_MEMBERS: Readonly<Record<string, ReadonlySet<string>>> = {
+  file: new Set(["filename", "file_data"]),
+  input_audio: new Set(["data", "format"]),
+};
+
+/** Where a part's payload sits: `messages[i].content[j].file` and the like. */
+const PART_PAYLOAD = /^messages\[\d+\]\.(?:content|images)\[\d+\]\.(file|input_audio)$/;
 
 /**
  * The plugin the proxy itself adds to an OpenRouter body that carries a file: the file parser,
@@ -210,12 +240,43 @@ export function vetBody(
     if (seen.inArray && seen.key === "tools" && !clientTools.has(type ?? ABSENT)) {
       refuse(seen, `tool type ${JSON.stringify(type ?? null)} runs on the provider's side`);
     }
-    if (
-      opts.openRouter === true && seen.inArray && seen.key === "content" &&
-      !OPENROUTER_CONTENT_PARTS.has(type ?? ABSENT) && MESSAGE_PART.test(seen.path())
-    ) {
-      refuse(seen, `a content part of type ${JSON.stringify(type ?? null)}, not one ryph forwards`);
-      return;
+    if (opts.openRouter === true) {
+      if (seen.inArray && seen.key === "messages" && MESSAGE.test(seen.path())) {
+        for (const member of ["content", "images"] as const) {
+          const kind = seen.members.get(member);
+          const allowed = member === "content" ? OPENROUTER_CONTENT_KINDS : LIST_OR_NULL;
+          if (kind !== undefined && !allowed.has(kind)) {
+            refuse(seen, `${member} that is ${kindName(kind)}, not one ryph forwards`);
+          }
+        }
+      }
+      if (
+        seen.inArray && (seen.key === "content" || seen.key === "images") &&
+        !OPENROUTER_CONTENT_PARTS.has(type ?? ABSENT) && MESSAGE_PART.test(seen.path())
+      ) {
+        refuse(
+          seen,
+          `a content part of type ${JSON.stringify(type ?? null)}, not one ryph forwards`,
+        );
+        return;
+      }
+      const payload = !seen.inArray && seen.key !== null &&
+          Object.hasOwn(OPENROUTER_PART_MEMBERS, seen.key)
+        ? PART_PAYLOAD.exec(seen.path())?.[1]
+        : undefined;
+      if (payload !== undefined) {
+        const allowed = OPENROUTER_PART_MEMBERS[payload];
+        // A file by id has a refusal of its own, below.
+        const unknown = [...seen.members.keys()]
+          .filter((name) => !allowed.has(name) && !(payload === "file" && name === "file_id"));
+        if (unknown.length > 0) {
+          refuse(
+            seen,
+            `${unknown.map((name) => JSON.stringify(name)).join(", ")} in ${payload}, ` +
+              `which takes only ${[...allowed].join(" and ")}`,
+          );
+        }
+      }
     }
     if (type === undefined) return;
     if (REFUSED_ITEM_TYPES.has(type)) {

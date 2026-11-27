@@ -356,7 +356,23 @@ test("OpenRouter's content parts: only text, image, file and audio, every one in
     assertEquals(refused.length, 1, JSON.stringify(part));
     assert(refused[0].startsWith("messages[0].content[1]: "), refused[0]);
   }
-  // A file by id is refused for every provider, as it was.
+  // A part's payload carries only what the rules above read: a `url` beside inline bytes would be
+  // something OpenRouter may fetch that nothing here looked at.
+  for (
+    const part of [
+      { type: "file", file: { filename: "a.pdf", file_data: pdf, url: "https://x.test/a.pdf" } },
+      { type: "file", file: { file_data: pdf, file_url: null } },
+      { type: "input_audio", input_audio: { data: "UklG", format: "wav", url: "https://x.test" } },
+      { type: "input_audio", input_audio: { data: "UklG", source: { url: "https://x.test" } } },
+    ]
+  ) {
+    const { refused } = vet(part);
+    assertEquals(refused.length, 1, JSON.stringify(part));
+    assert(refused[0].startsWith("messages[0].content[1]."), refused[0]);
+    assert(refused[0].includes("which takes only"), refused[0]);
+  }
+  assertEquals(vet({ type: "file", file: { file_data: pdf, url: "x" } }, false).refused, []);
+
   assertEquals(vet({ type: "file", file: { file_id: "f-1" } }, false).refused.length, 1);
   // The OpenRouter-only rules stay OpenRouter's.
   assertEquals(vet({ type: "video_url", video_url: { url: "https://x.test" } }, false).refused, []);
@@ -383,4 +399,52 @@ test("OpenRouter's content parts: only text, image, file and audio, every one in
     "preset",
     "provider",
   ]);
+});
+
+test("OpenRouter's message content is text or a list of parts, and so are an assistant's images", () => {
+  const vet = (message: Record<string, unknown>, openRouter = true) =>
+    vetBody(
+      enc.encode(JSON.stringify({ model: "m", messages: [{ role: "user", ...message }] })),
+      "openai-chat",
+      new Set(),
+      { openRouter },
+    ).refused;
+  assertEquals(vet({ content: "hi" }), []);
+  assertEquals(vet({ content: null }), []);
+  assertEquals(vet({}), []);
+  assertEquals(vet({ content: [{ type: "text", text: "hi" }] }), []);
+
+  // One part on its own, as an object, would pass every part rule unseen.
+  for (
+    const content of [
+      { type: "video_url", video_url: { url: "https://x.test/v.mp4" } },
+      { type: "text", text: "hi" },
+      42,
+      true,
+    ]
+  ) {
+    const refused = vet({ content });
+    assertEquals(refused.length >= 1, true, JSON.stringify(content));
+    assert(refused.some((r) => r.startsWith("messages[0]: content that is")), refused.join());
+  }
+  assertEquals(vet({ content: { type: "video_url" } }, false), []);
+
+  // Images an assistant message carries back are held to the same parts, inline.
+  assertEquals(
+    vet({ role: "assistant", images: [{ type: "image_url", image_url: { url: PNG } }] }),
+    [],
+  );
+  for (
+    const image of [
+      { type: "image_url", image_url: { url: "https://x.test/a.png" } },
+      { type: "video_url", video_url: { url: "https://x.test/v.mp4" } },
+      { image_url: { url: "https://x.test/a.png" } },
+    ]
+  ) {
+    const refused = vet({ role: "assistant", images: [image] });
+    assertEquals(refused.length, 1, JSON.stringify(image));
+    assert(refused[0].startsWith("messages[0].images[0]: "), refused[0]);
+  }
+  assertEquals(vet({ images: { type: "image_url", image_url: { url: PNG } } }).length, 1);
+  assertEquals(vet({ images: [{ type: "video_url" }] }, false), []);
 });
