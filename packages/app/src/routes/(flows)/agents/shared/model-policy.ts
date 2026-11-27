@@ -155,6 +155,60 @@ export function modelPolicyProblem(
   return null;
 }
 
+/**
+ * Whether two policies are the same, compared as the server compares them on save: the allowlist
+ * as a set, and a missing thinking level as none.
+ */
+export function sameModelPolicy(a: ModelPolicy | null, b: ModelPolicy | null): boolean {
+  if (a === null || b === null) return a === b;
+  const sameModels = a.allowedModels === "*" || b.allowedModels === "*"
+    ? a.allowedModels === b.allowedModels
+    : sameIds(a.allowedModels, b.allowedModels);
+  return a.providerKeyId === b.providerKeyId && a.provider === b.provider &&
+    a.defaultModel === b.defaultModel &&
+    (a.defaultThinking ?? null) === (b.defaultThinking ?? null) && sameModels;
+}
+
+/** The edit flow's model step: why it can't be saved, and what to warn about while it can. */
+export type EditedModelPolicyCheck = { problem: string | null; warning: string | null };
+
+/**
+ * The edit flow's check of the model fields. The server checks a policy only when it moves, so
+ * one sent back as stored saves as it is, even after an admin disabled its default model. That
+ * case gets a warning, so the rest of the agent can still be saved.
+ */
+export function editedModelPolicyCheck(
+  stored: ModelPolicy | null,
+  composed: ModelPolicy | null,
+  fields: {
+    providerKeyId: string;
+    allowedModels: ModelPolicy["allowedModels"];
+    defaultModel: string;
+  },
+  openRouter: OpenRouterChoices | null,
+): EditedModelPolicyCheck {
+  if (stored !== null && sameModelPolicy(composed, stored)) {
+    const enabled = openRouter?.enabled ?? null;
+    const stale = enabled !== null &&
+      (stored.defaultModel === null || !enabled.includes(stored.defaultModel));
+    return {
+      problem: null,
+      warning: stale ? "This agent's default model isn't enabled any more" : null,
+    };
+  }
+  const { providerKeyId, allowedModels, defaultModel } = fields;
+  return {
+    problem: modelPolicyProblem(providerKeyId, allowedModels, defaultModel, openRouter),
+    warning: null,
+  };
+}
+
+function sameIds(a: readonly string[], b: readonly string[]): boolean {
+  const left = new Set(a);
+  const right = new Set(b);
+  return left.size === right.size && [...left].every((id) => right.has(id));
+}
+
 /** Trimmed, blank-free and each id once — what the server is sent and what a picker can key on. */
 function cleanList(models: string[]): string[] {
   return [...new Set(models.map((model) => model.trim()).filter((model) => model.length > 0))];

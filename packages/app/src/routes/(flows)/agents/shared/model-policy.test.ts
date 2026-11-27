@@ -4,9 +4,11 @@ import {
   composeModelPolicy,
   defaultModelThinkingLevels,
   editedDefaultThinking,
+  editedModelPolicyCheck,
   modelPolicyProblem,
   openRouterChoices,
   policyToFields,
+  sameModelPolicy,
   usableProviderKeys,
 } from "./model-policy";
 
@@ -262,5 +264,68 @@ describe("OpenRouter model fields", () => {
   it("still needs a default when the enabled models are not known", () => {
     expect(modelPolicyProblem("or-1", "*", "", { enabled: null })).toBe("Pick a default model.");
     expect(modelPolicyProblem("or-1", "*", "c/z", { enabled: null })).toBeNull();
+  });
+
+  describe("on an agent being edited", () => {
+    const stored = {
+      providerKeyId: "or-1",
+      provider: "openrouter",
+      allowedModels: ["a/x", "b/y"],
+      defaultModel: "a/x",
+      defaultThinking: null,
+    };
+    const fields = policyToFields(stored);
+    const compose = (over: Partial<typeof fields> = {}) => {
+      const f = { ...fields, ...over };
+      return composeModelPolicy(f.providerKeyId, f.allowedModels, f.defaultModel, [OR_KEY]);
+    };
+    // An admin has since disabled the default.
+    const now = { enabled: ["b/y"] };
+
+    it("compares policies as the server does", () => {
+      expect(sameModelPolicy(compose(), stored)).toBe(true);
+      expect(sameModelPolicy({ ...stored, allowedModels: ["b/y", "a/x"] }, stored)).toBe(true);
+      expect(
+        sameModelPolicy({ ...stored, defaultThinking: undefined } as never, stored),
+      ).toBe(true);
+      expect(sameModelPolicy({ ...stored, defaultThinking: "high" }, stored)).toBe(false);
+      expect(sameModelPolicy({ ...stored, allowedModels: "*" }, stored)).toBe(false);
+      expect(sameModelPolicy(null, stored)).toBe(false);
+      expect(sameModelPolicy(null, null)).toBe(true);
+    });
+
+    it("saves an unchanged policy whose default was disabled, with a warning", () => {
+      expect(editedModelPolicyCheck(stored, compose(), fields, now)).toEqual({
+        problem: null,
+        warning: "This agent's default model isn't enabled any more",
+      });
+    });
+
+    it("warns about nothing while the default is still enabled or the models aren't known", () => {
+      const fine = { problem: null, warning: null };
+      expect(editedModelPolicyCheck(stored, compose(), fields, { enabled: ["a/x"] }))
+        .toEqual(fine);
+      expect(editedModelPolicyCheck(stored, compose(), fields, { enabled: null })).toEqual(fine);
+    });
+
+    it("holds a moved policy to the OpenRouter rules", () => {
+      const moved = { ...fields, allowedModels: ["a/x"] };
+      expect(editedModelPolicyCheck(stored, compose(moved), moved, now)).toEqual({
+        problem: "Pick one of the enabled OpenRouter models as the default.",
+        warning: null,
+      });
+      const fixed = { ...fields, defaultModel: "b/y" };
+      expect(editedModelPolicyCheck(stored, compose(fixed), fixed, now)).toEqual({
+        problem: null,
+        warning: null,
+      });
+    });
+
+    it("holds a new policy to the rules", () => {
+      const fresh = { providerKeyId: "or-1", allowedModels: "*" as const, defaultModel: "" };
+      const composed = composeModelPolicy("or-1", "*", "", [OR_KEY]);
+      expect(editedModelPolicyCheck(null, composed, fresh, now).problem)
+        .toBe("Pick a default model.");
+    });
   });
 });
