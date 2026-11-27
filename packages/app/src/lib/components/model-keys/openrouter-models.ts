@@ -219,3 +219,26 @@ export function creditLine(info: OpenRouterKeyInfo): CreditLine | null {
 export function creditFailureLine(e: unknown): CreditLine | null {
   return isOpenRouterKeyRefused(e) ? { text: "OpenRouter refused this key", problem: true } : null;
 }
+
+/** A key card's line on the deployment's OpenRouter models, and whether it needs attention. */
+export type ModelsLine = { text: string; problem: boolean };
+
+/**
+ * "2 models enabled", counting only models agents can use now, "No models enabled" as a problem
+ * once the list is in, and "Syncing models…" while the first sync has not brought any.
+ */
+export function enabledModelsLine(catalogue: OpenRouterCatalogue): ModelsLine {
+  if (catalogue.sync.syncing && catalogue.models.length === 0) {
+    return { text: "Syncing models…", problem: false };
+  }
+  const usable = catalogue.models.filter((m) => m.enabled && m.listed && m.tools).length;
+  if (usable === 0) return { text: "No models enabled", problem: true };
+  return { text: `${usable} ${usable === 1 ? "model" : "models"} enabled`, problem: false };
+}
+
+/** The picker's `Dialog.Content` classes: wide enough for a row, the list scrolling inside. */
+export const PICKER_DIALOG_CLASS =
+  "flex max-h-[min(85dvh,56rem)] flex-col gap-4 p-4 sm:max-w-3xl sm:gap-6 sm:p-6";
+
+/** What the picker shows before the page's load has read the catalogue: its loading state. */
+export const CATALOGUE_NOT_READ: CatalogueRead = { catalogue: null, error: null };

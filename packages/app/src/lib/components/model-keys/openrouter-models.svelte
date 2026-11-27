@@ -3,6 +3,7 @@ import { invalidate } from "$app/navigation";
 import { toast } from "svelte-sonner";
 import {
   enableRefusal,
+  type OpenRouterModel,
   type OpenRouterSync,
   setOpenRouterEnabled,
   syncOpenRouter,
@@ -13,6 +14,7 @@ import { Badge } from "#lib/components/ui/badge/index.ts";
 import { TONES } from "#lib/components/ui/badge/tones.ts";
 import { Button } from "#lib/components/ui/button/index.ts";
 import { Checkbox } from "#lib/components/ui/checkbox/index.ts";
+import * as Dialog from "#lib/components/ui/dialog/index.ts";
 import * as InputGroup from "#lib/components/ui/input-group/index.ts";
 import { Skeleton } from "#lib/components/ui/skeleton/index.ts";
 import { Spinner } from "#lib/components/ui/spinner/index.ts";
@@ -46,12 +48,25 @@ let {
   read,
   dependency,
   description = "Pick which OpenRouter models agents can use.",
+  placement = "inline",
+  doneLabel = "Done",
+  ondone,
 }: {
   /** The catalogue as the page's load read it. */
   read: CatalogueRead;
   /** The load's `depends` key: invalidated to read the catalogue again. */
   dependency: string;
   description?: string;
+  /**
+   * Where the picker sits. `inline` is a page section with a save bar that sticks while the page
+   * scrolls; `dialog` fills a `Dialog.Content`: its own header, a list that scrolls inside it, and
+   * the save bar as the footer.
+   */
+  placement?: "inline" | "dialog";
+  /** The dialog footer's action while nothing is unsaved: "Done", "Skip for now". */
+  doneLabel?: string;
+  /** In a dialog: the footer's done action, and a save that worked. */
+  ondone?: () => void;
 } = $props();
 
 const catalogue = $derived(read.catalogue);
@@ -113,6 +128,11 @@ refreshWhileLive(dependency, () => catalogue?.sync.syncing === true);
 const clock = liveClock(() => sync !== null && !busy && sync.syncedAt !== null);
 const status = $derived(sync === null ? null : syncLine(sync, clock.now));
 
+/** Whether there are ticks not yet saved: a dialog asks before closing over them. */
+export function hasChanges(): boolean {
+  return changes > 0;
+}
+
 function toggle(id: string, on: boolean) {
   const next = new Set(choice);
   if (on) next.add(id);
@@ -137,6 +157,7 @@ async function save() {
     await invalidate(dependency);
     edits = null;
     toast.success("Models saved");
+    ondone?.();
   } catch (e) {
     const refused = enableRefusal(e);
     if (refused) refusal = refusalLines(refused, models);
@@ -176,39 +197,36 @@ function holdEnter(event: KeyboardEvent) {
 }
 </script>
 
-<section class="flex flex-col gap-3" aria-labelledby="openrouter-models-title">
-  <div class="flex flex-wrap items-end justify-between gap-3">
-    <div class="flex flex-col gap-1">
-      <h2 id="openrouter-models-title" class="text-base font-medium">OpenRouter models</h2>
-      <p class="text-muted-foreground text-sm">{description}</p>
-    </div>
-    <div class="flex min-w-0 items-center gap-3">
-      {#if status}
-        <span class="text-muted-foreground max-w-72 truncate text-xs" aria-live="polite">
-          {status}
-        </span>
-      {/if}
-      <Button
-        variant="outline"
-        size="sm"
-        disabled={busy || catalogue === null}
-        onclick={() => syncNow()}
-      >
-        {#if busy}
-          <Spinner data-icon="inline-start" />
-        {:else}
-          <RefreshCwIcon data-icon="inline-start" />
-        {/if}
-        Sync now
-      </Button>
-    </div>
-  </div>
 
+{#snippet syncControls()}
+  <div class="flex min-w-0 items-center gap-3">
+    {#if status}
+      <span class="text-muted-foreground max-w-72 truncate text-xs" aria-live="polite">
+        {status}
+      </span>
+    {/if}
+    <Button
+      variant="outline"
+      size="sm"
+      disabled={busy || catalogue === null}
+      onclick={() => syncNow()}
+    >
+      {#if busy}
+        <Spinner data-icon="inline-start" />
+      {:else}
+        <RefreshCwIcon data-icon="inline-start" />
+      {/if}
+      Sync now
+    </Button>
+  </div>
+{/snippet}
+
+{#snippet syncFailure()}
   {#if failure !== null}
     <Alert.Root variant="destructive">
-      <CircleAlertIcon />
-      <Alert.Title>Sync failed</Alert.Title>
-      <Alert.Description class="flex flex-col items-start gap-2">
+  <CircleAlertIcon />
+  <Alert.Title>Sync failed</Alert.Title>
+  <Alert.Description class="flex flex-col items-start gap-2">
         <span>{failure}</span>
         {#if forceable}
           <Button variant="outline" size="sm" onclick={() => syncNow(true)}>
@@ -216,205 +234,292 @@ function holdEnter(event: KeyboardEvent) {
           </Button>
         {/if}
       </Alert.Description>
-    </Alert.Root>
+</Alert.Root>
   {/if}
+{/snippet}
 
-  {#if read.error !== null && catalogue === null}
+{#snippet unread()}
+  {#if read.error !== null}
     <Alert.Root variant="destructive">
-      <CircleAlertIcon />
-      <Alert.Title>Couldn't load OpenRouter's models</Alert.Title>
-      <Alert.Description class="flex flex-col items-start gap-2">
-        <span>{read.error}</span>
-        <Button variant="outline" size="sm" disabled={retrying} onclick={retry}>
+  <CircleAlertIcon />
+  <Alert.Title>Couldn't load OpenRouter's models</Alert.Title>
+  <Alert.Description class="flex flex-col items-start gap-2">
+    <span>{read.error}</span>
+    <Button variant="outline" size="sm" disabled={retrying} onclick={retry}>
           {#if retrying}
             <Spinner data-icon="inline-start" />
           {/if}
           Try again
         </Button>
-      </Alert.Description>
-    </Alert.Root>
-  {:else if catalogue === null}
+  </Alert.Description>
+</Alert.Root>
+  {:else}
     <div class="flex flex-col gap-2 rounded-lg border p-3" aria-busy="true">
       {#each [0, 1, 2, 3] as row (row)}
         <Skeleton class="h-9 w-full" />
       {/each}
     </div>
+  {/if}
+{/snippet}
+
+{#snippet filters()}
+  <InputGroup.Root class="w-full sm:w-72" role="search">
+  <InputGroup.Addon>
+    <SearchIcon />
+  </InputGroup.Addon>
+  <InputGroup.Input
+    type="search"
+    placeholder="Search models"
+    aria-label="Search OpenRouter models"
+    bind:value={query}
+    oninput={() => (limit = PAGE_SIZE)}
+    onkeydown={holdEnter}
+  />
+</InputGroup.Root>
+  <ToggleGroup.Root
+  type="single"
+  variant="outline"
+  size="sm"
+  aria-label="Which models to show"
+  value={filter}
+  onValueChange={(value: string) => {
+      // A second click on the pressed item would clear it; keep a filter chosen.
+      if (value === "all" || value === "enabled") filter = value;
+      limit = PAGE_SIZE;
+    }}
+>
+  <ToggleGroup.Item value="all">All</ToggleGroup.Item>
+  <ToggleGroup.Item value="enabled">Enabled</ToggleGroup.Item>
+</ToggleGroup.Root>
+{/snippet}
+
+{#snippet selectedCount()}
+  <span class="text-muted-foreground text-xs tabular-nums">
+    {choice.size} of {offered.length} selected
+  </span>
+{/snippet}
+
+{#snippet refused()}
+  {#if refusal}
+    <Alert.Root variant="destructive">
+  <CircleAlertIcon />
+  <Alert.Title>Some models can't be enabled</Alert.Title>
+  <Alert.Description>
+    <ul class="flex flex-col gap-1">
+          {#each refusal as line (line)}
+            <li>{line}</li>
+          {/each}
+        </ul>
+  </Alert.Description>
+</Alert.Root>
+  {/if}
+{/snippet}
+
+{#snippet list(listClass: string)}
+  {#if rows.length === 0}
+    <p class="text-muted-foreground rounded-lg border border-dashed px-3 py-6 text-center text-sm">
+      {#if offered.length === 0 && busy}
+        Syncing OpenRouter's models…
+      {:else if offered.length === 0}
+        No models yet. Sync to load them.
+      {:else if filter === "enabled" && query.trim() === ""}
+        No models enabled yet.
+      {:else}
+        No models match "{query.trim()}".
+      {/if}
+    </p>
   {:else}
-    <div class="flex flex-wrap items-center gap-3">
-      <InputGroup.Root class="w-full sm:w-72" role="search">
-        <InputGroup.Addon>
-          <SearchIcon />
-        </InputGroup.Addon>
-        <InputGroup.Input
-          type="search"
-          placeholder="Search models"
-          aria-label="Search OpenRouter models"
-          bind:value={query}
-          oninput={() => (limit = PAGE_SIZE)}
-          onkeydown={holdEnter}
-        />
-      </InputGroup.Root>
-      <ToggleGroup.Root
-        type="single"
-        variant="outline"
-        size="sm"
-        aria-label="Which models to show"
-        value={filter}
-        onValueChange={(value: string) => {
-          // A second click on the pressed item would clear it; keep a filter chosen.
-          if (value === "all" || value === "enabled") filter = value;
-          limit = PAGE_SIZE;
-        }}
-      >
-        <ToggleGroup.Item value="all">All</ToggleGroup.Item>
-        <ToggleGroup.Item value="enabled">Enabled</ToggleGroup.Item>
-      </ToggleGroup.Root>
-      <span class="text-muted-foreground text-xs tabular-nums">
-        {choice.size} of {offered.length} selected
-      </span>
-    </div>
-
-    {#if refusal}
-      <Alert.Root variant="destructive">
-        <CircleAlertIcon />
-        <Alert.Title>Some models can't be enabled</Alert.Title>
-        <Alert.Description>
-          <ul class="flex flex-col gap-1">
-            {#each refusal as line (line)}
-              <li>{line}</li>
-            {/each}
-          </ul>
-        </Alert.Description>
-      </Alert.Root>
-    {/if}
-
-    {#if rows.length === 0}
-      <p class="text-muted-foreground rounded-lg border border-dashed px-3 py-6 text-center text-sm">
-        {#if offered.length === 0}
-          No models yet. Sync to load them.
-        {:else if filter === "enabled" && query.trim() === ""}
-          No models enabled yet.
-        {:else}
-          No models match "{query.trim()}".
-        {/if}
-      </p>
-    {:else}
-      <!-- Its own provider: the list also sits in flows outside the app's sidebar, which holds one. -->
-      <Tooltip.Provider>
-      <ul class="divide-y rounded-lg border text-sm" aria-label="OpenRouter models">
+    <!-- Its own provider: the list also sits in flows outside the app's sidebar, which holds one. -->
+    <Tooltip.Provider>
+  <ul class={["divide-y text-sm", listClass]} aria-label="OpenRouter models">
         {#each shown as model (model.id)}
-          {@const checked = choice.has(model.id)}
-          {@const price = formatModelPrice(model.price)}
-          {@const inputId = `openrouter-model-${model.id}`}
-          {@const noteId = `openrouter-model-note-${model.id}`}
-          {@const usable = model.listed && model.tools}
-          <li
-            class={[
-              "has-[button:focus-visible]:bg-muted/50 flex flex-wrap items-center gap-x-4 gap-y-1.5 px-3 py-2.5",
-              checked && "bg-muted/30",
-            ]}
-          >
-            <Checkbox
-              id={inputId}
-              {checked}
-              disabled={saving || (!usable && !checked)}
-              aria-describedby={usable ? undefined : noteId}
-              onCheckedChange={(on) => toggle(model.id, on === true)}
-            />
-            <label for={inputId} class="flex min-w-0 flex-1 cursor-pointer flex-col">
-              <span class="truncate font-medium" title={model.label}>{model.label}</span>
-              <span class="text-muted-foreground truncate font-mono text-xs" title={model.id}>
-                {model.id}
-              </span>
-            </label>
-            <div class="flex flex-wrap items-center gap-2 pl-7 sm:pl-0">
-              {#if !model.listed}
-                <Badge variant="destructive">No longer listed</Badge>
-              {:else if !model.tools}
-                <Badge variant="destructive">Can't use tools</Badge>
-              {/if}
-              {#if model.vision}
-                <Badge variant="outline">Vision</Badge>
-              {/if}
-              {#if model.reasoning}
-                <Badge variant="outline">Reasoning</Badge>
-              {/if}
-              <span
-                class="text-muted-foreground w-14 text-right text-xs tabular-nums"
-                title="Context window, in tokens"
-              >
-                {formatContext(model.contextLength)}
-                <span class="sr-only">tokens of context</span>
-              </span>
-              {#if price === null}
-                <span class="flex w-28 justify-end">
-                  <Tooltip.Root>
-                    <Tooltip.Trigger>
-                      {#snippet child({ props })}
-                        <span {...props} class="rounded-md">
-                          <Badge class={TONES.warning}>
-                            <TriangleAlertIcon data-icon="inline-start" />
-                            No price
-                          </Badge>
-                        </span>
-                      {/snippet}
-                    </Tooltip.Trigger>
-                    <Tooltip.Content>Not usable in runs with a spend cap</Tooltip.Content>
-                  </Tooltip.Root>
-                </span>
-              {:else}
-                <span class="w-28 text-right text-xs tabular-nums" title={PRICE_HINT}>
-                  {price}
-                  {#if price !== "Free"}
-                    <span class="sr-only">{PRICE_HINT}</span>
-                  {/if}
-                </span>
-              {/if}
-            </div>
-            {#if !model.listed}
-              <p id={noteId} class="text-muted-foreground w-full pl-7 text-xs">
-                OpenRouter dropped this model. Saving turns it off.
-              </p>
-            {:else if !model.tools}
-              <p id={noteId} class="text-muted-foreground w-full pl-7 text-xs">
-                OpenRouter says this model can't use tools now, so agents can't use it.
-              </p>
-            {/if}
-          </li>
+          {@render row(model)}
         {/each}
       </ul>
-      </Tooltip.Provider>
-      {#if rows.length > shown.length}
-        <Button
-          variant="ghost"
-          size="sm"
-          class="self-center"
-          onclick={() => (limit += PAGE_SIZE)}
-        >
-          Show {Math.min(PAGE_SIZE, rows.length - shown.length)} more
-        </Button>
-      {/if}
-    {/if}
-
-    {#if changes > 0}
-      <!-- Stays in view while the list scrolls, so the choice can be saved from anywhere in it. -->
-      <div
-        class="bg-background sticky bottom-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border px-3 py-2 shadow-sm"
-      >
-        <span class="text-sm">
-          {changes}
-          {changes === 1 ? "unsaved change" : "unsaved changes"}
-        </span>
-        <div class="flex items-center gap-2">
-          <Button variant="ghost" size="sm" disabled={saving} onclick={discard}>Discard</Button>
-          <Button size="sm" disabled={saving} onclick={save}>
-            {#if saving}
-              <Spinner data-icon="inline-start" />
-            {/if}
-            Save
-          </Button>
-        </div>
-      </div>
+</Tooltip.Provider>
+    {#if rows.length > shown.length}
+      <Button
+  variant="ghost"
+  size="sm"
+  class="self-center"
+  onclick={() => (limit += PAGE_SIZE)}
+>
+        Show {Math.min(PAGE_SIZE, rows.length - shown.length)} more
+      </Button>
     {/if}
   {/if}
-</section>
+{/snippet}
+
+{#snippet row(model: OpenRouterModel)}
+    {@const checked = choice.has(model.id)}
+    {@const price = formatModelPrice(model.price)}
+    {@const inputId = `openrouter-model-${model.id}`}
+    {@const noteId = `openrouter-model-note-${model.id}`}
+    {@const usable = model.listed && model.tools}
+    <li
+  class={[
+        "has-[button:focus-visible]:bg-muted/50 flex flex-wrap items-center gap-x-4 gap-y-1.5 px-3 py-2.5",
+        checked && "bg-muted/30",
+      ]}
+>
+      <Checkbox
+        id={inputId}
+        {checked}
+        disabled={saving || (!usable && !checked)}
+        aria-describedby={usable ? undefined : noteId}
+        onCheckedChange={(on) => toggle(model.id, on === true)}
+      />
+      <label for={inputId} class="flex min-w-0 flex-1 cursor-pointer flex-col">
+        <span class="truncate font-medium" title={model.label}>{model.label}</span>
+        <span class="text-muted-foreground truncate font-mono text-xs" title={model.id}>
+          {model.id}
+        </span>
+      </label>
+      <div class="flex flex-wrap items-center gap-2 pl-7 sm:pl-0">
+        {#if !model.listed}
+          <Badge variant="destructive">No longer listed</Badge>
+        {:else if !model.tools}
+          <Badge variant="destructive">Can't use tools</Badge>
+        {/if}
+        {#if model.vision}
+          <Badge variant="outline">Vision</Badge>
+        {/if}
+        {#if model.reasoning}
+          <Badge variant="outline">Reasoning</Badge>
+        {/if}
+        <span
+          class="text-muted-foreground w-14 text-right text-xs tabular-nums"
+          title="Context window, in tokens"
+        >
+          {formatContext(model.contextLength)}
+          <span class="sr-only">tokens of context</span>
+        </span>
+        {#if price === null}
+          <span class="flex w-28 justify-end">
+            <Tooltip.Root>
+              <Tooltip.Trigger>
+                {#snippet child({ props })}
+                  <span {...props} class="rounded-md">
+                    <Badge class={TONES.warning}>
+                      <TriangleAlertIcon data-icon="inline-start" />
+                      No price
+                    </Badge>
+                  </span>
+                {/snippet}
+              </Tooltip.Trigger>
+              <Tooltip.Content>Not usable in runs with a spend cap</Tooltip.Content>
+            </Tooltip.Root>
+          </span>
+        {:else}
+          <span class="w-28 text-right text-xs tabular-nums" title={PRICE_HINT}>
+            {price}
+            {#if price !== "Free"}
+              <span class="sr-only">{PRICE_HINT}</span>
+            {/if}
+          </span>
+        {/if}
+      </div>
+      {#if !model.listed}
+        <p id={noteId} class="text-muted-foreground w-full pl-7 text-xs">
+          OpenRouter dropped this model. Saving turns it off.
+        </p>
+      {:else if !model.tools}
+        <p id={noteId} class="text-muted-foreground w-full pl-7 text-xs">
+          OpenRouter says this model can't use tools now, so agents can't use it.
+        </p>
+      {/if}
+    </li>
+{/snippet}
+
+{#snippet changesCount()}
+  <span class="text-sm">
+    {changes}
+    {changes === 1 ? "unsaved change" : "unsaved changes"}
+  </span>
+{/snippet}
+
+{#snippet saveActions()}
+  <div class="flex items-center gap-2">
+  <Button variant="ghost" size="sm" disabled={saving} onclick={discard}>Discard</Button>
+  <Button size="sm" disabled={saving} onclick={save}>
+      {#if saving}
+        <Spinner data-icon="inline-start" />
+      {/if}
+      Save
+    </Button>
+</div>
+{/snippet}
+
+{#if placement === "dialog"}
+  <Dialog.Header class="pr-8">
+  <Dialog.Title>OpenRouter models</Dialog.Title>
+  <Dialog.Description>{description}</Dialog.Description>
+</Dialog.Header>
+
+  <div class="flex min-h-0 flex-1 flex-col gap-3">
+    <div class="flex flex-wrap items-center gap-3">
+      {#if catalogue !== null}
+        {@render filters()}
+      {/if}
+      <div class="ml-auto">{@render syncControls()}</div>
+    </div>
+    {@render syncFailure()}
+    {#if catalogue === null}
+      {@render unread()}
+    {:else}
+      {@render refused()}
+      <!-- The list scrolls inside the dialog, so its header and footer stay in view. -->
+      <div class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
+        {@render list("rounded-lg border")}
+      </div>
+    {/if}
+  </div>
+
+  <Dialog.Footer class="flex-row flex-wrap items-center justify-between sm:justify-between">
+    {#if changes > 0}
+      {@render changesCount()}
+      {@render saveActions()}
+    {:else}
+      {#if catalogue !== null}
+        {@render selectedCount()}
+      {:else}
+        <span></span>
+      {/if}
+      <Button size="sm" variant="outline" onclick={() => ondone?.()}>{doneLabel}</Button>
+    {/if}
+  </Dialog.Footer>
+{:else}
+  <section class="flex flex-col gap-3" aria-labelledby="openrouter-models-title">
+    <div class="flex flex-wrap items-end justify-between gap-3">
+      <div class="flex flex-col gap-1">
+        <h2 id="openrouter-models-title" class="text-base font-medium">OpenRouter models</h2>
+        <p class="text-muted-foreground text-sm">{description}</p>
+      </div>
+      {@render syncControls()}
+    </div>
+
+    {@render syncFailure()}
+
+    {#if catalogue === null}
+      {@render unread()}
+    {:else}
+      <div class="flex flex-wrap items-center gap-3">
+        {@render filters()}
+        {@render selectedCount()}
+      </div>
+
+      {@render refused()}
+      {@render list("rounded-lg border")}
+
+      {#if changes > 0}
+        <!-- Stays in view while the page scrolls, so the choice can be saved from anywhere in it. -->
+        <div
+          class="bg-background sticky bottom-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border px-3 py-2 shadow-sm"
+        >
+          {@render changesCount()}
+          {@render saveActions()}
+        </div>
+      {/if}
+    {/if}
+  </section>
+{/if}

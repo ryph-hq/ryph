@@ -9,6 +9,7 @@ import {
   creditLine,
   draftInCatalogue,
   enabledIds,
+  enabledModelsLine,
   formatContext,
   formatModelPrice,
   idsToSave,
@@ -248,5 +249,48 @@ describe("the page's catalogue read", () => {
     const f = answering([200, catalogue], [500, { error: "down" }]);
     await read(f);
     expect(await read(f)).toEqual({ catalogue: null, error: "down" });
+  });
+});
+
+describe("a key card's models line", () => {
+  const sync = {
+    syncedAt: "2026-11-01T00:00:00Z",
+    attemptedAt: "2026-11-01T00:00:00Z",
+    error: null,
+    errorCode: null,
+    syncing: false,
+  };
+
+  it("counts only the enabled models agents can use", () => {
+    const models = [
+      model("a", { enabled: true }),
+      model("b", { enabled: true }),
+      model("c", { enabled: true, listed: false }),
+      model("d", { enabled: true, tools: false }),
+      model("e"),
+    ];
+    expect(enabledModelsLine({ models, sync })).toEqual({
+      text: "2 models enabled",
+      problem: false,
+    });
+    expect(enabledModelsLine({ models: [model("a", { enabled: true })], sync }).text)
+      .toBe("1 model enabled");
+  });
+
+  it("flags none enabled, unusable ones included", () => {
+    const models = [model("a"), model("b", { enabled: true, listed: false })];
+    expect(enabledModelsLine({ models, sync })).toEqual({
+      text: "No models enabled",
+      problem: true,
+    });
+  });
+
+  it("says a first sync is still running instead of flagging an empty list", () => {
+    expect(enabledModelsLine({ models: [], sync: { ...sync, syncing: true } })).toEqual({
+      text: "Syncing models…",
+      problem: false,
+    });
+    expect(enabledModelsLine({ models: [model("a")], sync: { ...sync, syncing: true } }).problem)
+      .toBe(true);
   });
 });
