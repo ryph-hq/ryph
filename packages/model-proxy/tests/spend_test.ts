@@ -118,7 +118,6 @@ test("spendOfRun counts OpenRouter's bills and prices its unbilled rows from the
     reasoning: false,
     tools: true,
     price: { input: 1, output: 2, cacheRead: 0, cacheWrite: 0 },
-    rawPricing: null,
   }], "2026-09-01T00:00:00.000Z");
   const row = usageRow({ provider: "openrouter", model: "openai/gpt-6" });
   await store.recordUsage({ ...row, costUsd: 0.5 });

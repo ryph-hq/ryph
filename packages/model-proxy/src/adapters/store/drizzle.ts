@@ -20,6 +20,7 @@ import {
 import { SEALED_FORMAT } from "@ryph/sealed";
 import { NO_SECRET, PLATFORM_PRINCIPAL_PREFIX } from "../../core/types.ts";
 import { customProviderSpec, endpointShape } from "../../core/registry.ts";
+import { MISSES_BEFORE_UNLISTED } from "../../core/openrouter.ts";
 import type { UsageDimension } from "../../core/usage_report.ts";
 import type { KeyStore } from "../../ports/key_store.ts";
 import type { ModelProxyDb, ModelProxyDbHandle } from "./db/db.ts";
@@ -31,7 +32,7 @@ const PLATFORM_POLICY_ID = "default";
 const AGENT_HOST_ID = "default";
 /** The one row the OpenRouter sync table holds. */
 const OPENROUTER_SYNC_ID = "default";
-/** Catalogue rows per INSERT: eleven columns each, well under Postgres' bound parameters. */
+/** Catalogue rows per INSERT: thirteen columns each, well under Postgres' bound parameters. */
 const CATALOGUE_CHUNK = 200;
 
 /** How often a waiting lock is asked for again, and how long it is waited for in all. */
@@ -380,6 +381,8 @@ export function drizzleKeyStore(handle: ModelProxyDbHandle): KeyStore {
               models.slice(i, i + CATALOGUE_CHUNK).map((m) => ({
                 ...m,
                 listed: true,
+                missedSyncs: 0,
+                seenAt: at,
                 enabled: false,
                 updatedAt: at,
               })),
@@ -395,25 +398,48 @@ export function drizzleKeyStore(handle: ModelProxyDbHandle): KeyStore {
                 reasoning: sql`excluded.reasoning`,
                 tools: sql`excluded.tools`,
                 price: sql`excluded.price`,
-                rawPricing: sql`excluded.raw_pricing`,
                 listed: true,
+                missedSyncs: 0,
+                seenAt: at,
                 updatedAt: at,
               },
             });
         }
-        const ids = models.map((m) => m.id);
+        // Every listed row this sync did not carry, found by its stamp rather than by naming the
+        // ids it did (which would be a bound parameter each): one more miss, and unlisted unless
+        // it is enabled and has missed fewer than MISSES_BEFORE_UNLISTED in a row. In a SET, the
+        // columns read their values from before the update.
         await tx.update(rows)
-          .set({ listed: false, updatedAt: at })
-          .where(and(
-            eq(rows.listed, true),
-            ...(ids.length === 0 ? [] : [notInArray(rows.id, ids)]),
-          ));
+          .set({
+            missedSyncs: sql`${rows.missedSyncs} + 1`,
+            listed: sql`(${rows.enabled} and ${rows.missedSyncs} + 1 < ${MISSES_BEFORE_UNLISTED})`,
+            updatedAt: at,
+          })
+          .where(and(eq(rows.listed, true), ne(rows.seenAt, at)));
       });
+    },
+    async countListedOpenRouterModels() {
+      return await db.$count(schema.openrouterModels, eq(schema.openrouterModels.listed, true));
     },
     async listOpenRouterModels() {
       return await db.query.openrouterModels.findMany({
+        columns: { seenAt: false },
         orderBy: (m, { asc }) => [asc(m.id)],
       });
+    },
+    async listUsableOpenRouterModels() {
+      return await db.query.openrouterModels.findMany({
+        columns: { seenAt: false },
+        where: (m, { and, eq }) => and(eq(m.enabled, true), eq(m.listed, true)),
+        orderBy: (m, { asc }) => [asc(m.id)],
+      });
+    },
+    async listOpenRouterPrices() {
+      const rows = await db.query.openrouterModels.findMany({
+        columns: { id: true, price: true },
+        where: (m, { isNotNull }) => isNotNull(m.price),
+      });
+      return rows.flatMap(({ id, price }) => price === null ? [] : [{ id, price }]);
     },
     async setOpenRouterEnabled(ids, at) {
       const rows = schema.openrouterModels;

@@ -12,6 +12,7 @@ import type { OpenRouterCatalogueEntry } from "../src/core/openrouter.ts";
 
 const T0 = "2026-01-01T00:00:00.000Z";
 const T1 = "2026-01-01T01:00:00.000Z";
+const T2 = "2026-01-01T02:00:00.000Z";
 
 const key: ProviderKey = {
   id: "pk-1",
@@ -231,7 +232,6 @@ const catalogueEntry = (id: string, over: Partial<OpenRouterCatalogueEntry> = {}
   reasoning: false,
   tools: true,
   price: { input: 1, output: 2, cacheRead: 0.5, cacheWrite: 1 },
-  rawPricing: { prompt: "0.000001", completion: "0.000002" },
   ...over,
 });
 
@@ -245,7 +245,7 @@ test("the OpenRouter catalogue round-trips through both stores identically", asy
 
       await store.upsertOpenRouterCatalogue([
         catalogueEntry("a/one"),
-        catalogueEntry("b/two", { price: null, rawPricing: null }),
+        catalogueEntry("b/two", { price: null }),
         catalogueEntry("c/three"),
       ], T0);
       await store.setOpenRouterEnabled(["a/one", "b/two"], T0);
@@ -259,24 +259,48 @@ test("the OpenRouter catalogue round-trips through both stores identically", asy
       assertEquals(rows[1].price, null, name);
       assertEquals(rows[0].price, { input: 1, output: 2, cacheRead: 0.5, cacheWrite: 1 }, name);
 
-      // The next sync drops `b/two` and re-prices `a/one`: the dropped row is kept, unlisted, and
-      // what an admin enabled survives the sync.
+      assertEquals(await store.countListedOpenRouterModels(), 3, name);
+      assertEquals((await store.listUsableOpenRouterModels()).map((r) => r.id), [
+        "a/one",
+        "b/two",
+      ], name);
+      // Only what has a price is priced.
+      assertEquals((await store.listOpenRouterPrices()).map((r) => r.id).sort(), [
+        "a/one",
+        "c/three",
+      ], name);
+
+      // The next sync drops `b/two` and `c/three` and re-prices `a/one`. Enabled, `b/two` stays
+      // listed through one miss; `c/three`, which nobody enabled, is unlisted at once. Nothing is
+      // deleted, and what an admin enabled survives the sync.
       await store.upsertOpenRouterCatalogue([
         catalogueEntry("a/one", {
           label: "One",
           price: { ...catalogueEntry("").price!, input: 3 },
         }),
-        catalogueEntry("c/three"),
       ], T1);
       rows = await store.listOpenRouterModels();
-      assertEquals(rows.map((r) => [r.id, r.listed, r.enabled]), [
-        ["a/one", true, true],
-        ["b/two", false, true],
-        ["c/three", true, false],
+      assertEquals(rows.map((r) => [r.id, r.listed, r.enabled, r.missedSyncs]), [
+        ["a/one", true, true, 0],
+        ["b/two", true, true, 1],
+        ["c/three", false, false, 1],
       ], name);
       assertEquals(rows[0].label, "One", name);
       assertEquals(rows[0].price?.input, 3, name);
       assertEquals(rows[0].updatedAt, T1, name);
+
+      // A second miss in a row unlists `b/two`; `c/three` coming back is listed again.
+      await store.upsertOpenRouterCatalogue(
+        [catalogueEntry("a/one"), catalogueEntry("c/three")],
+        T2,
+      );
+      rows = await store.listOpenRouterModels();
+      assertEquals(rows.map((r) => [r.id, r.listed, r.missedSyncs]), [
+        ["a/one", true, 0],
+        ["b/two", false, 2],
+        ["c/three", true, 0],
+      ], name);
+      assertEquals((await store.listUsableOpenRouterModels()).map((r) => r.id), ["a/one"], name);
 
       // The enabled set is replaced whole; an empty set disables everything.
       await store.setOpenRouterEnabled(["c/three"], T1);

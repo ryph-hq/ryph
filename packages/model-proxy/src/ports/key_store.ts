@@ -13,6 +13,7 @@ import type {
   VirtualKey,
 } from "../core/types.ts";
 import type { UsageAggregateQuery, UsageAggregateRow } from "../core/usage_report.ts";
+import type { PriceRates } from "../core/pricing.ts";
 import type {
   OpenRouterCatalogueEntry,
   OpenRouterModel,
@@ -157,12 +158,22 @@ export interface KeyStore {
 
   /**
    * Writes one sync of OpenRouter's catalogue, in one transaction: every model in it inserted or
-   * updated and marked listed (its `enabled` left as it was), and every row the sync did NOT
-   * carry marked unlisted. Nothing is deleted: an old usage row keeps its model's price.
+   * updated, marked listed and its misses cleared (its `enabled` left as it was); every listed row
+   * the sync did NOT carry counted one more miss, and unlisted — at once when it is not enabled,
+   * after `MISSES_BEFORE_UNLISTED` misses in a row when it is. Nothing is deleted: an old usage row
+   * keeps its model's price.
    */
   upsertOpenRouterCatalogue(models: OpenRouterCatalogueEntry[], at: string): Promise<void>;
-  /** Every catalogue row, unlisted ones included, by id. */
+  /** How many catalogue rows are listed: what the next sync is held against. */
+  countListedOpenRouterModels(): Promise<number>;
+  /** Every catalogue row, unlisted ones included, by id. The admin's picker reads it. */
   listOpenRouterModels(): Promise<OpenRouterModel[]>;
+  /** The rows agents may use — enabled and listed — by id: what a credential is issued, and the
+   * provider list offers. */
+  listUsableOpenRouterModels(): Promise<OpenRouterModel[]>;
+  /** Every row's price, listed or not, enabled or not; rows with none left out. What a call is
+   * priced at. */
+  listOpenRouterPrices(): Promise<Array<{ id: string; price: PriceRates }>>;
   /** Replaces the enabled set with exactly `ids`. The caller checks they are usable. */
   setOpenRouterEnabled(ids: readonly string[], at: string): Promise<void>;
   /** Where the catalogue sync stands; null before the first attempt. */

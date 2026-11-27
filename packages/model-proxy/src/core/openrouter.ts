@@ -15,6 +15,8 @@
 // - OpenRouter's own routers (`openrouter/auto` and the like) are left out: they pick a model at
 //   request time, which no allowlist can hold to an id
 // - only models that take tools are worth enabling: pi's agent loop is tool calls
+// - every number a row holds is bounded here, so one absurd entry in OpenRouter's list cannot fail
+//   the write of all the others
 
 import type { DeclaredModel } from "./registry.ts";
 import type { PriceRates } from "./pricing.ts";
@@ -48,6 +50,22 @@ const DEFAULT_MAX_OUTPUT_TOKENS = 16_384;
  */
 const MAX_OUTPUT_TOKENS_CAP = 65_536;
 
+/** The most context a row says a model has. Past any model there is, and well inside the
+ * store's integer column: a bigger figure is clamped to it rather than failing the sync. */
+const MAX_CONTEXT_TOKENS = 100_000_000;
+
+/** How many models one sync takes. OpenRouter lists a few hundred; a list past this is not one
+ * the sync trusts, and fails. */
+export const MAX_CATALOGUE_MODELS = 5_000;
+
+/**
+ * How many syncs in a row an ENABLED model must be missing from before it is unlisted. One list
+ * that came back short (a truncated answer, entries this cannot read) must not take a model away
+ * from every agent until somebody presses "Sync now"; a model not enabled has nobody to lose and
+ * is unlisted at once.
+ */
+export const MISSES_BEFORE_UNLISTED = 2;
+
 /** One model as the sync writes it. */
 export interface OpenRouterCatalogueEntry {
   id: string;
@@ -60,14 +78,14 @@ export interface OpenRouterCatalogueEntry {
   tools: boolean;
   /** USD per million tokens; null when OpenRouter's pricing could not be read. */
   price: PriceRates | null;
-  /** OpenRouter's `pricing` object as it came, per-token USD strings. */
-  rawPricing: Record<string, string> | null;
 }
 
 /** One model as the store holds it. Rows are never deleted: old usage keeps its price. */
 export interface OpenRouterModel extends OpenRouterCatalogueEntry {
-  /** False once a sync no longer lists it. */
+  /** False once a sync no longer lists it (an enabled model: `MISSES_BEFORE_UNLISTED` syncs). */
   listed: boolean;
+  /** Syncs in a row that did not list it; 0 for one the last sync listed. */
+  missedSyncs: number;
   /** Whether an admin picked it for agents. */
   enabled: boolean;
   updatedAt: string;
@@ -86,8 +104,11 @@ type Json = Record<string, unknown>;
 const isObject = (value: unknown): value is Json =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-const positiveInt = (value: unknown): number | null =>
-  typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.floor(value) : null;
+/** A positive whole number, at most `max`; null for anything that is not one. */
+const positiveInt = (value: unknown, max: number): number | null =>
+  typeof value === "number" && Number.isFinite(value) && value >= 1
+    ? Math.min(Math.floor(value), max)
+    : null;
 
 /** A per-token USD string as USD per million tokens; null for OpenRouter's `-1` (a price it does
  * not know) or anything that is not a number. */
@@ -132,7 +153,7 @@ export function catalogueOf(body: unknown): OpenRouterCatalogueEntry[] {
     const id = entry.id.trim();
     if (id === "" || id.length > 200 || /\s/.test(id) || id.startsWith(ROUTER_PREFIX)) continue;
     if (seen.has(id)) continue;
-    const contextLength = positiveInt(entry.context_length);
+    const contextLength = positiveInt(entry.context_length, MAX_CONTEXT_TOKENS);
     if (contextLength === null) continue;
     seen.add(id);
     const architecture = isObject(entry.architecture) ? entry.architecture : {};
@@ -141,18 +162,11 @@ export function catalogueOf(body: unknown): OpenRouterCatalogueEntry[] {
     const maxOutputTokens = Math.max(
       1,
       Math.min(
-        positiveInt(top.max_completion_tokens) ?? DEFAULT_MAX_OUTPUT_TOKENS,
+        positiveInt(top.max_completion_tokens, MAX_OUTPUT_TOKENS_CAP) ?? DEFAULT_MAX_OUTPUT_TOKENS,
         MAX_OUTPUT_TOKENS_CAP,
         Math.floor(contextLength / 2),
       ),
     );
-    const rawPricing = isObject(entry.pricing)
-      ? Object.fromEntries(
-        Object.entries(entry.pricing)
-          .filter(([, v]) => typeof v === "string" || typeof v === "number")
-          .map(([k, v]) => [k, String(v)]),
-      )
-      : null;
     rows.push({
       id,
       label: typeof entry.name === "string" && entry.name.trim() !== ""
@@ -164,7 +178,6 @@ export function catalogueOf(body: unknown): OpenRouterCatalogueEntry[] {
       reasoning: parameters.includes("reasoning"),
       tools: parameters.includes("tools"),
       price: priceOf(entry.pricing),
-      rawPricing,
     });
   }
   return rows;
@@ -189,23 +202,17 @@ export function openRouterModelForRun(row: OpenRouterCatalogueEntry): DeclaredMo
   };
 }
 
-/** The models agents may use: enabled, and still in OpenRouter's list. */
-export function usableOpenRouterModels(rows: readonly OpenRouterModel[]): OpenRouterModel[] {
-  return rows.filter((row) => row.enabled && row.listed);
-}
-
 /**
- * The models a credential may use: a policy's allowlist narrowed to the usable ones, in the
- * policy's order — or every usable one for `"*"`. Narrowed at issue time and frozen onto the
- * credential, so a model disabled while a run holds one stays usable to that run; the next run
- * no longer gets it.
+ * The models a credential may use: a policy's allowlist narrowed to the ones the provider serves
+ * (OpenRouter's: enabled and listed), in the policy's order — or every one for `"*"`. Narrowed
+ * each time a credential is issued, so a run that is issued another (a restart, a resume, an
+ * expiry) loses a model disabled since: a run holds a model only as long as its credential.
  */
-export function effectiveOpenRouterModels(
-  rows: readonly OpenRouterModel[],
+export function narrowedModels(
+  served: readonly DeclaredModel[],
   allowed: readonly string[] | "*",
-): OpenRouterModel[] {
-  const usable = usableOpenRouterModels(rows);
-  if (allowed === "*") return usable;
-  const byId = new Map(usable.map((row) => [row.id, row]));
+): DeclaredModel[] {
+  if (allowed === "*") return [...served];
+  const byId = new Map(served.map((model) => [model.id, model]));
   return [...new Set(allowed)].flatMap((id) => byId.get(id) ?? []);
 }

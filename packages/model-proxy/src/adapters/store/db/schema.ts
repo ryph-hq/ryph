@@ -98,7 +98,7 @@ export const customProviders = pgTable("custom_providers", {
 
 // OpenRouter's model catalogue, synced from its public model list (core/openrouter_catalogue.ts),
 // and which of those models an admin enabled for agents. One set per deployment: the catalogue is
-// the same for every OpenRouter key. Rows are never deleted — a model that drops out of a sync is
+// the same for every OpenRouter key. Rows are never deleted — a model that drops out of syncs is
 // marked unlisted — so a usage row spent on it keeps a price.
 export const openrouterModels = pgTable("openrouter_models", {
   id: text("id").primaryKey(),
@@ -113,8 +113,12 @@ export const openrouterModels = pgTable("openrouter_models", {
   // USD per million tokens; null when OpenRouter's pricing could not be read, which reports as
   // unpriced, never as free.
   price: jsonb("price").$type<PriceRates>(),
-  rawPricing: jsonb("raw_pricing").$type<Record<string, string>>(),
   listed: boolean("listed").notNull().default(true),
+  // Syncs in a row that left the model out, and the last sync that carried it: an enabled model
+  // is unlisted only after more than one (MISSES_BEFORE_UNLISTED), and the sync finds the rows it
+  // left out by `seen_at` rather than by a list of every id it carried.
+  missedSyncs: integer("missed_syncs").notNull().default(0),
+  seenAt: text("seen_at").notNull(),
   enabled: boolean("enabled").notNull().default(false),
   updatedAt: text("updated_at").notNull(),
 });

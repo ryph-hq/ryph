@@ -18,7 +18,11 @@ import { PLATFORM_PRINCIPAL_PREFIX } from "../src/core/types.ts";
 import { customProviderSpec, endpointShape } from "../src/core/registry.ts";
 import type { KeyStore } from "../src/ports/key_store.ts";
 import type { UsageAggregateRow, UsageDimension } from "../src/core/usage_report.ts";
-import type { OpenRouterModel, OpenRouterSync } from "../src/core/openrouter.ts";
+import {
+  MISSES_BEFORE_UNLISTED,
+  type OpenRouterModel,
+  type OpenRouterSync,
+} from "../src/core/openrouter.ts";
 
 export function memoryKeyStore(): KeyStore {
   const providerKeys = new Map<string, ProviderKey>();
@@ -30,6 +34,10 @@ export function memoryKeyStore(): KeyStore {
   let agentHostId: string | null = null;
   const openRouterModels = new Map<string, OpenRouterModel>();
   let openRouterSync: OpenRouterSync | null = null;
+  const openRouterRows = () =>
+    structuredClone(
+      [...openRouterModels.values()].sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+    );
 
   return {
     createProviderKey(key) {
@@ -232,28 +240,43 @@ export function memoryKeyStore(): KeyStore {
     },
 
     upsertOpenRouterCatalogue(models, at) {
-      // Mirrors the drizzle store's one transaction: upserted and listed, `enabled` kept, and
-      // every row the sync left out marked unlisted.
+      // Mirrors the drizzle store's one transaction: upserted, listed and its misses cleared,
+      // `enabled` kept; every listed row the sync left out one miss more, and unlisted unless it
+      // is enabled and short of MISSES_BEFORE_UNLISTED.
       const ids = new Set(models.map((m) => m.id));
       for (const [id, row] of openRouterModels) {
         if (!ids.has(id) && row.listed) {
-          openRouterModels.set(id, { ...row, listed: false, updatedAt: at });
+          const missedSyncs = row.missedSyncs + 1;
+          openRouterModels.set(id, {
+            ...row,
+            missedSyncs,
+            listed: row.enabled && missedSyncs < MISSES_BEFORE_UNLISTED,
+            updatedAt: at,
+          });
         }
       }
       for (const model of models) {
         const enabled = openRouterModels.get(model.id)?.enabled ?? false;
         openRouterModels.set(
           model.id,
-          structuredClone({ ...model, listed: true, enabled, updatedAt: at }),
+          structuredClone({ ...model, listed: true, missedSyncs: 0, enabled, updatedAt: at }),
         );
       }
       return Promise.resolve();
     },
+    countListedOpenRouterModels() {
+      return Promise.resolve([...openRouterModels.values()].filter((m) => m.listed).length);
+    },
     listOpenRouterModels() {
-      const rows = [...openRouterModels.values()].sort((a, b) =>
-        a.id < b.id ? -1 : a.id > b.id ? 1 : 0
+      return Promise.resolve(openRouterRows());
+    },
+    listUsableOpenRouterModels() {
+      return Promise.resolve(openRouterRows().filter((m) => m.enabled && m.listed));
+    },
+    listOpenRouterPrices() {
+      return Promise.resolve(
+        openRouterRows().flatMap(({ id, price }) => price === null ? [] : [{ id, price }]),
       );
-      return Promise.resolve(structuredClone(rows));
     },
     setOpenRouterEnabled(ids, at) {
       const wanted = new Set(ids);

@@ -234,7 +234,6 @@ test("catalogueModels: the price list's models, dated snapshots folded into thei
 test("rollUp takes a stated bill at its word, scales its split, and adds the unbilled rows", () => {
   const overlay = priceOverlayFrom([], [
     { id: "openai/gpt-6", price: { input: 1, output: 3, cacheRead: 0, cacheWrite: 0 } },
-    { id: "x/unpriced", price: null },
   ]);
   const openrouter = { provider: "openrouter", model: "openai/gpt-6" };
   const [all] = rollUp([

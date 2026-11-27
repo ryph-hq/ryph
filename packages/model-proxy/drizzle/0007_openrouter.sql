@@ -7,8 +7,9 @@ CREATE TABLE "openrouter_models" (
 	"reasoning" boolean NOT NULL,
 	"tools" boolean NOT NULL,
 	"price" jsonb,
-	"raw_pricing" jsonb,
 	"listed" boolean DEFAULT true NOT NULL,
+	"missed_syncs" integer DEFAULT 0 NOT NULL,
+	"seen_at" text NOT NULL,
 	"enabled" boolean DEFAULT false NOT NULL,
 	"updated_at" text NOT NULL
 );

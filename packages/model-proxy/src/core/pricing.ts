@@ -24,7 +24,7 @@ import { CHATGPT_PLAN } from "./chatgpt_plan.ts";
 import { PRICE_CATALOGUE } from "./pricing_catalogue.ts";
 import { THINKING_CATALOGUE } from "./thinking_catalogue.ts";
 import type { DeclaredModel, ProviderSpec } from "./registry.ts";
-import { OPENROUTER, type OpenRouterModel } from "./openrouter.ts";
+import { OPENROUTER } from "./openrouter.ts";
 import type { KeyStore } from "../ports/key_store.ts";
 
 export interface PriceRates {
@@ -142,15 +142,13 @@ export function priceOverlayOf(
  */
 export function priceOverlayFrom(
   customProviders: ReadonlyArray<Pick<ProviderSpec, "id"> & { models: readonly DeclaredModel[] }>,
-  openRouterModels: readonly Pick<OpenRouterModel, "id" | "price">[],
+  openRouterPrices: readonly { id: string; price: PriceRates }[],
 ): PriceOverlay {
   return priceOverlayOf([
     ...customProviders,
     {
       id: OPENROUTER,
-      models: openRouterModels.flatMap((m) =>
-        m.price === null ? [] : [{ id: m.id, price: m.price }]
-      ),
+      models: openRouterPrices.map((m) => ({ id: m.id, price: m.price })),
     },
   ]);
 }
@@ -159,7 +157,7 @@ export function priceOverlayFrom(
 export async function priceOverlay(store: KeyStore): Promise<PriceOverlay> {
   const [custom, openRouter] = await Promise.all([
     store.listCustomProviders(),
-    store.listOpenRouterModels(),
+    store.listOpenRouterPrices(),
   ]);
   return priceOverlayFrom(custom, openRouter);
 }

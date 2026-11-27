@@ -1,5 +1,5 @@
 {
-  "id": "24b2ff80-1e29-479e-ab37-4f077840722f",
+  "id": "8d6d39d7-00a2-41e3-a148-f32cd75f6cfb",
   "prevId": "e9a081f0-acba-49f3-bf92-575dd0f80368",
   "version": "7",
   "dialect": "postgresql",
@@ -273,18 +273,25 @@
           "primaryKey": false,
           "notNull": false
         },
-        "raw_pricing": {
-          "name": "raw_pricing",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
         "listed": {
           "name": "listed",
           "type": "boolean",
           "primaryKey": false,
           "notNull": true,
           "default": true
+        },
+        "missed_syncs": {
+          "name": "missed_syncs",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "seen_at": {
+          "name": "seen_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
         },
         "enabled": {
           "name": "enabled",

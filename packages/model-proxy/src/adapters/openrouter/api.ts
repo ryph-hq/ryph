@@ -2,11 +2,13 @@
 // so tests point it at a fake and nothing in a test run ever reaches OpenRouter.
 //
 // Invariants:
-// - every call is bounded (CALL_TIMEOUT_MS): a key save and a catalogue sync must not hang on it
+// - every call is bounded (CALL_TIMEOUT_MS), and so is what it reads (MAX_BODY_BYTES): a key save
+//   and a catalogue sync must not hang on it, nor hold a body of any size in memory
 // - a failure says whether OpenRouter answered (`status`) or was never reached (null)
 // - the key is never put in an error message
 // - no redirect is followed: the key is on the request
 
+import { readCappedBytes } from "@ryph/shared/http";
 import { OPENROUTER_API, OPENROUTER_HEADERS } from "../../core/openrouter.ts";
 import {
   type OpenRouterApi,
@@ -22,6 +24,10 @@ export interface OpenRouterApiOptions {
 
 const CALL_TIMEOUT_MS = 15_000;
 
+/** The most of an answer a call reads. OpenRouter's whole model list, descriptions and all, is a
+ * few megabytes. */
+const MAX_BODY_BYTES = 16 * 1024 * 1024;
+
 type Json = Record<string, unknown>;
 const isObject = (value: unknown): value is Json =>
   typeof value === "object" && value !== null && !Array.isArray(value);
@@ -35,6 +41,7 @@ export function openRouterApi(opts: OpenRouterApiOptions = {}): OpenRouterApi {
 
   /** One bounded GET, its JSON body, or the OpenRouterApiError it amounts to. */
   const get = async (path: string, what: string, secret?: string): Promise<unknown> => {
+    const deadline = AbortSignal.timeout(CALL_TIMEOUT_MS);
     let res: Response;
     try {
       res = await doFetch(`${base}${path}`, {
@@ -44,7 +51,7 @@ export function openRouterApi(opts: OpenRouterApiOptions = {}): OpenRouterApi {
           ...(secret === undefined ? {} : { authorization: `Bearer ${secret}` }),
         },
         redirect: "manual",
-        signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
+        signal: deadline,
       });
     } catch (err) {
       throw new OpenRouterApiError(
@@ -56,8 +63,22 @@ export function openRouterApi(opts: OpenRouterApiOptions = {}): OpenRouterApi {
       await res.body?.cancel().catch(() => {});
       throw new OpenRouterApiError(`OpenRouter answered ${res.status} for ${what}`, res.status);
     }
+    let read: Awaited<ReturnType<typeof readCappedBytes>>;
     try {
-      return await res.json();
+      read = await readCappedBytes(res, MAX_BODY_BYTES, deadline);
+    } catch {
+      throw new OpenRouterApiError(`OpenRouter broke off ${what}`, null);
+    }
+    if (!read.ok) {
+      throw new OpenRouterApiError(
+        read.reason === "too_large"
+          ? `OpenRouter answered ${what} with more than ${MAX_BODY_BYTES} bytes`
+          : `OpenRouter took too long to answer ${what}`,
+        res.status,
+      );
+    }
+    try {
+      return JSON.parse(new TextDecoder().decode(read.bytes));
     } catch {
       throw new OpenRouterApiError(`OpenRouter answered ${what} with no JSON`, res.status);
     }
