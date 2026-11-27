@@ -920,7 +920,8 @@ export function makeProxyHandler(deps: ProxyHandlerDeps): (req: Request) => Prom
     // on (give or take the cache's minute), platform credentials included. The same answer as
     // the allowlist's. A model missing from the cached set is looked up once more in the store
     // before the refusal: it may have been enabled through another replica, whose change this
-    // process's cache never heard of. That costs a query on the refusal path only.
+    // process's cache never heard of. That costs a query on the refusal path only, and at most
+    // one a second however many calls are refused (core/openrouter_usable.ts).
     let served = provider.models;
     if (
       provider.id === OPENROUTER && route?.spends === true && named !== null &&

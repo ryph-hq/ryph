@@ -3,7 +3,11 @@
 
 import { test } from "bun:test";
 import { assertEquals } from "@std/assert";
-import { makeUsableOpenRouterModels, USABLE_TTL_MS } from "../src/core/openrouter_usable.ts";
+import {
+  makeUsableOpenRouterModels,
+  REREAD_EVERY_MS,
+  USABLE_TTL_MS,
+} from "../src/core/openrouter_usable.ts";
 import type { OpenRouterModel } from "../src/core/openrouter.ts";
 import { memoryKeyStore } from "./memory_store.ts";
 
@@ -88,4 +92,47 @@ test("two caches over one store: a reread sees what the other's process enabled"
   assertEquals((await here.reread()).map((m) => m.id), ["a/one", "b/two"]);
   assertEquals((await here.get()).map((m) => m.id), ["a/one", "b/two"]);
   assertEquals(s.reads(), 3);
+});
+
+test("a reread never drops the cache, shares the one in flight, and starts once a second", async () => {
+  const s = countingStore();
+  let now = T0;
+  const usable = makeUsableOpenRouterModels({ store: s.store, now: () => new Date(now) });
+  s.set(["a/one"]);
+  assertEquals((await usable.get()).map((m) => m.id), ["a/one"]);
+  assertEquals(s.reads(), 1);
+
+  // A run loops on a model that is off. Its rereads, all at once, are one read of the store, and
+  // while it is out every other caller is served from the cache.
+  const release = s.holdReads();
+  const rereads = Array.from({ length: 50 }, () => usable.reread());
+  assertEquals((await usable.get()).map((m) => m.id), ["a/one"], "the cache stands meanwhile");
+  release();
+  await Promise.all(rereads);
+  assertEquals(s.reads(), 2);
+
+  // More refusals inside the same second read nothing.
+  for (let i = 0; i < 50; i++) await usable.reread();
+  assertEquals(s.reads(), 2);
+
+  // A model another process enabled is served after the next refusal a second on, and cached.
+  s.set(["a/one", "b/two"]);
+  assertEquals((await usable.reread()).map((m) => m.id), ["a/one"], "within the second");
+  now = T0 + REREAD_EVERY_MS;
+  assertEquals((await usable.reread()).map((m) => m.id), ["a/one", "b/two"]);
+  assertEquals((await usable.get()).map((m) => m.id), ["a/one", "b/two"]);
+  assertEquals(s.reads(), 3);
+});
+
+test("a reread out when the cache is invalidated does not fill it", async () => {
+  const s = countingStore();
+  const usable = makeUsableOpenRouterModels({ store: s.store, now: () => new Date(T0) });
+  s.set(["a/one"]);
+  const release = s.holdReads();
+  const out = usable.reread();
+  s.set([]);
+  usable.invalidate();
+  release();
+  assertEquals((await out).map((m) => m.id), ["a/one"]);
+  assertEquals(await usable.get(), [], "the next call reads again");
 });
