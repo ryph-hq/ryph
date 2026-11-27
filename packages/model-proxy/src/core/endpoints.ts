@@ -23,7 +23,7 @@
 // - a ChatGPT plan keeps its own route table and header list (core/chatgpt_plan.ts)
 //
 // Where the list comes from (re-check it whenever a harness version moves):
-// - pi (images/harness, pi-coding-agent 1.5.0): `POST /v1/messages` for Anthropic, and for
+// - pi (images/harness, pi-coding-agent 1.6.1): `POST /v1/messages` for Anthropic, and for
 //   OpenAI `POST /v1/responses` (the `openai-responses` dialect, `store: false`)
 // - memory's and the orchestrator's platform-scoped calls: the same two, plus
 //   `POST /v1/chat/completions` for the completions dialect
@@ -221,7 +221,7 @@ const FORWARDED_REQUEST_HEADERS: Record<string, readonly string[]> = {
  * The `anthropic-beta` features a run may switch on, by family (the flag without its date, so
  * `context-management-2025-06-27` is `context-management` and a re-dated flag still passes).
  * Every one of them changes how ONE messages call behaves and is paid for in its tokens: the
- * flags pi 1.5.0 sends, and those Claude Code 2.1.294 carries that are about the model call
+ * flags pi 1.6.1 sends, and those Claude Code 2.1.294 carries that are about the model call
  * itself.
  *
  * Left out on purpose, because each reaches past a single metered completion: `files-api`

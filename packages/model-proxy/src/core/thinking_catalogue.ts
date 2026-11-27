@@ -2,8 +2,8 @@
 // pickers offer for it.
 //
 // Sourced from the model data bundled with @earendil-works/pi-ai, the pi release the agent
-// image installs (`providers/data/{anthropic,openai}.json`; last refreshed from 1.5.0 on
-// 2026-11-04), and hand-kept between refreshes like the price list (pricing_catalogue.ts),
+// image installs (`providers/data/{anthropic,openai}.json`; last refreshed from 1.6.1 on
+// 2026-11-27), and hand-kept between refreshes like the price list (pricing_catalogue.ts),
 // refreshed from the same release. A model's levels are pi-ai's `getSupportedThinkingLevels`:
 // `off` alone if it does not reason; otherwise every level its `thinkingLevelMap` does not map
 // to null, with `xhigh` and `max` only where the map names them. A model missing here has
@@ -18,6 +18,7 @@ export const THINKING_CATALOGUE: Readonly<
   anthropic: {
     "claude-fable-5": ["minimal", "low", "medium", "high", "xhigh", "max"],
     "claude-fable-5-1": ["minimal", "low", "medium", "high", "xhigh", "max"],
+    "claude-fable-5-2": ["minimal", "low", "medium", "high", "xhigh", "max"],
     "claude-haiku-4-5": ["off", "minimal", "low", "medium", "high"],
     "claude-haiku-4-5-20251001": ["off", "minimal", "low", "medium", "high"],
     "claude-haiku-5-5": ["off", "low", "medium", "high", "xhigh", "max"],
@@ -67,10 +68,13 @@ export const THINKING_CATALOGUE: Readonly<
     "gpt-5.6-terra": ["off", "low", "medium", "high", "xhigh", "max"],
     "gpt-5.6-cyber": ["low", "medium", "high", "xhigh", "max"],
     "gpt-6-astra": ["low", "medium", "high", "xhigh", "max"],
+    "gpt-6-cyber": ["low", "medium", "high", "xhigh", "max"],
     "gpt-6-luna": ["off", "low", "medium", "high", "xhigh", "max"],
     "gpt-6-sol": ["off", "low", "medium", "high", "xhigh", "max"],
     "gpt-6.1-sol": ["low", "medium", "high", "xhigh", "max"],
     "gpt-6.1-terra": ["off", "low", "medium", "high", "xhigh", "max"],
+    "gpt-6.2-astra": ["low", "medium", "high", "xhigh", "max"],
+    "gpt-6.2-sol": ["low", "medium", "high", "xhigh", "max"],
     "gpt-daybreak-blue-latest": ["off", "low", "medium", "high", "xhigh", "max"],
     "gpt-daybreak-red-latest": ["off", "low", "medium", "high", "xhigh", "max"],
     "o1": ["low", "medium", "high"],

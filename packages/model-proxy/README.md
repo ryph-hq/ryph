@@ -375,7 +375,7 @@ Reported counts stand (an Anthropic stream cut after `message_start` keeps its e
 row has `estimated: true`, and the caps and the ceiling count it like any other.
 
 **Money is never stored.** Reports price tokens at read time from a hand-kept price list,
-`src/core/pricing_catalogue.ts` — sourced from the model data of pi-ai 1.5.0, the pi release
+`src/core/pricing_catalogue.ts` — sourced from the model data of pi-ai 1.6.1, the pi release
 the agent image installs, and edited by hand from here on — so a price correction re-prices history
 too. A custom endpoint's declared rates arrive as an **overlay** built once per request from the
 rows and checked before the catalogue, so a declaration always wins for its own provider id and

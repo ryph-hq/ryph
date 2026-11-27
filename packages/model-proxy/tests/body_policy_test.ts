@@ -17,6 +17,7 @@ function refused(shape: BodyShape, body: unknown | string): string[] {
       "previous_response_id",
       "conversation",
       "prompt",
+      "thread",
       "mcp_servers",
       "container",
       "web_search_options",
@@ -45,7 +46,7 @@ const schema = {
   },
 };
 
-test("what pi 1.5.0 sends passes, for each shape", () => {
+test("what pi 1.6.1 sends passes, for each shape", () => {
   assertEquals(
     refused("anthropic-messages", {
       model: "claude-sonnet-5",
@@ -302,6 +303,11 @@ test("stored state and provider-side fields at the top level are refused", () =>
   assertEquals(refused("openai-responses", { conversation: "conv_1" }).length, 1);
   assertEquals(refused("openai-responses", { prompt: { id: "pmpt_1" } }).length, 1);
   assertEquals(refused("openai-chat", { web_search_options: {} }).length, 1);
+  assertEquals(
+    refused("anthropic-messages", { thread: { type: "continue", previous_message_id: "msg_1" } })
+      .length,
+    1,
+  );
   assertEquals(refused("anthropic-messages", { mcp_servers: [{ url: "https://x" }] }).length, 1);
   assertEquals(refused("anthropic-messages", { container: "c_1" }).length, 1);
 });
