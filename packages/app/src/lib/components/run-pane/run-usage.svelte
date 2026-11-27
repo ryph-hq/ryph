@@ -206,8 +206,7 @@ const modelLabel = (model: string | null) => model ?? "(no model named)";
       {#if bill.totals.reportedRequests > 0}
         <p>
           {bill.totals.reportedRequests}
-          {bill.totals.reportedRequests === 1 ? "call is" : "calls are"} costed at what OpenRouter
-          billed.
+          {bill.totals.reportedRequests === 1 ? "call is" : "calls are"} priced at OpenRouter's bill.
         </p>
       {/if}
       {#if bill.totals.unpricedRequests > 0}

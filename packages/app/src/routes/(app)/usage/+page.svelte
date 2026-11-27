@@ -505,7 +505,7 @@ const costCell = costLabel;
           {/if}
           {#if totals.reportedRequests > 0}
             {totals.reportedRequests}
-            {totals.reportedRequests === 1 ? "call is" : "calls are"} costed at what OpenRouter billed.
+            {totals.reportedRequests === 1 ? "call is" : "calls are"} priced at OpenRouter's bill.
           {/if}
           {#if totals.unpricedRequests > 0}
             {totals.unpricedRequests}
