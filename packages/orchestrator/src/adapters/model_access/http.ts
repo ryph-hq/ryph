@@ -145,6 +145,7 @@ export function httpModelAccess(opts: HttpModelAccessOptions): ModelAccess {
           providerKeyId: scope.providerKeyId,
           provider: scope.provider,
           allowedModels: scope.allowedModels,
+          model: scope.model,
           spendUsd: scope.spendUsd,
           callsInFlight: scope.callsInFlight,
         },

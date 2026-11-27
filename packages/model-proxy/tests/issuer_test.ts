@@ -351,7 +351,9 @@ async function openRouterStore(enabled: string[]) {
     T0,
   );
   await store.setOpenRouterEnabled(enabled, T0);
-  // `c/gone` drops out of OpenRouter's list: still enabled, but no longer usable.
+  // `c/gone` drops out of OpenRouter's list for two syncs in a row: still enabled, but no longer
+  // usable.
+  await store.upsertOpenRouterCatalogue(catalogueOf({ data: [one, two] }), T0);
   await store.upsertOpenRouterCatalogue(catalogueOf({ data: [one, two] }), T0);
   await store.createProviderKey(anthropicKey({ id: "pk-or", provider: OPENROUTER }));
   return store;
@@ -402,6 +404,31 @@ test("an OpenRouter scope with no enabled model left is refused definitively", a
     () => issuer.issue({ ...OPENROUTER_SCOPE, allowedModels: "*" }),
     CredentialRefusedError,
     "enable them under Model keys",
+  );
+});
+
+test("an OpenRouter run whose own model is not enabled is refused, not booted to fail", async () => {
+  const store = await openRouterStore(["a/one", "c/gone"]);
+  const { issuer } = makeIssuer(store);
+  // The run's model narrowed away — never enabled, or enabled and then gone from the list —
+  // is refused, naming it, even with other models left.
+  for (const model of ["b/two", "c/gone"]) {
+    await assertRejects(
+      () => issuer.issue({ ...OPENROUTER_SCOPE, allowedModels: "*", model }),
+      CredentialRefusedError,
+      `model "${model}" isn't enabled for OpenRouter`,
+    );
+  }
+  // Its model enabled, or no model of its own: issued.
+  const env = await issuer.issue({ ...OPENROUTER_SCOPE, allowedModels: "*", model: "a/one" });
+  assert(env.RYPH_MODEL_API_KEY.startsWith("ryph-vk-"));
+  await issuer.issue({ ...OPENROUTER_SCOPE, runId: "r-2", allowedModels: "*", model: null });
+
+  // A re-issue narrows again: disabled since, the model is refused to the same run.
+  await store.setOpenRouterEnabled(["c/gone"], T0);
+  await assertRejects(
+    () => issuer.issue({ ...OPENROUTER_SCOPE, allowedModels: "*", model: "a/one" }),
+    CredentialRefusedError,
   );
 });
 

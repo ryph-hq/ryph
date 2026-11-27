@@ -78,7 +78,7 @@ export function internalCredentialRoutes(deps: InternalRoutesDeps): Route[] {
       dialect: provider.dialect,
       providerArchivedAt: provider.archivedAt,
       archivedAt: key.archivedAt,
-      models: await enabledModelsOf(deps.store, provider.id),
+      models: enabledModelsOf(provider),
     });
   };
 
@@ -100,6 +100,7 @@ export function internalCredentialRoutes(deps: InternalRoutesDeps): Route[] {
         providerKeyId: body.data.providerKeyId,
         provider: body.data.provider,
         allowedModels: body.data.allowedModels,
+        model: body.data.model ?? null,
         spendUsd: body.data.spendUsd ?? null,
         callsInFlight: body.data.callsInFlight ?? null,
       });

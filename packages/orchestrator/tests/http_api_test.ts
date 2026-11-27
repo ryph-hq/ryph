@@ -862,6 +862,54 @@ test("a task's model pick is bounded by the allowlist and frozen onto the run", 
   assertEquals((await spec2.json()).workItem.harness.model, "claude-sonnet-5");
 });
 
+test("a task on an OpenRouter model disabled since the policy was saved is refused at the door", async () => {
+  const key = {
+    id: "pk-or",
+    provider: "openrouter",
+    dialect: "openai-completions" as const,
+    archivedAt: null,
+    models: ["openai/gpt-6", "anthropic/claude-sonnet-5"] as string[] | null,
+  };
+  const { modelAccess } = fakeModelAccess(key);
+  const { handler } = buildApp({ ...imageConfig(), modelAccess });
+  const agent = await createAgent(handler, {
+    ...PI_AGENT,
+    modelPolicy: {
+      ...PI_AGENT.modelPolicy,
+      providerKeyId: "pk-or",
+      provider: "openrouter",
+      allowedModels: "*",
+      defaultModel: "openai/gpt-6",
+    },
+  });
+
+  // The admin turns the default model off: a task on it would boot only to fail every call.
+  key.models = ["anthropic/claude-sonnet-5"];
+  const refused = await post(handler, "/v1/tasks", { agentId: agent.id, ...TASK_SPEC });
+  assertEquals(refused.status, 400);
+  assertEquals(
+    (await refused.json()).error,
+    'model "openai/gpt-6" isn\'t enabled for OpenRouter — enable it under Model keys',
+  );
+  const picked = await post(handler, "/v1/tasks", {
+    agentId: agent.id,
+    ...TASK_SPEC,
+    model: "openai/gpt-6",
+  });
+  assertEquals(picked.status, 400);
+
+  // A model still enabled starts; so does any task when the proxy cannot say (the issuer still
+  // refuses at boot).
+  const enabled = await post(handler, "/v1/tasks", {
+    agentId: agent.id,
+    ...TASK_SPEC,
+    model: "anthropic/claude-sonnet-5",
+  });
+  assertEquals(enabled.status, 201);
+  modelAccess.getKey = () => Promise.reject(new Error("proxy down"));
+  assertEquals((await post(handler, "/v1/tasks", { agentId: agent.id, ...TASK_SPEC })).status, 201);
+});
+
 test("a task's thinking level: its pick, else the policy's default, frozen onto the run", async () => {
   const { modelAccess } = fakeModelAccess();
   const { handler, launches, store } = buildApp({ ...imageConfig(), modelAccess });
@@ -1003,6 +1051,8 @@ test("boot credentials: minted from the frozen scope, empty without one, dead af
     providerKeyId: "pk-1",
     provider: "anthropic",
     allowedModels: ["claude-sonnet-5", "claude-haiku-4-5"],
+    // The run's own model rides along, for a provider that narrows its models to refuse.
+    model: "claude-sonnet-5",
     spendUsd: null,
     callsInFlight: null,
   }]);

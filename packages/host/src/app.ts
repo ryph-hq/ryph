@@ -831,7 +831,7 @@ export async function buildApp(cfg: HostConfig): Promise<HostApp> {
           providerArchivedAt: provider.archivedAt,
           archivedAt: key.archivedAt,
           // The same set the internal key read answers with (`enabledModelsOf`).
-          models: await enabledModelsOf(keyStore, provider.id),
+          models: enabledModelsOf(provider),
         };
       },
       issueRunCredentials(scope) {

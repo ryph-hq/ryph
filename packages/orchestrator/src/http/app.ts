@@ -224,6 +224,9 @@ export interface ModelAccess {
     providerKeyId: string;
     provider: string;
     allowedModels: string[] | "*";
+    /** The model the run will call, frozen with the scope; null when the harness picks. A
+     * provider that narrows its models refuses a credential that would not carry it. */
+    model: string | null;
     /** The run's spend cap and calls-in-flight cap, frozen onto the credential like the
      * allowlist; null is uncapped. */
     spendUsd: number | null;

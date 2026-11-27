@@ -34,9 +34,11 @@ export interface RunSpendReader {
   spendOf(runId: string): Promise<number>;
 }
 
-/** What the door asks of the proxy: whether the deployment's spend ceiling is reached. */
+/** What the door asks of the proxy: whether the deployment's spend ceiling is reached, and which
+ * models a key's provider narrows every run to (OpenRouter's enabled ones; null for none). */
 export interface SpendGate {
   ceilingReached(): Promise<boolean>;
+  getKey(id: string): Promise<{ models: string[] | null } | null>;
 }
 
 /**

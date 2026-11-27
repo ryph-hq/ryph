@@ -358,6 +358,8 @@ export const IssueCredentialsSchema = z.object({
   providerKeyId: z.string().min(1).max(200),
   provider: providerId,
   allowedModels: z.union([z.literal("*"), z.array(z.string().min(1).max(200)).max(200)]),
+  /** The model the run will call; null or absent when its harness picks. */
+  model: z.string().min(1).max(200).nullable().optional(),
   /** The run's caps, decided by the control plane; null or absent is uncapped. */
   spendUsd: z.number().positive().finite().nullable().optional(),
   callsInFlight: z.number().int().min(1).max(64).nullable().optional(),
@@ -398,4 +400,10 @@ export const StartPlanSignInSchema = z.object({
 export const SetOpenRouterEnabledSchema = z.object({
   ids: z.array(z.string().trim().min(1).max(200)).max(2000)
     .transform((ids) => [...new Set(ids)]),
+});
+
+/** What POST /v1/openrouter/sync accepts, when it carries a body: `force` takes a model list the
+ * sync would otherwise refuse for having shrunk by more than half. */
+export const SyncOpenRouterSchema = z.object({
+  force: z.boolean().default(false),
 });

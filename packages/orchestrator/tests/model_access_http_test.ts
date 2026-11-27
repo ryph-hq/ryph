@@ -196,6 +196,7 @@ test("issueRunCredentials posts the frozen scope and returns the env", async () 
         providerKeyId: "pk-1",
         provider: "anthropic",
         allowedModels: ["claude-opus-5"],
+        model: "claude-opus-5",
         spendUsd: null,
         callsInFlight: null,
       });
@@ -209,6 +210,7 @@ test("issueRunCredentials posts the frozen scope and returns the env", async () 
         providerKeyId: "pk-1",
         provider: "anthropic",
         allowedModels: ["claude-opus-5"],
+        model: "claude-opus-5",
         spendUsd: null,
         callsInFlight: null,
       });
@@ -231,6 +233,7 @@ test("issueRunCredentials carries the proxy's reason into the thrown error", asy
             providerKeyId: "pk-1",
             provider: "anthropic",
             allowedModels: "*",
+            model: null,
             spendUsd: null,
             callsInFlight: null,
           }),
@@ -259,6 +262,7 @@ test("issueRunCredentials rejects an env that is not all strings", async () => {
             providerKeyId: "pk-1",
             provider: "anthropic",
             allowedModels: "*",
+            model: null,
             spendUsd: null,
             callsInFlight: null,
           }),

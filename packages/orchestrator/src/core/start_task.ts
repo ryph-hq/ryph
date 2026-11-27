@@ -167,8 +167,8 @@ export interface StartTaskDeps {
   /** Environment builds (core/environments.ts). Null, or off: every run launches on
    * `config.agentImage`, exactly as before environments existed. */
   environments: EnvironmentService | null;
-  /** Answers whether the deployment's spend ceiling is reached. Null: no model access,
-   * so no ceiling to ask about. */
+  /** Answers whether the deployment's spend ceiling is reached, and which models a key serves.
+   * Null: no model access, so neither to ask about. */
   modelAccess: SpendGate | null;
   /** Where the images a task starts with are kept (core/attachments.ts). Null: a start that
    * carries images is refused with a 503. */
@@ -413,6 +413,27 @@ export async function startTask(
     };
   }
   const thinking = args.thinking ?? policy?.defaultThinking ?? null;
+
+  // A provider that narrows its models (OpenRouter: the ones an admin enabled) issues a run only
+  // those, and refuses a credential without the run's own model in it: a run started on a model
+  // disabled since the policy was saved would boot only to fail. Refused here instead, naming
+  // the model. A proxy that cannot answer does not refuse the task, as with the ceiling below:
+  // the issuer still refuses the credential.
+  if (deps.modelAccess && policy !== null && model !== null) {
+    let served: string[] | null = null;
+    try {
+      served = (await deps.modelAccess.getKey(policy.providerKeyId))?.models ?? null;
+    } catch (err) {
+      diag.warn("task.models_unreadable", { err: String(err) });
+    }
+    if (served !== null && !served.includes(model)) {
+      return {
+        kind: "refused",
+        status: 400,
+        error: `model "${model}" isn't enabled for OpenRouter — enable it under Model keys`,
+      };
+    }
+  }
 
   // A task without instructions awaits its prompt, and has neither a title nor images until it
   // arrives: the title is made from the prompt, and the images ride it.

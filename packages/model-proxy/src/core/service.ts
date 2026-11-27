@@ -14,18 +14,15 @@
 //   runner reports upstream than a run that starts and can never call a model
 // - an OPENROUTER credential is narrowed to the models an admin enabled, at issue time: its
 //   allowlist is the policy's ∩ the enabled set ("*" is the enabled set), frozen onto the virtual
-//   key, and none left is a refusal
+//   key and narrowed again for every credential a run is issued after. None left is a refusal,
+//   and so is a run whose own model was narrowed away: it would boot only to have every call
+//   refused
 
 import type { AllowedModels, PlatformModelPolicy } from "./types.ts";
 import { platformPrincipal, secretCleared } from "./types.ts";
 import type { DeclaredModel, Dialect, ProviderSpec } from "./registry.ts";
 import { CHATGPT_PLAN, PLAN_LOCAL_ONLY, type PlanModel } from "./chatgpt_plan.ts";
-import {
-  effectiveOpenRouterModels,
-  OPENROUTER,
-  openRouterModelForRun,
-  usableOpenRouterModels,
-} from "./openrouter.ts";
+import { narrowedModels, OPENROUTER, openRouterModelForRun } from "./openrouter.ts";
 import {
   BUILTIN_PROVIDERS,
   customProviderSpec,
@@ -55,8 +52,16 @@ export class CredentialRefusedError extends Error {
  * rows resolve forever, and the refusal is the CALLER's to make, with the status its own surface
  * owns (the proxy's 403, the issuer's definitive 400). Answering null here instead would report
  * an archived endpoint as config drift — a 502 — which is a different and wrong story.
+ *
+ * OPENROUTER resolves with the models agents may use (enabled, and still listed) as its declared
+ * ones, read from the store each time: what a custom endpoint declares, so the issuer, the
+ * provider list and the proxy read them the same way.
  */
 export async function resolveProvider(store: KeyStore, id: string): Promise<ProviderSpec | null> {
+  if (id === OPENROUTER) {
+    const usable = await store.listUsableOpenRouterModels();
+    return { ...BUILTIN_PROVIDERS[OPENROUTER], models: usable.map(openRouterModelForRun) };
+  }
   // hasOwn, not `in`: a provider id is user input, and `constructor` is not a provider.
   if (Object.hasOwn(BUILTIN_PROVIDERS, id)) return BUILTIN_PROVIDERS[id];
   const row = await store.getCustomProvider(id);
@@ -82,16 +87,15 @@ export async function listProviderSpecs(
       if (!planModels.has(model.id)) planModels.set(model.id, model);
     }
   }
-  const openRouterModels = usableOpenRouterModels(await store.listOpenRouterModels())
-    .map(openRouterModelForRun);
+  const openRouter = await resolveProvider(store, OPENROUTER);
   return [
     ...Object.values(BUILTIN_PROVIDERS)
       .filter((spec) => opts.planOn || spec.id !== CHATGPT_PLAN)
       .map((spec) =>
         spec.id === CHATGPT_PLAN
           ? { ...spec, models: [...planModels.values()] }
-          : spec.id === OPENROUTER
-          ? { ...spec, models: openRouterModels }
+          : spec.id === OPENROUTER && openRouter !== null
+          ? openRouter
           : spec
       ),
     ...custom.map(customProviderSpec),
@@ -100,15 +104,15 @@ export async function listProviderSpecs(
 
 /**
  * The models a provider limits every policy to, for the control plane's policy check: OpenRouter's
- * enabled and listed ids, and null for every other provider, whose models no row narrows.
+ * enabled and listed ids, and null for every other provider, whose models nothing narrows.
  */
-export async function enabledModelsOf(
-  store: KeyStore,
-  providerId: string,
-): Promise<string[] | null> {
-  if (providerId !== OPENROUTER) return null;
-  return usableOpenRouterModels(await store.listOpenRouterModels()).map((row) => row.id);
+export function enabledModelsOf(provider: ProviderSpec): string[] | null {
+  return provider.id === OPENROUTER ? provider.models.map((model) => model.id) : null;
 }
+
+/** The refusal for an OpenRouter model a credential would not carry. */
+export const notEnabledForOpenRouter = (model: string) =>
+  `model "${model}" isn't enabled for OpenRouter — enable it under Model keys`;
 
 /**
  * The models a plan key's run is told about: the account's own list, or — when it was never
@@ -137,6 +141,9 @@ export interface CredentialScope {
   providerKeyId: string;
   provider: string;
   allowedModels: AllowedModels;
+  /** The model the run will call (the task's pick or the policy's default); absent or null when
+   * the harness picks. Held to what the credential carries, where a provider narrows it. */
+  model?: string | null;
   /** The run's spend cap in USD; absent or null means uncapped. */
   spendUsd?: number | null;
   /** Spending calls the proxy may hold open at once; absent or null means uncapped. */
@@ -228,15 +235,16 @@ export function makeCredentialIssuer(deps: CredentialIssuerDeps): CredentialIssu
       // enabled, out of those its policy names. The credential's allowlist is that narrowed list,
       // so "*" never reaches past the enabled set.
       let allowedModels = scope.allowedModels;
-      let openRouterModels: DeclaredModel[] | null = null;
+      let declared = provider.models;
       if (provider.id === OPENROUTER) {
-        const effective = effectiveOpenRouterModels(
-          await deps.store.listOpenRouterModels(),
-          scope.allowedModels,
-        );
-        if (effective.length === 0) throw new CredentialRefusedError(NO_OPENROUTER_MODEL);
-        allowedModels = effective.map((row) => row.id);
-        openRouterModels = effective.map(openRouterModelForRun);
+        declared = narrowedModels(provider.models, scope.allowedModels);
+        if (declared.length === 0) throw new CredentialRefusedError(NO_OPENROUTER_MODEL);
+        allowedModels = declared.map((model) => model.id);
+        if (
+          scope.model !== undefined && scope.model !== null && !allowedModels.includes(scope.model)
+        ) {
+          throw new CredentialRefusedError(notEnabledForOpenRouter(scope.model));
+        }
       }
 
       const at = deps.now();
@@ -277,20 +285,14 @@ export function makeCredentialIssuer(deps: CredentialIssuerDeps): CredentialIssu
           dialect: provider.dialect,
           models,
         });
-      } else if (openRouterModels !== null) {
-        // OpenRouter rides it too: pi's own `openrouter` entry knows models we have not enabled
-        // and detects OpenRouter by a base URL that is the proxy's here, so the run is told the
-        // enabled models and their thinking format outright.
+      } else if (!provider.builtin || provider.id === OPENROUTER) {
+        // OpenRouter rides it too, with the models narrowed above: pi's own `openrouter` entry
+        // knows models nobody enabled, and detects OpenRouter by a base URL that is the proxy's
+        // here, so the run is told its models and their thinking format outright.
         env[MODEL_PROVIDER_CONFIG_ENV] = JSON.stringify({
           id: provider.id,
           dialect: provider.dialect,
-          models: openRouterModels,
-        });
-      } else if (!provider.builtin) {
-        env[MODEL_PROVIDER_CONFIG_ENV] = JSON.stringify({
-          id: provider.id,
-          dialect: provider.dialect,
-          models: provider.models,
+          models: declared,
         });
       }
       return env;
@@ -387,17 +389,13 @@ export function makePlatformCredentialIssuer(
       // be among what is left: a consumer calls it by default.
       let allowedModels = policy.allowedModels;
       if (provider.id === OPENROUTER) {
-        const effective = effectiveOpenRouterModels(
-          await deps.store.listOpenRouterModels(),
-          policy.allowedModels,
-        ).map((row) => row.id);
-        if (!effective.includes(policy.model)) {
+        allowedModels = narrowedModels(provider.models, policy.allowedModels)
+          .map((model) => model.id);
+        if (!allowedModels.includes(policy.model)) {
           throw new CredentialRefusedError(
-            `the platform's model "${policy.model}" isn't enabled for OpenRouter — enable it ` +
-              "under Model keys",
+            `the platform's ${notEnabledForOpenRouter(policy.model)}`,
           );
         }
-        allowedModels = effective;
       }
       const at = deps.now();
       // EXACTLY ONE live credential per consumer. A consumer re-mints on every restart, every
