@@ -2,12 +2,17 @@
 // models are offered, how a search matches them, their order, and the words for prices, context,
 // the sync and a key's credit.
 
-import type {
-  EnableRefusal,
-  OpenRouterKeyInfo,
-  OpenRouterModel,
-  OpenRouterSync,
+import { ApiError } from "#lib/api/call.ts";
+import {
+  type EnableRefusal,
+  getOpenRouterCatalogue,
+  isOpenRouterKeyRefused,
+  type OpenRouterCatalogue,
+  type OpenRouterKeyInfo,
+  type OpenRouterModel,
+  type OpenRouterSync,
 } from "#lib/api/openrouter.ts";
+import { isModelAccessDisabled } from "#lib/api/provider-keys.ts";
 import { formatRelativeTime, formatUsd } from "#lib/utils/format.ts";
 
 /** Rows drawn at first, and added by each "Show more". */
@@ -119,15 +124,44 @@ export function formatModelPrice(price: OpenRouterModel["price"]): string | null
   return `${perMillion.format(price.input)} / ${perMillion.format(price.output)}`;
 }
 
-/** The sync's state as one line, and whether it is a failure. */
-export type SyncLine = { text: string; failed: boolean };
+/**
+ * "Syncing…", "Synced 2h ago" or "Not synced yet", as of `now`. A failed sync is said apart, in
+ * full, so this line only says where the list stands.
+ */
+export function syncLine(sync: OpenRouterSync, now = Date.now()): string {
+  if (sync.syncing) return "Syncing…";
+  if (sync.syncedAt === null) return "Not synced yet";
+  return `Synced ${formatRelativeTime(sync.syncedAt, now)}`;
+}
 
-/** "Syncing…", "Sync failed: …", "Synced 2h ago" or "Not synced yet". */
-export function syncLine(sync: OpenRouterSync): SyncLine {
-  if (sync.syncing) return { text: "Syncing…", failed: false };
-  if (sync.error !== null) return { text: `Sync failed: ${sync.error}`, failed: true };
-  if (sync.syncedAt === null) return { text: "Not synced yet", failed: false };
-  return { text: `Synced ${formatRelativeTime(sync.syncedAt)}`, failed: false };
+/** What a failed OpenRouter call says to a person: model access being off in plain words. */
+export function openRouterErrorText(e: unknown, fallback: string): string {
+  if (e instanceof ApiError && isModelAccessDisabled(e)) return "Model access is off";
+  return e instanceof Error && e.message !== "" ? e.message : fallback;
+}
+
+/** The catalogue as a page's load hands it on: the read, or why it failed. */
+export type CatalogueRead = { catalogue: OpenRouterCatalogue | null; error: string | null };
+
+/**
+ * A page load's catalogue read. A read that fails answers its reason and, when `remember` is on
+ * (in the browser), the catalogue the page last had, so a poll that misses a beat keeps the list
+ * on screen and keeps polling.
+ */
+export function catalogueReader(remember: boolean) {
+  let shown: OpenRouterCatalogue | null = null;
+  return async (f: typeof fetch): Promise<CatalogueRead> => {
+    try {
+      const catalogue = await getOpenRouterCatalogue(f);
+      if (remember) shown = catalogue;
+      return { catalogue, error: null };
+    } catch (e) {
+      return {
+        catalogue: shown,
+        error: openRouterErrorText(e, "Couldn't load OpenRouter's models"),
+      };
+    }
+  };
 }
 
 /** A refused save as lines to show, each naming the models by their names where known. */
@@ -146,7 +180,7 @@ export function refusalLines(
 }
 
 /** A key card's credit line, and whether it is a problem. */
-export type CreditLine = { text: string; empty: boolean };
+export type CreditLine = { text: string; problem: boolean };
 
 /**
  * "No credits left" when the key's limit is spent, "$4.20 of $10 left" under a limit, and
@@ -155,13 +189,21 @@ export type CreditLine = { text: string; empty: boolean };
  */
 export function creditLine(info: OpenRouterKeyInfo): CreditLine | null {
   if (info.limitRemaining !== null && info.limitRemaining <= 0) {
-    return { text: "No credits left", empty: true };
+    return { text: "No credits left", problem: true };
   }
   if (info.limit !== null && info.limitRemaining !== null) {
     return {
       text: `${formatUsd(info.limitRemaining)} of ${formatUsd(info.limit)} left`,
-      empty: false,
+      problem: false,
     };
   }
   return null;
+}
+
+/**
+ * A credit read that failed: said when OpenRouter refused the key, else nothing, since the key
+ * may still work and the card already says when its secret is missing.
+ */
+export function creditFailureLine(e: unknown): CreditLine | null {
+  return isOpenRouterKeyRefused(e) ? { text: "OpenRouter refused this key", problem: true } : null;
 }

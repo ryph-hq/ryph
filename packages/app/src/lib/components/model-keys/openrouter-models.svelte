@@ -1,14 +1,12 @@
 <script lang="ts">
-import { onMount } from "svelte";
-import { SvelteSet } from "svelte/reactivity";
 import { invalidate } from "$app/navigation";
 import { toast } from "svelte-sonner";
 import {
   enableRefusal,
-  getOpenRouterCatalogue,
-  type OpenRouterCatalogue,
+  type OpenRouterSync,
   setOpenRouterEnabled,
   syncOpenRouter,
+  syncShrunk,
 } from "#lib/api/openrouter.ts";
 import * as Alert from "#lib/components/ui/alert/index.ts";
 import { Badge } from "#lib/components/ui/badge/index.ts";
@@ -19,12 +17,16 @@ import * as InputGroup from "#lib/components/ui/input-group/index.ts";
 import { Skeleton } from "#lib/components/ui/skeleton/index.ts";
 import { Spinner } from "#lib/components/ui/spinner/index.ts";
 import * as ToggleGroup from "#lib/components/ui/toggle-group/index.ts";
+import * as Tooltip from "#lib/components/ui/tooltip/index.ts";
 import { PRICE_HINT } from "#lib/components/model-picker/models.ts";
+import { liveClock } from "#lib/utils/live-clock.svelte.ts";
+import { refreshWhileLive } from "#lib/utils/live-refresh.svelte.ts";
 import CircleAlertIcon from "@lucide/svelte/icons/circle-alert";
 import RefreshCwIcon from "@lucide/svelte/icons/refresh-cw";
 import SearchIcon from "@lucide/svelte/icons/search";
 import TriangleAlertIcon from "@lucide/svelte/icons/triangle-alert";
 import {
+  type CatalogueRead,
   changeCount,
   enabledIds,
   formatContext,
@@ -32,22 +34,36 @@ import {
   idsToSave,
   type ModelFilter,
   offeredModels,
+  openRouterErrorText,
   PAGE_SIZE,
   refusalLines,
   syncLine,
   visibleModels,
 } from "./openrouter-models.ts";
 
-/** How often the list is read again while a sync runs. */
-const SYNC_POLL_MS = 3_000;
+let {
+  read,
+  dependency,
+  description = "Pick which OpenRouter models agents can use.",
+}: {
+  /** The catalogue as the page's load read it. */
+  read: CatalogueRead;
+  /** The load's `depends` key: invalidated to read the catalogue again. */
+  dependency: string;
+  description?: string;
+} = $props();
 
-let catalogue = $state.raw<OpenRouterCatalogue | null>(null);
-let loadError = $state<string | null>(null);
+const catalogue = $derived(read.catalogue);
 
-/** The models ticked, saved or not. Saving sends it; the saved set is `saved`. */
-const draft = new SvelteSet<string>();
+/** The ids enabled as saved. */
 const saved = $derived(catalogue === null ? new Set<string>() : enabledIds(catalogue.models));
-const changes = $derived(changeCount(draft, saved));
+/**
+ * The unsaved choice, or null while there is none and the ticks follow what is saved. It lives
+ * here, apart from the load's data, so a refresh of the catalogue keeps it.
+ */
+let edits = $state.raw<ReadonlySet<string> | null>(null);
+const choice = $derived(edits ?? saved);
+const changes = $derived(changeCount(choice, saved));
 
 let query = $state("");
 let filter = $state<ModelFilter>("all");
@@ -55,54 +71,55 @@ let limit = $state(PAGE_SIZE);
 
 const offered = $derived(catalogue === null ? [] : offeredModels(catalogue.models));
 const rows = $derived(
-  catalogue === null ? [] : visibleModels(catalogue.models, { query, filter, saved, draft }),
+  catalogue === null
+    ? []
+    : visibleModels(catalogue.models, { query, filter, saved, draft: choice }),
 );
 const shown = $derived(rows.slice(0, limit));
 
 let saving = $state(false);
 let syncing = $state(false);
+let retrying = $state(false);
 /** Why the last save was refused, one line per kind of problem. */
 let refusal = $state<string[] | null>(null);
 
-const status = $derived(catalogue === null ? null : syncLine(catalogue.sync));
-
-/** Takes a fresh catalogue. The choice follows it unless there are unsaved changes to keep. */
-function apply(next: OpenRouterCatalogue, resetChoice: boolean) {
-  catalogue = next;
-  if (!resetChoice) return;
-  draft.clear();
-  for (const id of enabledIds(next.models)) draft.add(id);
-}
-
-async function load() {
-  try {
-    apply(await getOpenRouterCatalogue(fetch), changes === 0);
-    loadError = null;
-  } catch (e) {
-    loadError = e instanceof Error ? e.message : "Couldn't read OpenRouter's models";
+/**
+ * The last sync this page ran, for its failure's code: a server that predates the code on the
+ * catalogue still sends it on the sync's 502. It applies only while that attempt is the last.
+ */
+let ranSync = $state.raw<OpenRouterSync | null>(null);
+const sync = $derived.by(() => {
+  const current = catalogue?.sync;
+  if (!current) return null;
+  if (
+    current.errorCode === null && ranSync !== null &&
+    ranSync.attemptedAt === current.attemptedAt
+  ) {
+    return { ...current, errorCode: ranSync.errorCode };
   }
-}
-
-onMount(() => {
-  void load();
+  return current;
 });
+const busy = $derived(syncing || sync?.syncing === true);
+const failure = $derived(sync !== null && !busy ? sync.error : null);
+const forceable = $derived(sync !== null && !busy && syncShrunk(sync));
 
-// Opening the page can start a sync in the background: read again until it is done.
-$effect(() => {
-  if (!catalogue?.sync.syncing) return;
-  const timer = setTimeout(load, SYNC_POLL_MS);
-  return () => clearTimeout(timer);
-});
+// Opening the page can start a sync in the background: read again until it is done. The key is
+// the page's own and never changes.
+// svelte-ignore state_referenced_locally
+refreshWhileLive(dependency, () => catalogue?.sync.syncing === true);
+const clock = liveClock(() => sync !== null && !busy && sync.syncedAt !== null);
+const status = $derived(sync === null ? null : syncLine(sync, clock.now));
 
 function toggle(id: string, on: boolean) {
-  if (on) draft.add(id);
-  else draft.delete(id);
+  const next = new Set(choice);
+  if (on) next.add(id);
+  else next.delete(id);
+  edits = changeCount(next, saved) === 0 ? null : next;
   refusal = null;
 }
 
 function discard() {
-  draft.clear();
-  for (const id of saved) draft.add(id);
+  edits = null;
   refusal = null;
 }
 
@@ -112,34 +129,47 @@ async function save() {
   saving = true;
   refusal = null;
   try {
-    apply(await setOpenRouterEnabled(fetch, idsToSave(draft, models)), true);
-    toast.success("Saved the models agents can use");
-    // The pickers on this page read the enabled models through the provider list.
-    await invalidate("app:model-keys");
+    await setOpenRouterEnabled(fetch, idsToSave(choice, models));
+    // The ticks follow the saved set once the page holds it, so they never show the old one.
+    await invalidate(dependency);
+    edits = null;
+    toast.success("Models saved");
   } catch (e) {
     const refused = enableRefusal(e);
     if (refused) refusal = refusalLines(refused, models);
-    else toast.error(e instanceof Error ? e.message : "Couldn't save the models");
+    else toast.error(openRouterErrorText(e, "Couldn't save the models"));
   } finally {
     saving = false;
   }
 }
 
-async function syncNow() {
+async function syncNow(force = false) {
   syncing = true;
   try {
-    const { catalogue: next, error } = await syncOpenRouter(fetch);
-    apply(next, changes === 0);
-    if (error) toast.error(error);
-    else {
-      const listed = next.models.filter((m) => m.listed).length;
-      toast.success(`Synced ${listed} models`);
-    }
+    const { catalogue: next, failed } = await syncOpenRouter(fetch, { force });
+    ranSync = next.sync;
+    await invalidate(dependency);
+    // A failure shows in full under the header.
+    if (!failed) toast.success(`Synced ${next.models.filter((m) => m.listed).length} models`);
   } catch (e) {
-    toast.error(e instanceof Error ? e.message : "Couldn't sync OpenRouter's models");
+    toast.error(openRouterErrorText(e, "Couldn't sync OpenRouter's models"));
   } finally {
     syncing = false;
   }
+}
+
+async function retry() {
+  retrying = true;
+  try {
+    await invalidate(dependency);
+  } finally {
+    retrying = false;
+  }
+}
+
+/** Enter in the search must not submit a form the list sits in. */
+function holdEnter(event: KeyboardEvent) {
+  if (event.key === "Enter") event.preventDefault();
 }
 </script>
 
@@ -147,28 +177,21 @@ async function syncNow() {
   <div class="flex flex-wrap items-end justify-between gap-3">
     <div class="flex flex-col gap-1">
       <h2 id="openrouter-models-title" class="text-base font-medium">OpenRouter models</h2>
-      <p class="text-muted-foreground text-sm">Pick which OpenRouter models agents can use.</p>
+      <p class="text-muted-foreground text-sm">{description}</p>
     </div>
     <div class="flex min-w-0 items-center gap-3">
       {#if status}
-        <span
-          class={[
-            "max-w-72 truncate text-xs",
-            status.failed ? "text-destructive" : "text-muted-foreground",
-          ]}
-          title={status.text}
-          aria-live="polite"
-        >
-          {status.text}
+        <span class="text-muted-foreground max-w-72 truncate text-xs" aria-live="polite">
+          {status}
         </span>
       {/if}
       <Button
         variant="outline"
         size="sm"
-        disabled={syncing || catalogue === null || catalogue.sync.syncing}
-        onclick={syncNow}
+        disabled={busy || catalogue === null}
+        onclick={() => syncNow()}
       >
-        {#if syncing || catalogue?.sync.syncing}
+        {#if busy}
           <Spinner data-icon="inline-start" />
         {:else}
           <RefreshCwIcon data-icon="inline-start" />
@@ -178,17 +201,33 @@ async function syncNow() {
     </div>
   </div>
 
-  {#if loadError !== null && catalogue === null}
+  {#if failure !== null}
     <Alert.Root variant="destructive">
       <CircleAlertIcon />
-      <Alert.Title>Couldn't read OpenRouter's models</Alert.Title>
-      <Alert.Description>
-        <span>
-          {loadError}.
-          <button type="button" class="underline underline-offset-4" onclick={load}>
-            Try again
-          </button>
-        </span>
+      <Alert.Title>Sync failed</Alert.Title>
+      <Alert.Description class="flex flex-col items-start gap-2">
+        <span>{failure}</span>
+        {#if forceable}
+          <Button variant="outline" size="sm" onclick={() => syncNow(true)}>
+            Use this list anyway
+          </Button>
+        {/if}
+      </Alert.Description>
+    </Alert.Root>
+  {/if}
+
+  {#if read.error !== null && catalogue === null}
+    <Alert.Root variant="destructive">
+      <CircleAlertIcon />
+      <Alert.Title>Couldn't load OpenRouter's models</Alert.Title>
+      <Alert.Description class="flex flex-col items-start gap-2">
+        <span>{read.error}</span>
+        <Button variant="outline" size="sm" disabled={retrying} onclick={retry}>
+          {#if retrying}
+            <Spinner data-icon="inline-start" />
+          {/if}
+          Try again
+        </Button>
       </Alert.Description>
     </Alert.Root>
   {:else if catalogue === null}
@@ -209,6 +248,7 @@ async function syncNow() {
           aria-label="Search OpenRouter models"
           bind:value={query}
           oninput={() => (limit = PAGE_SIZE)}
+          onkeydown={holdEnter}
         />
       </InputGroup.Root>
       <ToggleGroup.Root
@@ -227,7 +267,7 @@ async function syncNow() {
         <ToggleGroup.Item value="enabled">Enabled</ToggleGroup.Item>
       </ToggleGroup.Root>
       <span class="text-muted-foreground text-xs tabular-nums">
-        {draft.size} of {offered.length} enabled
+        {choice.size} of {offered.length} selected
       </span>
     </div>
 
@@ -248,7 +288,7 @@ async function syncNow() {
     {#if rows.length === 0}
       <p class="text-muted-foreground rounded-lg border border-dashed px-3 py-6 text-center text-sm">
         {#if offered.length === 0}
-          No models yet. Sync to fetch OpenRouter's list.
+          No models yet. Sync to load them.
         {:else if filter === "enabled" && query.trim() === ""}
           No models enabled yet.
         {:else}
@@ -256,11 +296,14 @@ async function syncNow() {
         {/if}
       </p>
     {:else}
+      <!-- Its own provider: the list also sits in flows outside the app's sidebar, which holds one. -->
+      <Tooltip.Provider>
       <ul class="divide-y rounded-lg border text-sm" aria-label="OpenRouter models">
         {#each shown as model (model.id)}
-          {@const checked = draft.has(model.id)}
+          {@const checked = choice.has(model.id)}
           {@const price = formatModelPrice(model.price)}
           {@const inputId = `openrouter-model-${model.id}`}
+          {@const noteId = `openrouter-model-note-${model.id}`}
           <li
             class={[
               "has-[button:focus-visible]:bg-muted/50 flex flex-wrap items-center gap-x-4 gap-y-1.5 px-3 py-2.5",
@@ -270,7 +313,8 @@ async function syncNow() {
             <Checkbox
               id={inputId}
               {checked}
-              disabled={!model.listed && !checked}
+              disabled={saving || (!model.listed && !checked)}
+              aria-describedby={model.listed ? undefined : noteId}
               onCheckedChange={(on) => toggle(model.id, on === true)}
             />
             <label for={inputId} class="flex min-w-0 flex-1 cursor-pointer flex-col">
@@ -294,26 +338,42 @@ async function syncNow() {
                 title="Context window, in tokens"
               >
                 {formatContext(model.contextLength)}
+                <span class="sr-only">tokens of context</span>
               </span>
               {#if price === null}
                 <span class="flex w-28 justify-end">
-                  <Badge class={TONES.warning} title="Runs with a spend cap can't use this model.">
-                    <TriangleAlertIcon data-icon="inline-start" />
-                    No price
-                  </Badge>
+                  <Tooltip.Root>
+                    <Tooltip.Trigger>
+                      {#snippet child({ props })}
+                        <span {...props} class="rounded-md">
+                          <Badge class={TONES.warning}>
+                            <TriangleAlertIcon data-icon="inline-start" />
+                            No price
+                          </Badge>
+                        </span>
+                      {/snippet}
+                    </Tooltip.Trigger>
+                    <Tooltip.Content>Not usable in runs with a spend cap</Tooltip.Content>
+                  </Tooltip.Root>
                 </span>
               {:else}
-                <span class="w-28 text-right text-xs tabular-nums" title={PRICE_HINT}>{price}</span>
+                <span class="w-28 text-right text-xs tabular-nums" title={PRICE_HINT}>
+                  {price}
+                  {#if price !== "Free"}
+                    <span class="sr-only">{PRICE_HINT}</span>
+                  {/if}
+                </span>
               {/if}
             </div>
             {#if !model.listed}
-              <p class="text-muted-foreground w-full pl-7 text-xs">
-                Agents can't use it. Saving turns it off.
+              <p id={noteId} class="text-muted-foreground w-full pl-7 text-xs">
+                OpenRouter dropped this model. Saving turns it off.
               </p>
             {/if}
           </li>
         {/each}
       </ul>
+      </Tooltip.Provider>
       {#if rows.length > shown.length}
         <Button
           variant="ghost"
@@ -321,7 +381,7 @@ async function syncNow() {
           class="self-center"
           onclick={() => (limit += PAGE_SIZE)}
         >
-          Show {Math.min(PAGE_SIZE, rows.length - shown.length)} more of {rows.length - shown.length}
+          Show {Math.min(PAGE_SIZE, rows.length - shown.length)} more
         </Button>
       {/if}
     {/if}

@@ -52,10 +52,11 @@ const RELATIVE_UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
 /**
  * How long ago, in one unit: "3h ago", "2d ago", "now". A dense list row has space for the age of
  * a thing but not for its date, and next to rows that are minutes apart the age is the part being
- * compared anyway. Anything wanting the actual moment uses `formatDateTime`.
+ * compared anyway. Anything wanting the actual moment uses `formatDateTime`. `now` is for a line
+ * that ticks with a clock.
  */
-export function formatRelativeTime(iso: string): string {
-  const delta = new Date(iso).getTime() - Date.now();
+export function formatRelativeTime(iso: string, now = Date.now()): string {
+  const delta = new Date(iso).getTime() - now;
   for (const [unit, ms] of RELATIVE_UNITS) {
     if (Math.abs(delta) >= ms) return relative.format(Math.round(delta / ms), unit);
   }

@@ -5,8 +5,10 @@ import {
   getOpenRouterCatalogue,
   getOpenRouterKeyInfo,
   isOpenRouterKeyRefused,
+  OPENROUTER_SYNC_SHRUNK,
   setOpenRouterEnabled,
   syncOpenRouter,
+  syncShrunk,
 } from "./openrouter";
 import { createProviderKey } from "./provider-keys";
 
@@ -76,6 +78,24 @@ describe("the catalogue", () => {
     expect((await getOpenRouterCatalogue(f)).sync.errorCode).toBe("openrouter_sync_shrunk");
   });
 
+  it("reads a sync without an error code as having none, and keeps one it carries", async () => {
+    expect((await getOpenRouterCatalogue(answering(200, catalogue).f)).sync.errorCode).toBeNull();
+    const shrunk = {
+      ...catalogue,
+      sync: { ...catalogue.sync, error: "the list shrank", errorCode: OPENROUTER_SYNC_SHRUNK },
+    };
+    const read = await getOpenRouterCatalogue(answering(200, shrunk).f);
+    expect(read.sync.errorCode).toBe(OPENROUTER_SYNC_SHRUNK);
+    expect(syncShrunk(read.sync)).toBe(true);
+  });
+
+  it("offers forcing only while the shrunk sync is the last failure", () => {
+    const sync = { ...catalogue.sync, errorCode: OPENROUTER_SYNC_SHRUNK };
+    expect(syncShrunk({ ...sync, error: "the list shrank" })).toBe(true);
+    expect(syncShrunk({ ...sync, error: null })).toBe(false);
+    expect(syncShrunk({ ...sync, error: "timed out", errorCode: null })).toBe(false);
+  });
+
   it("refuses a model missing a field", async () => {
     const { tools: _, ...broken } = sonnet;
     const { f } = answering(200, { ...catalogue, models: [broken] });
@@ -114,7 +134,10 @@ describe("saving the enabled set", () => {
 describe("syncing", () => {
   it("posts with no body unless forced", async () => {
     const plain = answering(200, catalogue);
-    expect(await syncOpenRouter(plain.f)).toEqual({ catalogue, error: null });
+    expect(await syncOpenRouter(plain.f)).toEqual({
+      catalogue: { ...catalogue, sync: { ...catalogue.sync, errorCode: null } },
+      failed: false,
+    });
     expect(plain.seen[0].url).toBe("/api/v1/openrouter/sync");
     expect(plain.seen[0].init?.method).toBe("POST");
     expect(plain.seen[0].init?.body).toBeUndefined();
@@ -124,13 +147,25 @@ describe("syncing", () => {
     expect(JSON.parse(String(forced.seen[0].init?.body))).toEqual({ force: true });
   });
 
-  it("returns the catalogue and the error from a failed sync", async () => {
+  it("returns the catalogue from a failed sync, with the stored reason", async () => {
     const failed = { ...catalogue, sync: { ...catalogue.sync, error: "timed out" } };
     const { f } = answering(502, { error: "could not sync OpenRouter's models", ...failed });
     expect(await syncOpenRouter(f)).toEqual({
-      catalogue: failed,
-      error: "could not sync OpenRouter's models",
+      catalogue: { ...failed, sync: { ...failed.sync, errorCode: null } },
+      failed: true,
     });
+  });
+
+  it("takes the 502's code when the catalogue carries none", async () => {
+    const failed = { ...catalogue, sync: { ...catalogue.sync, error: "the list shrank" } };
+    const { f } = answering(502, {
+      error: "could not sync OpenRouter's models",
+      code: OPENROUTER_SYNC_SHRUNK,
+      ...failed,
+    });
+    const { catalogue: read } = await syncOpenRouter(f);
+    expect(read.sync.error).toBe("the list shrank");
+    expect(syncShrunk(read.sync)).toBe(true);
   });
 
   it("throws a 502 that carries no catalogue", async () => {

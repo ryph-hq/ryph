@@ -1,8 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { OpenRouterModel } from "#lib/api/openrouter.ts";
+import { ApiError } from "#lib/api/call.ts";
+import { OPENROUTER_KEY_REFUSED, type OpenRouterModel } from "#lib/api/openrouter.ts";
 import { formatUsd } from "#lib/utils/format.ts";
 import {
+  catalogueReader,
   changeCount,
+  creditFailureLine,
   creditLine,
   enabledIds,
   formatContext,
@@ -10,6 +13,7 @@ import {
   idsToSave,
   matchesSearch,
   offeredModels,
+  openRouterErrorText,
   refusalLines,
   sortModels,
   syncLine,
@@ -140,37 +144,101 @@ describe("the sync line", () => {
     vi.useRealTimers();
   });
 
-  const base = { syncedAt: null, attemptedAt: null, error: null, errorCode: null, syncing: false };
+  const base = {
+    syncedAt: null,
+    attemptedAt: null,
+    error: null,
+    errorCode: null,
+    syncing: false,
+  };
 
-  it("says syncing first, then a failure, then when it last worked", () => {
-    expect(syncLine({ ...base, syncing: true, error: "x" })).toEqual({
-      text: "Syncing…",
-      failed: false,
-    });
-    expect(syncLine({ ...base, syncedAt: "2026-11-27T10:00:00.000Z", error: "timed out" }))
-      .toEqual({ text: "Sync failed: timed out", failed: true });
-    expect(syncLine(base)).toEqual({ text: "Not synced yet", failed: false });
-    const synced = syncLine({ ...base, syncedAt: "2026-11-27T10:00:00.000Z" });
-    expect(synced.failed).toBe(false);
-    expect(synced.text).toMatch(/^Synced .*2/);
+  it("says syncing first, then when it last worked, and leaves a failure out", () => {
+    expect(syncLine({ ...base, syncing: true, error: "x" })).toBe("Syncing…");
+    expect(syncLine(base)).toBe("Not synced yet");
+    const failed = syncLine({ ...base, syncedAt: "2026-11-27T10:00:00.000Z", error: "timed out" });
+    expect(failed).toMatch(/^Synced .*2/);
+    expect(failed).not.toContain("timed out");
+  });
+
+  it("reads the age against the clock it is given", () => {
+    const sync = { ...base, syncedAt: "2026-11-27T10:00:00.000Z" };
+    const later = new Date("2026-11-27T15:00:00.000Z").getTime();
+    expect(syncLine(sync, later)).toMatch(/5/);
+    expect(syncLine(sync, later)).not.toBe(syncLine(sync));
   });
 });
 
 describe("a key's credit line", () => {
   it("says when the credit is spent", () => {
     expect(creditLine({ limit: 10, limitRemaining: 0, usage: 10, isFreeTier: false }))
-      .toEqual({ text: "No credits left", empty: true });
-    expect(creditLine({ limit: 10, limitRemaining: -0.5, usage: 10.5, isFreeTier: false })?.empty)
+      .toEqual({ text: "No credits left", problem: true });
+    expect(creditLine({ limit: 10, limitRemaining: -0.5, usage: 10.5, isFreeTier: false })?.problem)
       .toBe(true);
   });
 
   it("shows what is left under a limit", () => {
     expect(creditLine({ limit: 10, limitRemaining: 4.2, usage: 5.8, isFreeTier: false }))
-      .toEqual({ text: `${formatUsd(4.2)} of ${formatUsd(10)} left`, empty: false });
+      .toEqual({ text: `${formatUsd(4.2)} of ${formatUsd(10)} left`, problem: false });
   });
 
   it("shows nothing for a key without a limit", () => {
     expect(creditLine({ limit: null, limitRemaining: null, usage: 3, isFreeTier: false }))
       .toBeNull();
+  });
+
+  it("says when OpenRouter refused the key, and nothing for any other failure", () => {
+    const refused = new ApiError(502, { error: "no", code: OPENROUTER_KEY_REFUSED }, "no");
+    expect(creditFailureLine(refused)).toEqual({
+      text: "OpenRouter refused this key",
+      problem: true,
+    });
+    expect(creditFailureLine(new ApiError(502, { error: "down" }, "down"))).toBeNull();
+    expect(creditFailureLine(new Error("offline"))).toBeNull();
+  });
+});
+
+describe("errors", () => {
+  it("says model access is off in plain words", () => {
+    const off = new ApiError(503, {
+      error: "model access not configured",
+      code: "model_access_disabled",
+    }, "model access not configured");
+    expect(openRouterErrorText(off, "fallback")).toBe("Model access is off");
+    expect(openRouterErrorText(new Error("boom"), "fallback")).toBe("boom");
+    expect(openRouterErrorText("??", "fallback")).toBe("fallback");
+  });
+});
+
+describe("the page's catalogue read", () => {
+  const catalogue = {
+    models: [model("a")],
+    sync: {
+      syncedAt: null,
+      attemptedAt: null,
+      error: null,
+      errorCode: null,
+      syncing: true,
+    },
+  };
+
+  function answering(...answers: [number, unknown][]) {
+    return (() => {
+      const [status, body] = answers.shift()!;
+      return Promise.resolve(new Response(JSON.stringify(body), { status }));
+    }) as unknown as typeof fetch;
+  }
+
+  it("keeps the last catalogue when a later read fails, so polling goes on", async () => {
+    const read = catalogueReader(true);
+    const f = answering([200, catalogue], [500, { error: "orchestrator restarting" }]);
+    expect(await read(f)).toEqual({ catalogue, error: null });
+    expect(await read(f)).toEqual({ catalogue, error: "orchestrator restarting" });
+  });
+
+  it("has nothing to keep on the server, or before a first read worked", async () => {
+    const read = catalogueReader(false);
+    const f = answering([200, catalogue], [500, { error: "down" }]);
+    await read(f);
+    expect(await read(f)).toEqual({ catalogue: null, error: "down" });
   });
 });

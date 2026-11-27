@@ -113,11 +113,6 @@ $effect(() => {
   };
 });
 
-// An admin picks OpenRouter's models once the deployment holds a live OpenRouter key.
-const hasOpenRouterKey = $derived(
-  data.providerKeys.some((k) => k.provider === OPENROUTER_PROVIDER && k.archivedAt === null),
-);
-
 // ── custom endpoints ────────────────────────────────────────────────────────────────────────
 //
 // An OpenAI-compatible upstream registered as a row: from then on it is a provider like any
@@ -648,8 +643,9 @@ async function submitArchive() {
                 {/if}
               {:else}
                 <Card.Description class="font-mono text-xs">····{key.last4}</Card.Description>
-                {#if key.provider === OPENROUTER_PROVIDER && !key.archivedAt}
-                  <!-- Read again when the key changes, a new secret included. -->
+                {#if canManage && key.provider === OPENROUTER_PROVIDER && !key.archivedAt}
+                  <!-- Admins only: the credit read takes models:manage. Read again when the key
+                       changes, a new secret included. -->
                   {#key key.updatedAt}
                     <OpenrouterCredit keyId={key.id} />
                   {/key}
@@ -678,8 +674,8 @@ async function submitArchive() {
       </div>
     {/if}
 
-    {#if canManage && hasOpenRouterKey}
-      <OpenrouterModels />
+    {#if data.openrouter}
+      <OpenrouterModels read={data.openrouter} dependency="app:model-keys" />
     {/if}
 
     <!-- The ChatGPT plan: a sign-in rather than a pasted key. Once signed in, the plan is a key
@@ -825,8 +821,8 @@ async function submitArchive() {
             </Field.FieldDescription>
           {/if}
           <Field.FieldDescription>
-            The built-in providers and every custom endpoint registered above. Register the
-            endpoint first; the key is what authenticates to it.
+            The built-in providers and every custom endpoint registered above. Add a custom endpoint
+            first to use its key here.
           </Field.FieldDescription>
         </Field.Field>
         <KeySecretFields

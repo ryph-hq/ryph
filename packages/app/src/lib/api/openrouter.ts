@@ -35,7 +35,10 @@ export const openRouterSyncSchema = z.object({
   attemptedAt: z.string().nullable(),
   /** Why the last attempt failed; null once one works. */
   error: z.string().nullable(),
-  /** The failure's code when the admin can act on it: `openrouter_sync_shrunk`. */
+  /**
+   * The failure's code, when it has one: `OPENROUTER_SYNC_SHRUNK` when the list shrank too much
+   * and the old one was kept. Absent from a server that predates it.
+   */
   errorCode: z.string().nullable().default(null),
   syncing: z.boolean(),
 });
@@ -68,6 +71,17 @@ export const OPENROUTER_KEY_REFUSED = "openrouter_key_refused";
 export function isOpenRouterKeyRefused(e: unknown): e is ApiError {
   return e instanceof ApiError && typeof e.body === "object" && e.body !== null &&
     (e.body as { code?: unknown }).code === OPENROUTER_KEY_REFUSED;
+}
+
+/**
+ * The code on a sync that found OpenRouter's list shrunk by more than half and kept the old one.
+ * Syncing again with `force` takes the new list anyway.
+ */
+export const OPENROUTER_SYNC_SHRUNK = "openrouter_sync_shrunk";
+
+/** True when the last sync failed because the list shrank too much, and can be forced. */
+export function syncShrunk(sync: OpenRouterSync): boolean {
+  return sync.error !== null && sync.errorCode === OPENROUTER_SYNC_SHRUNK;
 }
 
 export async function getOpenRouterCatalogue(f = fetch): Promise<OpenRouterCatalogue> {
@@ -119,12 +133,15 @@ export type SyncOptions = {
   force?: boolean;
 };
 
-/** A sync's answer: the catalogue either way, and the reason when the sync failed. */
-export type SyncResult = { catalogue: OpenRouterCatalogue; error: string | null };
+/**
+ * A sync's answer: the catalogue either way. A failed sync's reason and code are in its `sync`,
+ * the code filled in from the 502 when the catalogue does not carry one.
+ */
+export type SyncResult = { catalogue: OpenRouterCatalogue; failed: boolean };
 
 /**
  * Syncs the catalogue now. A failed sync (a 502 carrying the catalogue as it stands) comes back
- * as a result with its error, so the page can show both; any other failure throws.
+ * as a result, so the page can show the catalogue and why; any other failure throws.
  */
 export async function syncOpenRouter(f = fetch, options: SyncOptions = {}): Promise<SyncResult> {
   const init: RequestInit = { method: "POST" };
@@ -132,12 +149,26 @@ export async function syncOpenRouter(f = fetch, options: SyncOptions = {}): Prom
   try {
     return {
       catalogue: openRouterCatalogueSchema.parse(await apiCall(f, "/v1/openrouter/sync", init)),
-      error: null,
+      failed: false,
     };
   } catch (e) {
     if (e instanceof ApiError && e.status === 502) {
       const parsed = openRouterCatalogueSchema.safeParse(e.body);
-      if (parsed.success) return { catalogue: parsed.data, error: e.message };
+      if (parsed.success) {
+        const { sync } = parsed.data;
+        const code = (e.body as { code?: unknown }).code;
+        return {
+          catalogue: {
+            ...parsed.data,
+            sync: {
+              ...sync,
+              error: sync.error ?? e.message,
+              errorCode: sync.errorCode ?? (typeof code === "string" ? code : null),
+            },
+          },
+          failed: true,
+        };
+      }
     }
     throw e;
   }
