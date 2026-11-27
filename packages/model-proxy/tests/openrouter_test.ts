@@ -455,3 +455,109 @@ test("without model access the OpenRouter paths answer the disabled refusal", as
     assertEquals(res.status, 503);
   }
 });
+
+// ── saving a key ────────────────────────────────────────────────────────────────────────────
+
+test("an OpenRouter key is checked with OpenRouter before it is saved", async () => {
+  const { call, store, api } = makeApi();
+  api.keys.set("sk-or-v1-good-secret", KEY_INFO);
+
+  const refused = await call("POST", "/v1/provider-keys", {
+    provider: OPENROUTER,
+    label: "nope",
+    secret: "sk-or-v1-wrong-secret",
+  });
+  assertEquals(refused.status, 400);
+  assertEquals((await refused.json()).error, "OpenRouter didn't accept this key");
+  assertEquals(await store.listProviderKeys(), [], "a refused key is never saved");
+
+  const created = await call("POST", "/v1/provider-keys", {
+    provider: OPENROUTER,
+    label: "team",
+    secret: "sk-or-v1-good-secret",
+  });
+  assertEquals(created.status, 201);
+  const body = await created.json();
+  assertEquals(body.provider, OPENROUTER);
+  assertEquals(body.openrouter, KEY_INFO);
+  assert(!("warning" in body));
+  assert(!JSON.stringify(body).includes("good-secret"), "the secret never comes back");
+  // The first key synced the catalogue before answering, so the picker has something to show.
+  assertEquals(api.calls.models, 1);
+  assertEquals((await store.listOpenRouterModels()).length, 3);
+
+  // A second key finds the catalogue there and does not sync again.
+  api.keys.set("sk-or-v1-other-secret", KEY_INFO);
+  await call("POST", "/v1/provider-keys", {
+    provider: OPENROUTER,
+    label: "second",
+    secret: "sk-or-v1-other-secret",
+  });
+  assertEquals(api.calls.models, 1);
+
+  // Any other provider's key is not OpenRouter's to check.
+  const anthropic = await call("POST", "/v1/provider-keys", {
+    provider: "anthropic",
+    label: "a",
+    secret: "sk-ant-whatever",
+  });
+  assertEquals(anthropic.status, 201);
+  assertEquals(api.calls.keys, [
+    "sk-or-v1-wrong-secret",
+    "sk-or-v1-good-secret",
+    "sk-or-v1-other-secret",
+  ]);
+});
+
+test("an OpenRouter key OpenRouter cannot be asked about is saved, with a warning", async () => {
+  const { call, store, api } = makeApi();
+  api.keys.set("sk-or-v1-good-secret", new OpenRouterApiError("could not reach", null));
+  api.models = new OpenRouterApiError("could not reach", null);
+  const created = await call("POST", "/v1/provider-keys", {
+    provider: OPENROUTER,
+    label: "team",
+    secret: "sk-or-v1-good-secret",
+  });
+  // A failed first sync does not fail the save either.
+  assertEquals(created.status, 201);
+  const body = await created.json();
+  assert(typeof body.warning === "string");
+  assert(!("openrouter" in body));
+  assertEquals((await store.listProviderKeys()).length, 1);
+  assert((await store.getOpenRouterSync())?.error !== null);
+});
+
+test("rotating an OpenRouter key's secret checks the new one", async () => {
+  const { call, store, api } = makeApi();
+  api.keys.set("sk-or-v1-first-secret", KEY_INFO);
+  const created = await (await call("POST", "/v1/provider-keys", {
+    provider: OPENROUTER,
+    label: "team",
+    secret: "sk-or-v1-first-secret",
+  })).json();
+
+  const refused = await call("PATCH", `/v1/provider-keys/${created.id}`, {
+    secret: "sk-or-v1-revoked-secret",
+  });
+  assertEquals(refused.status, 400);
+  assertEquals(
+    (await store.getProviderKey(created.id))?.encryptedSecret,
+    "sealed:sk-or-v1-first-secret",
+    "the old secret stands",
+  );
+
+  api.keys.set("sk-or-v1-second-secret", { ...KEY_INFO, limitRemaining: 0 });
+  const rotated = await call("PATCH", `/v1/provider-keys/${created.id}`, {
+    secret: "sk-or-v1-second-secret",
+  });
+  assertEquals(rotated.status, 200);
+  assertEquals((await rotated.json()).openrouter.limitRemaining, 0);
+
+  // A relabel does not ask OpenRouter anything.
+  const asked = api.calls.keys.length;
+  assertEquals(
+    (await call("PATCH", `/v1/provider-keys/${created.id}`, { label: "renamed" })).status,
+    200,
+  );
+  assertEquals(api.calls.keys.length, asked);
+});
