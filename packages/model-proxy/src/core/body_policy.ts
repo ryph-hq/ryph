@@ -82,6 +82,8 @@ const REFUSED_TOP_LEVEL: Record<BodyShape, readonly string[]> = {
  * - `provider`: routing preferences, which can override what the account decided about which
  *   upstreams may keep or train on its data (`data_collection`, `zdr`, `only`, `ignore`). pi
  *   does not send it
+ * - `debug`: OpenRouter's debugging options; `echo_upstream_body` streams back the request as
+ *   OpenRouter sent it upstream, the account's routing and what OpenRouter added included
  * Each is refused by NAME, whatever its value, `null` included: the proxy adds members of its own
  * to an OpenRouter body (`plugins`), and a `null` it let through is one OpenRouter reads.
  * A model id's own suffixes (`:online`, `@preset/…`) need no rule: the allowlist is exact ids.
@@ -91,6 +93,7 @@ const OPENROUTER_REFUSED: Readonly<Record<string, string>> = {
   plugins: "OpenRouter-side plugins, billed per request",
   preset: "a preset stored in the OpenRouter account",
   provider: "routing preferences that can override the account's data and retention settings",
+  debug: "OpenRouter's debugging options, which echo the request it sent upstream",
 };
 
 const OPENROUTER_REFUSED_FIELDS: readonly string[] = Object.keys(OPENROUTER_REFUSED);

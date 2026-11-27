@@ -176,12 +176,16 @@ test("an OpenRouter body may not route around the allowlist or the meter", async
       { plugins: [{ id: "web" }] },
       { preset: "my-preset" },
       { provider: { data_collection: "allow", only: ["some-host"] } },
+      { debug: { echo_upstream_body: true } },
       // Refused by name: a `null` here is one OpenRouter reads, and the proxy's own `plugins`
       // must never sit beside the body's.
       { models: null },
       { plugins: null },
       { preset: null },
       { provider: null },
+      { debug: null },
+      { debug: {} },
+      { debug: false },
     ]
   ) {
     const res = await call({ model: "openai/gpt-6", messages: [], ...extra });
