@@ -18,6 +18,7 @@ export function usageRow(over: Partial<UsageRecord> = {}): UsageRecord {
     cacheWrite1hTokens: 0,
     reasoningTokens: 0,
     estimated: false,
+    costUsd: null,
     durationMs: 10,
     at: "2026-09-01T10:00:00.000Z",
     ...over,

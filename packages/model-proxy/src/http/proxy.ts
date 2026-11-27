@@ -1150,6 +1150,7 @@ export function makeProxyHandler(deps: ProxyHandlerDeps): (req: Request) => Prom
         cacheWrite1hTokens: tokens?.cacheWrite1h ?? null,
         reasoningTokens: tokens?.reasoning ?? null,
         estimated,
+        costUsd: null,
         durationMs: Math.max(0, deps.now().getTime() - startedAt.getTime()),
         at: startedAt.toISOString(),
       };

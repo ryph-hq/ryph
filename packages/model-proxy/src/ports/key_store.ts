@@ -13,6 +13,11 @@ import type {
   VirtualKey,
 } from "../core/types.ts";
 import type { UsageAggregateQuery, UsageAggregateRow } from "../core/usage_report.ts";
+import type {
+  OpenRouterCatalogueEntry,
+  OpenRouterModel,
+  OpenRouterSync,
+} from "../core/openrouter.ts";
 
 /** The custom endpoint a secret was sealed for, and that endpoint's shape (`endpointShape`) as
  * it was sealed for. */
@@ -149,6 +154,20 @@ export interface KeyStore {
   getPlatformPolicy(): Promise<PlatformModelPolicy | null>;
   savePlatformPolicy(policy: PlatformModelPolicy): Promise<void>;
   clearPlatformPolicy(): Promise<void>;
+
+  /**
+   * Writes one sync of OpenRouter's catalogue, in one transaction: every model in it inserted or
+   * updated and marked listed (its `enabled` left as it was), and every row the sync did NOT
+   * carry marked unlisted. Nothing is deleted: an old usage row keeps its model's price.
+   */
+  upsertOpenRouterCatalogue(models: OpenRouterCatalogueEntry[], at: string): Promise<void>;
+  /** Every catalogue row, unlisted ones included, by id. */
+  listOpenRouterModels(): Promise<OpenRouterModel[]>;
+  /** Replaces the enabled set with exactly `ids`. The caller checks they are usable. */
+  setOpenRouterEnabled(ids: readonly string[], at: string): Promise<void>;
+  /** Where the catalogue sync stands; null before the first attempt. */
+  getOpenRouterSync(): Promise<OpenRouterSync | null>;
+  putOpenRouterSync(state: OpenRouterSync): Promise<void>;
 
   /** Append-only metering trail, one row per forwarded request. */
   recordUsage(record: UsageRecord): Promise<void>;

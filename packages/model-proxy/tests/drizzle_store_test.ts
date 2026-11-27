@@ -8,6 +8,7 @@ import type { CustomProvider, PlanSignIn, ProviderKey, VirtualKey } from "../src
 import { memoryKeyStore } from "./memory_store.ts";
 import { platformPrincipal } from "../src/core/types.ts";
 import { makeTestDb } from "./db.ts";
+import type { OpenRouterCatalogueEntry } from "../src/core/openrouter.ts";
 
 const T0 = "2026-01-01T00:00:00.000Z";
 const T1 = "2026-01-01T01:00:00.000Z";
@@ -110,6 +111,7 @@ test("drizzle store round-trips provider keys, virtual keys, and usage", async (
       cacheWrite1hTokens: null,
       reasoningTokens: null,
       estimated: false,
+      costUsd: null,
       durationMs: 5,
       at: T0,
     });
@@ -128,6 +130,7 @@ test("drizzle store round-trips provider keys, virtual keys, and usage", async (
       cacheWrite1hTokens: null,
       reasoningTokens: null,
       estimated: false,
+      costUsd: null,
       durationMs: 5,
       at: T1,
     });
@@ -211,6 +214,82 @@ test("custom endpoints round-trip through both stores identically", async () => 
       assertEquals((await store.getCustomProvider("groq"))?.archivedAt, T1, name);
       assertEquals((await store.listCustomProviders()).length, 2, name);
       await store.archiveCustomProvider("nope", T1); // quiet about a row that is not there
+    }
+  } finally {
+    await stores.drizzle.close();
+  }
+});
+
+// ── OpenRouter's catalogue ──────────────────────────────────────────────────────────────────
+
+const catalogueEntry = (id: string, over: Partial<OpenRouterCatalogueEntry> = {}) => ({
+  id,
+  label: id,
+  contextLength: 128_000,
+  maxOutputTokens: 16_384,
+  vision: false,
+  reasoning: false,
+  tools: true,
+  price: { input: 1, output: 2, cacheRead: 0.5, cacheWrite: 1 },
+  rawPricing: { prompt: "0.000001", completion: "0.000002" },
+  ...over,
+});
+
+test("the OpenRouter catalogue round-trips through both stores identically", async () => {
+  const handle = await makeTestDb();
+  const stores = { drizzle: drizzleKeyStore(handle), memory: memoryKeyStore() };
+  try {
+    for (const [name, store] of Object.entries(stores)) {
+      assertEquals(await store.listOpenRouterModels(), [], name);
+      assertEquals(await store.getOpenRouterSync(), null, name);
+
+      await store.upsertOpenRouterCatalogue([
+        catalogueEntry("a/one"),
+        catalogueEntry("b/two", { price: null, rawPricing: null }),
+        catalogueEntry("c/three"),
+      ], T0);
+      await store.setOpenRouterEnabled(["a/one", "b/two"], T0);
+      let rows = await store.listOpenRouterModels();
+      assertEquals(rows.map((r) => [r.id, r.listed, r.enabled]), [
+        ["a/one", true, true],
+        ["b/two", true, true],
+        ["c/three", true, false],
+      ], name);
+      // A null price stays null — unpriced, never a zero rate.
+      assertEquals(rows[1].price, null, name);
+      assertEquals(rows[0].price, { input: 1, output: 2, cacheRead: 0.5, cacheWrite: 1 }, name);
+
+      // The next sync drops `b/two` and re-prices `a/one`: the dropped row is kept, unlisted, and
+      // what an admin enabled survives the sync.
+      await store.upsertOpenRouterCatalogue([
+        catalogueEntry("a/one", { label: "One", price: { ...catalogueEntry("").price!, input: 3 } }),
+        catalogueEntry("c/three"),
+      ], T1);
+      rows = await store.listOpenRouterModels();
+      assertEquals(rows.map((r) => [r.id, r.listed, r.enabled]), [
+        ["a/one", true, true],
+        ["b/two", false, true],
+        ["c/three", true, false],
+      ], name);
+      assertEquals(rows[0].label, "One", name);
+      assertEquals(rows[0].price?.input, 3, name);
+      assertEquals(rows[0].updatedAt, T1, name);
+
+      // The enabled set is replaced whole; an empty set disables everything.
+      await store.setOpenRouterEnabled(["c/three"], T1);
+      assertEquals(
+        (await store.listOpenRouterModels()).filter((r) => r.enabled).map((r) => r.id),
+        ["c/three"],
+        name,
+      );
+      await store.setOpenRouterEnabled([], T1);
+      assertEquals((await store.listOpenRouterModels()).filter((r) => r.enabled), [], name);
+
+      const state = { syncedAt: T0, attemptedAt: T1, error: "OpenRouter answered 503" };
+      await store.putOpenRouterSync(state);
+      assertEquals(await store.getOpenRouterSync(), state, name);
+      await store.putOpenRouterSync({ ...state, error: null });
+      assertEquals((await store.getOpenRouterSync())?.error, null, name);
     }
   } finally {
     await stores.drizzle.close();

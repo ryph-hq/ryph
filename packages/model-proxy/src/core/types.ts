@@ -326,7 +326,8 @@ export interface VirtualKey {
 
 /**
  * One forwarded request — the metering trail. Tokens are what the response itself reported; money
- * is never stored, it is priced at read time (see pricing.ts), so a catalogue edit re-prices it.
+ * is priced at read time (see pricing.ts), so a catalogue edit re-prices it. The one exception is
+ * `costUsd`: what OpenRouter billed for the call, which is stored because no list knows it better.
  */
 export interface UsageRecord {
   runId: string;
@@ -358,6 +359,13 @@ export interface UsageRecord {
    * guesses.
    */
   estimated: boolean;
+  /**
+   * What the provider charged for the call, in USD, as its own response said: OpenRouter's
+   * `usage.cost`, and only OpenRouter's (core/metering.ts reads it for no other provider, so no
+   * custom endpoint can price its own calls). Null on every other row, and on an estimated one.
+   * A row that carries it is spend at this figure, whatever the catalogue says.
+   */
+  costUsd: number | null;
   /** From the request arriving to the response body ending, a stream's whole length included.
    * Null only on rows older than duration metering. */
   durationMs: number | null;

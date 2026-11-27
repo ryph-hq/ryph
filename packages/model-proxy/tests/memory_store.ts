@@ -18,6 +18,7 @@ import { PLATFORM_PRINCIPAL_PREFIX } from "../src/core/types.ts";
 import { customProviderSpec, endpointShape } from "../src/core/registry.ts";
 import type { KeyStore } from "../src/ports/key_store.ts";
 import type { UsageAggregateRow, UsageDimension } from "../src/core/usage_report.ts";
+import type { OpenRouterModel, OpenRouterSync } from "../src/core/openrouter.ts";
 
 export function memoryKeyStore(): KeyStore {
   const providerKeys = new Map<string, ProviderKey>();
@@ -27,6 +28,8 @@ export function memoryKeyStore(): KeyStore {
   let platformPolicy: PlatformModelPolicy | null = null;
   const signIns = new Map<string, PlanSignIn>();
   let agentHostId: string | null = null;
+  const openRouterModels = new Map<string, OpenRouterModel>();
+  let openRouterSync: OpenRouterSync | null = null;
 
   return {
     createProviderKey(key) {
@@ -225,6 +228,47 @@ export function memoryKeyStore(): KeyStore {
     },
     clearPlatformPolicy() {
       platformPolicy = null;
+      return Promise.resolve();
+    },
+
+    upsertOpenRouterCatalogue(models, at) {
+      // Mirrors the drizzle store's one transaction: upserted and listed, `enabled` kept, and
+      // every row the sync left out marked unlisted.
+      const ids = new Set(models.map((m) => m.id));
+      for (const [id, row] of openRouterModels) {
+        if (!ids.has(id) && row.listed) {
+          openRouterModels.set(id, { ...row, listed: false, updatedAt: at });
+        }
+      }
+      for (const model of models) {
+        const enabled = openRouterModels.get(model.id)?.enabled ?? false;
+        openRouterModels.set(
+          model.id,
+          structuredClone({ ...model, listed: true, enabled, updatedAt: at }),
+        );
+      }
+      return Promise.resolve();
+    },
+    listOpenRouterModels() {
+      const rows = [...openRouterModels.values()].sort((a, b) =>
+        a.id < b.id ? -1 : a.id > b.id ? 1 : 0
+      );
+      return Promise.resolve(structuredClone(rows));
+    },
+    setOpenRouterEnabled(ids, at) {
+      const wanted = new Set(ids);
+      for (const [id, row] of openRouterModels) {
+        if (row.enabled !== wanted.has(id)) {
+          openRouterModels.set(id, { ...row, enabled: wanted.has(id), updatedAt: at });
+        }
+      }
+      return Promise.resolve();
+    },
+    getOpenRouterSync() {
+      return Promise.resolve(openRouterSync === null ? null : { ...openRouterSync });
+    },
+    putOpenRouterSync(state) {
+      openRouterSync = { ...state };
       return Promise.resolve();
     },
 

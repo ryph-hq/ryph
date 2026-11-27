@@ -7,10 +7,12 @@ import {
   eq,
   gt,
   gte,
+  inArray,
   isNull,
   like,
   lt,
   ne,
+  notInArray,
   or,
   type SQL,
   sql,
@@ -27,6 +29,10 @@ import * as schema from "./db/schema.ts";
 const PLATFORM_POLICY_ID = "default";
 /** The one row the agent host table holds. */
 const AGENT_HOST_ID = "default";
+/** The one row the OpenRouter sync table holds. */
+const OPENROUTER_SYNC_ID = "default";
+/** Catalogue rows per INSERT: eleven columns each, well under Postgres' bound parameters. */
+const CATALOGUE_CHUNK = 200;
 
 /** How often a waiting lock is asked for again, and how long it is waited for in all. */
 const LOCK_POLL_MS = 50;
@@ -363,6 +369,79 @@ export function drizzleKeyStore(handle: ModelProxyDbHandle): KeyStore {
     async clearPlatformPolicy() {
       await db.delete(schema.platformModelPolicy)
         .where(eq(schema.platformModelPolicy.id, PLATFORM_POLICY_ID));
+    },
+
+    async upsertOpenRouterCatalogue(models, at) {
+      const rows = schema.openrouterModels;
+      await db.transaction(async (tx) => {
+        for (let i = 0; i < models.length; i += CATALOGUE_CHUNK) {
+          await tx.insert(rows)
+            .values(
+              models.slice(i, i + CATALOGUE_CHUNK).map((m) => ({
+                ...m,
+                listed: true,
+                enabled: false,
+                updatedAt: at,
+              })),
+            )
+            .onConflictDoUpdate({
+              target: rows.id,
+              // Everything the sync knows, and nothing an admin decided: `enabled` stays.
+              set: {
+                label: sql`excluded.label`,
+                contextLength: sql`excluded.context_length`,
+                maxOutputTokens: sql`excluded.max_output_tokens`,
+                vision: sql`excluded.vision`,
+                reasoning: sql`excluded.reasoning`,
+                tools: sql`excluded.tools`,
+                price: sql`excluded.price`,
+                rawPricing: sql`excluded.raw_pricing`,
+                listed: true,
+                updatedAt: at,
+              },
+            });
+        }
+        const ids = models.map((m) => m.id);
+        await tx.update(rows)
+          .set({ listed: false, updatedAt: at })
+          .where(and(
+            eq(rows.listed, true),
+            ...(ids.length === 0 ? [] : [notInArray(rows.id, ids)]),
+          ));
+      });
+    },
+    async listOpenRouterModels() {
+      return await db.query.openrouterModels.findMany({
+        orderBy: (m, { asc }) => [asc(m.id)],
+      });
+    },
+    async setOpenRouterEnabled(ids, at) {
+      const rows = schema.openrouterModels;
+      await db.transaction(async (tx) => {
+        await tx.update(rows)
+          .set({ enabled: false, updatedAt: at })
+          .where(and(
+            eq(rows.enabled, true),
+            ...(ids.length === 0 ? [] : [notInArray(rows.id, [...ids])]),
+          ));
+        if (ids.length > 0) {
+          await tx.update(rows)
+            .set({ enabled: true, updatedAt: at })
+            .where(and(eq(rows.enabled, false), inArray(rows.id, [...ids])));
+        }
+      });
+    },
+    async getOpenRouterSync() {
+      const row = await db.query.openrouterSync.findFirst({
+        where: (s, { eq }) => eq(s.id, OPENROUTER_SYNC_ID),
+      });
+      if (row === undefined) return null;
+      const { id: _id, ...state } = row;
+      return state;
+    },
+    async putOpenRouterSync(state) {
+      await db.insert(schema.openrouterSync).values({ id: OPENROUTER_SYNC_ID, ...state })
+        .onConflictDoUpdate({ target: schema.openrouterSync.id, set: state });
     },
 
     async recordUsage(record) {

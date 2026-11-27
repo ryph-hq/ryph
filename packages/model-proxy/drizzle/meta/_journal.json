@@ -50,6 +50,13 @@
       "when": 1793793546038,
       "tag": "0006_usage_estimated",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1795781568341,
+      "tag": "0007_openrouter",
+      "breakpoints": true
     }
   ]
 }
