@@ -1,12 +1,12 @@
 <script lang="ts">
 import { page } from "$app/state";
-import TaskStreamStatus from "$lib/components/task-stream-status/task-stream-status.svelte";
-import PageTitle from "$lib/components/page-title/page-title.svelte";
-import TaskRow from "$lib/components/task-list-pane/task-row.svelte";
-import { getTaskListContext } from "$lib/components/task-list/live-task-list.svelte";
-import { Button } from "$lib/components/ui/button";
-import * as Empty from "$lib/components/ui/empty";
-import { Spinner } from "$lib/components/ui/spinner";
+import TaskStreamStatus from "#lib/components/task-stream-status/task-stream-status.svelte";
+import PageTitle from "#lib/components/page-title/page-title.svelte";
+import TaskRow from "#lib/components/task-list-pane/task-row.svelte";
+import { getTaskListContext } from "#lib/components/task-list/live-task-list.svelte.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import * as Empty from "#lib/components/ui/empty/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
 import ListChecksIcon from "@lucide/svelte/icons/list-checks";
 import PlusIcon from "@lucide/svelte/icons/plus";
 import type { PageProps } from "./$types";

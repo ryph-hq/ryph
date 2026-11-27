@@ -1,6 +1,6 @@
 <script lang="ts">
-import * as Field from "$lib/components/ui/field";
-import { Input } from "$lib/components/ui/input";
+import * as Field from "#lib/components/ui/field/index.ts";
+import { Input } from "#lib/components/ui/input/index.ts";
 
 // A provider key's own two fields, its name and its secret, for the Model keys dialog and the
 // welcome flow. The provider it is registered against is picked by whoever holds these.

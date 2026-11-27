@@ -10,19 +10,19 @@
  * a bundle was a run dying in the middle of a setup step.
  */
 import { invalidate } from "$app/navigation";
-import { putEgressAllowlist } from "$lib/api/egress";
-import type { EgressCeiling } from "$lib/api/types";
-import TagInput from "$lib/components/tag-input/tag-input.svelte";
-import * as Alert from "$lib/components/ui/alert";
-import { Badge } from "$lib/components/ui/badge";
-import { Button } from "$lib/components/ui/button";
-import * as Collapsible from "$lib/components/ui/collapsible";
-import * as Field from "$lib/components/ui/field";
-import { Label } from "$lib/components/ui/label";
-import { Spinner } from "$lib/components/ui/spinner";
-import { Switch } from "$lib/components/ui/switch";
-import { formatDateTime } from "$lib/utils/format";
-import { hostGrammarProblem, parseHosts } from "$lib/utils/egress-hosts";
+import { putEgressAllowlist } from "#lib/api/egress.ts";
+import type { EgressCeiling } from "#lib/api/types.ts";
+import TagInput from "#lib/components/tag-input/tag-input.svelte";
+import * as Alert from "#lib/components/ui/alert/index.ts";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import * as Collapsible from "#lib/components/ui/collapsible/index.ts";
+import * as Field from "#lib/components/ui/field/index.ts";
+import { Label } from "#lib/components/ui/label/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
+import { Switch } from "#lib/components/ui/switch/index.ts";
+import { formatDateTime } from "#lib/utils/format.ts";
+import { hostGrammarProblem, parseHosts } from "#lib/utils/egress-hosts.ts";
 import ChevronRightIcon from "@lucide/svelte/icons/chevron-right";
 import InfoIcon from "@lucide/svelte/icons/info";
 import TriangleAlertIcon from "@lucide/svelte/icons/triangle-alert";

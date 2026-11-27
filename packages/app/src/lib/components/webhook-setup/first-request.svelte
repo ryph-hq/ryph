@@ -1,10 +1,10 @@
 <script lang="ts">
-import { getAutomationFires } from "$lib/api/automations";
-import type { AutomationFire } from "$lib/api/types";
-import { fireOutcomeSentence } from "$lib/automations/presets";
-import { Button } from "$lib/components/ui/button";
-import { Spinner } from "$lib/components/ui/spinner";
-import { formatDateTime, formatTime } from "$lib/utils/format";
+import { getAutomationFires } from "#lib/api/automations.ts";
+import type { AutomationFire } from "#lib/api/types.ts";
+import { fireOutcomeSentence } from "#lib/automations/presets.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
+import { formatDateTime, formatTime } from "#lib/utils/format.ts";
 import ArrowRightIcon from "@lucide/svelte/icons/arrow-right";
 import CircleCheckIcon from "@lucide/svelte/icons/circle-check";
 import TriangleAlertIcon from "@lucide/svelte/icons/triangle-alert";

@@ -20,7 +20,7 @@ export type AlertVariant = VariantProps<typeof alertVariants>["variant"];
 </script>
 
 <script lang="ts">
-import { cn, type WithElementRef } from "$lib/utils.js";
+import { cn, type WithElementRef } from "#lib/utils.ts";
 import type { HTMLAttributes } from "svelte/elements";
 
 let {

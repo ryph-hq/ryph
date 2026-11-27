@@ -2,7 +2,7 @@
 // what stands in for each when it gives none. Every string here is plain text for the template to
 // escape; none of it is ever rendered as markup.
 
-import type { SkillIcon, SkillPresentation } from "$lib/api/types";
+import type { SkillIcon, SkillPresentation } from "#lib/api/types.ts";
 
 type Presented = { name: string; description: string; presentation: SkillPresentation | null };
 

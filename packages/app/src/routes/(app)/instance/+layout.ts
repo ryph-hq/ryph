@@ -1,4 +1,4 @@
-import { can } from "$lib/utils/auth/capabilities";
+import { can } from "#lib/utils/auth/capabilities.ts";
 import { redirect } from "@sveltejs/kit";
 import type { LayoutLoad } from "./$types";
 

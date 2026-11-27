@@ -1,9 +1,9 @@
 <script lang="ts">
-import type { DeclaredModel } from "$lib/api/types";
-import { Badge } from "$lib/components/ui/badge";
-import * as Command from "$lib/components/ui/command";
-import * as Popover from "$lib/components/ui/popover";
-import * as ToggleGroup from "$lib/components/ui/toggle-group";
+import type { DeclaredModel } from "#lib/api/types.ts";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import * as Command from "#lib/components/ui/command/index.ts";
+import * as Popover from "#lib/components/ui/popover/index.ts";
+import * as ToggleGroup from "#lib/components/ui/toggle-group/index.ts";
 import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
 import PlusIcon from "@lucide/svelte/icons/plus";
 import XIcon from "@lucide/svelte/icons/x";

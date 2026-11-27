@@ -1,6 +1,6 @@
 <script lang="ts">
-import { Badge } from "$lib/components/ui/badge";
-import * as InputGroup from "$lib/components/ui/input-group";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import * as InputGroup from "#lib/components/ui/input-group/index.ts";
 import XIcon from "@lucide/svelte/icons/x";
 
 // A list of short names, typed one at a time: each becomes a chip on Enter or a comma, and

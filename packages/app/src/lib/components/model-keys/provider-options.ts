@@ -1,7 +1,7 @@
 // Which providers a key can be registered against, shared by the Model keys page and the welcome
 // flow so both offer the same list.
 
-import { CHATGPT_PLAN_PROVIDER, type Harness, type Provider } from "$lib/api/types";
+import { CHATGPT_PLAN_PROVIDER, type Harness, type Provider } from "#lib/api/types.ts";
 
 /**
  * Every live provider (the two built-ins and the custom endpoints) whose wire dialect one of this

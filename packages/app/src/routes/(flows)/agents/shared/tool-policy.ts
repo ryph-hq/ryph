@@ -2,7 +2,7 @@
 // and edit flows so both compose, seed and validate identically — the model-policy bridge, one
 // credential class over.
 
-import type { AllowedTools, McpServer, ToolPolicy } from "$lib/api/types";
+import type { AllowedTools, McpServer, ToolPolicy } from "#lib/api/types.ts";
 
 /** The form's working shape for one server: the server, and which of its tools the agent may call. */
 export interface ToolGrant {

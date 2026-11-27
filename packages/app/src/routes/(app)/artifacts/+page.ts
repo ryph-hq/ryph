@@ -1,6 +1,6 @@
 import { redirect } from "@sveltejs/kit";
-import { can } from "$lib/utils/auth/capabilities";
-import { getArtifacts } from "$lib/api/artifacts";
+import { can } from "#lib/utils/auth/capabilities.ts";
+import { getArtifacts } from "#lib/api/artifacts.ts";
 import type { PageLoad } from "./$types";
 
 /** Every artifact on the instance, the most recently updated first. */

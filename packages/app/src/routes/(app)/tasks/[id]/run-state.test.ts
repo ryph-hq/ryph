@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { RunUsageState } from "$lib/api/model-usage";
-import type { HistoryEvent } from "$lib/api/types";
-import type { RunHistory } from "$lib/components/run-history/run-history.svelte";
+import type { RunUsageState } from "#lib/api/model-usage.ts";
+import type { HistoryEvent } from "#lib/api/types.ts";
+import type { RunHistory } from "#lib/components/run-history/run-history.svelte.ts";
 
 // The live tail is the one thing here with a socket behind it: the fake hands each subscription's
 // callbacks back to the test, which plays the historian.
@@ -13,7 +13,7 @@ type Callbacks = {
   onError?(): void;
 };
 const subscriptions: { runId: string; opts: Callbacks; closed: boolean }[] = [];
-vi.mock("$lib/api/history", () => ({
+vi.mock("#lib/api/history.ts", () => ({
   subscribeRunEvents: (runId: string, opts: Callbacks) => {
     const sub = { runId, opts, closed: false };
     subscriptions.push(sub);
@@ -25,7 +25,7 @@ const usageReads: {
   grant: string | null | undefined;
   resolve(value: RunUsageState): void;
 }[] = [];
-vi.mock("$lib/api/model-usage", () => ({
+vi.mock("#lib/api/model-usage.ts", () => ({
   getRunUsageState: (_f: unknown, runId: string, grant?: string | null) => {
     const answer = Promise.withResolvers<RunUsageState>();
     usageReads.push({ runId, grant, resolve: answer.resolve });

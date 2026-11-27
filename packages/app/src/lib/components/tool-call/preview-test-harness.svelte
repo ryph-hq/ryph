@@ -1,7 +1,7 @@
 <script lang="ts">
 import { untrack } from "svelte";
-import type { ToolCall } from "$lib/api/tools";
-import type { RunPreview } from "$lib/api/previews";
+import type { ToolCall } from "#lib/api/tools.ts";
+import type { RunPreview } from "#lib/api/previews.ts";
 import ToolCallView from "./tool-call.svelte";
 import { PreviewsState, setPreviewsContext } from "./previews-context.svelte";
 

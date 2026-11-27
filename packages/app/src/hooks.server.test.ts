@@ -4,10 +4,13 @@ import { describe, expect, it, vi } from "vitest";
 // which the proxy, SSR loads, previews, artifacts and images all forward. An API token's
 // exchanged access token put into the cookie would otherwise skip the proxy's bearer doors.
 
-vi.mock("$env/dynamic/private", () => ({ env: { RYPH_PROXY_SECRET: "hop" } }));
-vi.mock("$app/environment", () => ({ dev: true }));
-vi.mock("$lib/server/auth", async (importOriginal) => ({
-  ...await importOriginal<typeof import("$lib/server/auth")>(),
+vi.mock(
+  "$app/env/private",
+  async () => (await import("#lib/testing/env-mock.ts")).envMock({ RYPH_PROXY_SECRET: "hop" }),
+);
+vi.mock("$app/env", () => ({ dev: true }));
+vi.mock("#lib/server/auth.ts", async (importOriginal) => ({
+  ...await importOriginal<typeof import("#lib/server/auth.ts")>(),
   sessionAlive: () => Promise.resolve(true),
   refreshTokenPair: () => Promise.reject(new Error("no refresh in this test")),
 }));

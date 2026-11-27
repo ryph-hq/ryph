@@ -1,5 +1,5 @@
 import { error, redirect, type RequestHandler } from "@sveltejs/kit";
-import { authorizeUrl, beginOAuth } from "$lib/server/oauth";
+import { authorizeUrl, beginOAuth } from "#lib/server/oauth.ts";
 
 /**
  * Kicks off an OAuth round trip with a provider. `intent=login` signs in (or registers, when
@@ -22,5 +22,6 @@ export const GET: RequestHandler = async ({ params, url, cookies, locals }) => {
     leg: authorize.leg,
   });
   authorize.url.searchParams.set("state", state);
-  redirect(302, authorize.url.toString());
+  // The provider's own sign-in page: SvelteKit refuses an off-site redirect unless told.
+  redirect(302, authorize.url.toString(), { external: true });
 };

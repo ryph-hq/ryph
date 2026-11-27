@@ -1,10 +1,10 @@
 <script lang="ts">
-import * as Collapsible from "$lib/components/ui/collapsible";
-import * as Field from "$lib/components/ui/field";
-import { Input } from "$lib/components/ui/input";
-import { Label } from "$lib/components/ui/label";
-import { Switch } from "$lib/components/ui/switch";
-import { DEFAULT_MEMORY_BUDGET_TOKENS } from "$lib/api/types";
+import * as Collapsible from "#lib/components/ui/collapsible/index.ts";
+import * as Field from "#lib/components/ui/field/index.ts";
+import { Input } from "#lib/components/ui/input/index.ts";
+import { Label } from "#lib/components/ui/label/index.ts";
+import { Switch } from "#lib/components/ui/switch/index.ts";
+import { DEFAULT_MEMORY_BUDGET_TOKENS } from "#lib/api/types.ts";
 import ChevronRightIcon from "@lucide/svelte/icons/chevron-right";
 
 let {

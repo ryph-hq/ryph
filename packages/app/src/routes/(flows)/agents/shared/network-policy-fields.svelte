@@ -1,19 +1,19 @@
 <script lang="ts">
-import type { EgressState } from "$lib/api/egress";
-import type { EgressBundle, EgressCeiling } from "$lib/api/types";
-import * as Alert from "$lib/components/ui/alert";
-import { Badge } from "$lib/components/ui/badge";
-import { Checkbox } from "$lib/components/ui/checkbox";
-import * as Collapsible from "$lib/components/ui/collapsible";
-import * as Field from "$lib/components/ui/field";
-import { Label } from "$lib/components/ui/label";
-import { Switch } from "$lib/components/ui/switch";
-import { parseHosts } from "$lib/utils/egress-hosts";
+import type { EgressState } from "#lib/api/egress.ts";
+import type { EgressBundle, EgressCeiling } from "#lib/api/types.ts";
+import * as Alert from "#lib/components/ui/alert/index.ts";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import { Checkbox } from "#lib/components/ui/checkbox/index.ts";
+import * as Collapsible from "#lib/components/ui/collapsible/index.ts";
+import * as Field from "#lib/components/ui/field/index.ts";
+import { Label } from "#lib/components/ui/label/index.ts";
+import { Switch } from "#lib/components/ui/switch/index.ts";
+import { parseHosts } from "#lib/utils/egress-hosts.ts";
 import ChevronRightIcon from "@lucide/svelte/icons/chevron-right";
 import InfoIcon from "@lucide/svelte/icons/info";
 import TriangleAlertIcon from "@lucide/svelte/icons/triangle-alert";
 import { grantedHosts, type NetworkFields, networkPolicyToFields } from "./network-policy";
-import ToggleRow from "$lib/components/toggle-row/toggle-row.svelte";
+import ToggleRow from "#lib/components/toggle-row/toggle-row.svelte";
 
 let {
   fields = $bindable(),

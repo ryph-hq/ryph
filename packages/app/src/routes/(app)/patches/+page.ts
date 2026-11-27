@@ -1,6 +1,6 @@
 import type { PageLoad } from "./$types";
-import { getPatches } from "$lib/api/patches";
-import { type PatchState, patchStateSchema } from "$lib/api/types";
+import { getPatches } from "#lib/api/patches.ts";
+import { type PatchState, patchStateSchema } from "#lib/api/types.ts";
 
 /** Every patch, newest first; one state is a filter away. */
 export const load: PageLoad = async ({ fetch, url, depends }) => {

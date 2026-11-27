@@ -1,10 +1,10 @@
 <script lang="ts">
-import { rotateAutomationSecret } from "$lib/api/automations";
-import { pastedSecretProblem, type PresetVerification } from "$lib/automations/presets";
-import { Button } from "$lib/components/ui/button";
-import * as Field from "$lib/components/ui/field";
-import { Input } from "$lib/components/ui/input";
-import { Spinner } from "$lib/components/ui/spinner";
+import { rotateAutomationSecret } from "#lib/api/automations.ts";
+import { pastedSecretProblem, type PresetVerification } from "#lib/automations/presets.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import * as Field from "#lib/components/ui/field/index.ts";
+import { Input } from "#lib/components/ui/input/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
 import CircleCheckIcon from "@lucide/svelte/icons/circle-check";
 
 // Where a sender's own signing secret is pasted. Saving replaces the secret at once: requests

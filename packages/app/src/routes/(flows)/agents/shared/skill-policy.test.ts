@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_SKILL_POLICY, type SkillPolicy, type SkillsOverview } from "$lib/api/types";
+import { DEFAULT_SKILL_POLICY, type SkillPolicy, type SkillsOverview } from "#lib/api/types.ts";
 import {
   clearSkillChoice,
   composeSkillPolicy,

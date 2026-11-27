@@ -1,6 +1,6 @@
-import { browser } from "$app/environment";
-import { invalidateAll } from "$app/navigation";
-import { logOut, refreshSession } from "$lib/utils/auth/auth";
+import { browser } from "$app/env";
+import { refreshAll } from "$app/navigation";
+import { logOut, refreshSession } from "#lib/utils/auth/auth.ts";
 
 export class ApiError extends Error {
   status: number;
@@ -94,7 +94,7 @@ async function send(
 
     // Refresh token is gone — drop the session so guards kick in.
     await logOut();
-    await invalidateAll();
+    await refreshAll();
   }
   return res;
 }

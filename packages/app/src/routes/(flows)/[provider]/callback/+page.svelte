@@ -1,8 +1,8 @@
 <script lang="ts">
 import { page } from "$app/state";
-import FlowStep from "$lib/components/flow-step/flow-step.svelte";
-import { Button } from "$lib/components/ui/button";
-import { providerLabel } from "$lib/utils/providers";
+import FlowStep from "#lib/components/flow-step/flow-step.svelte";
+import { Button } from "#lib/components/ui/button/index.ts";
+import { providerLabel } from "#lib/utils/providers.ts";
 import ArrowRightIcon from "@lucide/svelte/icons/arrow-right";
 import CheckIcon from "@lucide/svelte/icons/check";
 import type { PageProps } from "./$types";

@@ -1,8 +1,8 @@
 import type { PageLoad } from "./$types";
-import { getAgents } from "$lib/api/agents";
-import { getHarnesses } from "$lib/api/harnesses";
-import { getModelAccess } from "$lib/api/provider-keys";
-import { getProvidersOrEmpty } from "$lib/api/providers";
+import { getAgents } from "#lib/api/agents.ts";
+import { getHarnesses } from "#lib/api/harnesses.ts";
+import { getModelAccess } from "#lib/api/provider-keys.ts";
+import { getProvidersOrEmpty } from "#lib/api/providers.ts";
 
 export const load: PageLoad = async ({ fetch, depends }) => {
   depends("app:model-keys");

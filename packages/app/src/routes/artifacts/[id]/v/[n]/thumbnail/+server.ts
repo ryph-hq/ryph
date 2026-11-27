@@ -1,7 +1,7 @@
 import type { RequestHandler } from "@sveltejs/kit";
-import { RYPH_API_URL, sessionHeaders } from "$lib/server/auth";
-import { getUserData } from "$lib/utils/auth/jwt";
-import { parseVersion } from "$lib/utils/artifacts";
+import { RYPH_API_URL, sessionHeaders } from "#lib/server/auth.ts";
+import { getUserData } from "#lib/utils/auth/jwt.ts";
+import { parseVersion } from "#lib/utils/artifacts.ts";
 
 function thumbnailHeaders(): Headers {
   return new Headers({

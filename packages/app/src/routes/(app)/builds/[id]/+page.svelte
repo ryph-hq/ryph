@@ -1,22 +1,26 @@
 <script lang="ts">
 import { goto } from "$app/navigation";
-import { ApiError } from "$lib/api/call";
-import { environmentLogHref, getEnvironmentLog, rebuildEnvironment } from "$lib/api/environments";
-import BuildStatusBadge from "$lib/components/build-status-badge/build-status-badge.svelte";
-import CopyButton from "$lib/components/copy-button/copy-button.svelte";
-import LogFindBar from "$lib/components/log-find/log-find-bar.svelte";
-import { LogFind } from "$lib/components/log-find/log-find.svelte";
-import LogView from "$lib/components/log-view/log-view.svelte";
-import Markdown from "$lib/components/markdown/markdown.svelte";
-import PageTitle from "$lib/components/page-title/page-title.svelte";
-import * as Alert from "$lib/components/ui/alert";
-import SetupWarnings from "$lib/components/environment-panel/setup-warnings.svelte";
-import { Button } from "$lib/components/ui/button";
-import * as Empty from "$lib/components/ui/empty";
-import { Separator } from "$lib/components/ui/separator";
-import { Spinner } from "$lib/components/ui/spinner";
-import { Toggle } from "$lib/components/ui/toggle";
-import { can } from "$lib/utils/auth/capabilities";
+import { ApiError } from "#lib/api/call.ts";
+import {
+  environmentLogHref,
+  getEnvironmentLog,
+  rebuildEnvironment,
+} from "#lib/api/environments.ts";
+import BuildStatusBadge from "#lib/components/build-status-badge/build-status-badge.svelte";
+import CopyButton from "#lib/components/copy-button/copy-button.svelte";
+import LogFindBar from "#lib/components/log-find/log-find-bar.svelte";
+import { LogFind } from "#lib/components/log-find/log-find.svelte.ts";
+import LogView from "#lib/components/log-view/log-view.svelte";
+import Markdown from "#lib/components/markdown/markdown.svelte";
+import PageTitle from "#lib/components/page-title/page-title.svelte";
+import * as Alert from "#lib/components/ui/alert/index.ts";
+import SetupWarnings from "#lib/components/environment-panel/setup-warnings.svelte";
+import { Button } from "#lib/components/ui/button/index.ts";
+import * as Empty from "#lib/components/ui/empty/index.ts";
+import { Separator } from "#lib/components/ui/separator/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
+import { Toggle } from "#lib/components/ui/toggle/index.ts";
+import { can } from "#lib/utils/auth/capabilities.ts";
 import {
   buildDurationMs,
   buildKindLabel,
@@ -28,10 +32,10 @@ import {
   shortImage,
   toolchainEntries,
   triggerLabel,
-} from "$lib/utils/environments";
-import { forgeRepoLabel } from "$lib/utils/forge";
-import { formatDateTime, formatElapsed } from "$lib/utils/format";
-import { refreshWhileLive } from "$lib/utils/live-refresh.svelte.js";
+} from "#lib/utils/environments.ts";
+import { forgeRepoLabel } from "#lib/utils/forge.ts";
+import { formatDateTime, formatElapsed } from "#lib/utils/format.ts";
+import { refreshWhileLive } from "#lib/utils/live-refresh.svelte.ts";
 import ExternalLinkIcon from "@lucide/svelte/icons/external-link";
 import RotateCwIcon from "@lucide/svelte/icons/rotate-cw";
 import ScrollTextIcon from "@lucide/svelte/icons/scroll-text";

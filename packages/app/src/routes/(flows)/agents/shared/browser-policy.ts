@@ -1,7 +1,7 @@
 // The Browser switch's rules, beside the switch (browser-fields.svelte), so they are tested on
 // their own.
 
-import type { Harness } from "$lib/api/types";
+import type { Harness } from "#lib/api/types.ts";
 
 /**
  * Turning a browser on is an administrator's call, as turning patches back on is: anyone else finds

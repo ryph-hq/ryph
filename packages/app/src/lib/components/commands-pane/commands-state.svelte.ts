@@ -1,4 +1,4 @@
-import type { BackgroundJob, CommandsMessage, CommandsSource } from "$lib/api/background";
+import type { BackgroundJob, CommandsMessage, CommandsSource } from "#lib/api/background.ts";
 import { applyCommandsEvent, OutputBuffer, snapshotJobs } from "./commands-view";
 
 /** The soonest a stream that lost lines is reopened again, for a fresh snapshot. */

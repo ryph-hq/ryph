@@ -1,5 +1,5 @@
 <script lang="ts" module>
-import type { Patch } from "$lib/api/types";
+import type { Patch } from "#lib/api/types.ts";
 
 /** What the actions read off a patch: a task's patch and the approval queue's both carry it. */
 export type ActionablePatch =
@@ -28,12 +28,12 @@ export type ActionablePatch =
 
 <script lang="ts">
 import { goto, invalidate } from "$app/navigation";
-import { type ApprovalBasis, approvePatch, rejectPatch, retryPatch } from "$lib/api/patches";
-import * as AlertDialog from "$lib/components/ui/alert-dialog";
-import { Button } from "$lib/components/ui/button";
-import { Spinner } from "$lib/components/ui/spinner";
-import type { PatchesRefresh } from "$lib/components/tool-call/patches-context";
-import { providerOfThread, threadLabel } from "$lib/utils/forge";
+import { type ApprovalBasis, approvePatch, rejectPatch, retryPatch } from "#lib/api/patches.ts";
+import * as AlertDialog from "#lib/components/ui/alert-dialog/index.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
+import type { PatchesRefresh } from "#lib/components/tool-call/patches-context.ts";
+import { providerOfThread, threadLabel } from "#lib/utils/forge.ts";
 import {
   approvalHookPaths,
   approvalRefusal,
@@ -44,7 +44,7 @@ import {
   isLocalPatch,
   refusalNeedsReview,
   snapshotHookFiles,
-} from "$lib/utils/hook-check";
+} from "#lib/utils/hook-check.ts";
 import CheckIcon from "@lucide/svelte/icons/check";
 import ExternalLinkIcon from "@lucide/svelte/icons/external-link";
 import GitBranchIcon from "@lucide/svelte/icons/git-branch";

@@ -1,9 +1,9 @@
 // The task form's limit fields: what a run of the chosen agent gets by default, what the person
 // typed instead, and whether that is theirs to ask for.
 
-import type { DeploymentLimits, RunLimits } from "$lib/api/types";
-import { HOUR_MS, parseTyped, RUN_LIMIT_BOUNDS } from "$lib/utils/limits";
-import { formatElapsed } from "$lib/utils/format";
+import type { DeploymentLimits, RunLimits } from "#lib/api/types.ts";
+import { HOUR_MS, parseTyped, RUN_LIMIT_BOUNDS } from "#lib/utils/limits.ts";
+import { formatElapsed } from "#lib/utils/format.ts";
 
 /** The limits as typed, each blank for "the agent's own". */
 export interface TaskLimitFields {

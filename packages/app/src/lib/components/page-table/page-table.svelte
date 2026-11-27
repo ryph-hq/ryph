@@ -10,7 +10,7 @@ export const edgeEnd = "pr-(--bleed)";
 </script>
 
 <script lang="ts">
-import * as Table from "$lib/components/ui/table";
+import * as Table from "#lib/components/ui/table/index.ts";
 import type { Snippet } from "svelte";
 
 let {

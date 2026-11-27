@@ -1,32 +1,32 @@
 <script lang="ts">
-import { can } from "$lib/utils/auth/capabilities";
-import ObjectHeader from "$lib/components/object-header/object-header.svelte";
+import { can } from "#lib/utils/auth/capabilities.ts";
+import ObjectHeader from "#lib/components/object-header/object-header.svelte";
 import { goto, invalidate } from "$app/navigation";
-import type { WorkspaceRepo } from "$lib/api/types";
+import type { WorkspaceRepo } from "#lib/api/types.ts";
 import {
   addWorkspaceRepo,
   archiveWorkspace,
   removeWorkspaceRepo,
   updateWorkspace,
   updateWorkspaceRepo,
-} from "$lib/api/workspaces";
-import EnvironmentPanel from "$lib/components/environment-panel/environment-panel.svelte";
-import ForgeIcon from "$lib/components/forge-icon/forge-icon.svelte";
-import SettingsSection from "$lib/components/settings-section/settings-section.svelte";
-import SizeClassSelect from "$lib/components/size-class-select/size-class-select.svelte";
-import * as Alert from "$lib/components/ui/alert";
-import * as AlertDialog from "$lib/components/ui/alert-dialog";
-import { Badge } from "$lib/components/ui/badge";
-import { Button } from "$lib/components/ui/button";
-import * as Dialog from "$lib/components/ui/dialog";
-import * as Field from "$lib/components/ui/field";
-import { Input } from "$lib/components/ui/input";
-import * as Select from "$lib/components/ui/select";
-import { Separator } from "$lib/components/ui/separator";
-import { Spinner } from "$lib/components/ui/spinner";
-import { Textarea } from "$lib/components/ui/textarea";
-import { ignoredDockerfiles } from "$lib/utils/environments";
-import { forgeRepoLabel } from "$lib/utils/forge";
+} from "#lib/api/workspaces.ts";
+import EnvironmentPanel from "#lib/components/environment-panel/environment-panel.svelte";
+import ForgeIcon from "#lib/components/forge-icon/forge-icon.svelte";
+import SettingsSection from "#lib/components/settings-section/settings-section.svelte";
+import SizeClassSelect from "#lib/components/size-class-select/size-class-select.svelte";
+import * as Alert from "#lib/components/ui/alert/index.ts";
+import * as AlertDialog from "#lib/components/ui/alert-dialog/index.ts";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import * as Dialog from "#lib/components/ui/dialog/index.ts";
+import * as Field from "#lib/components/ui/field/index.ts";
+import { Input } from "#lib/components/ui/input/index.ts";
+import * as Select from "#lib/components/ui/select/index.ts";
+import { Separator } from "#lib/components/ui/separator/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
+import { Textarea } from "#lib/components/ui/textarea/index.ts";
+import { ignoredDockerfiles } from "#lib/utils/environments.ts";
+import { forgeRepoLabel } from "#lib/utils/forge.ts";
 import ArchiveIcon from "@lucide/svelte/icons/archive";
 import GitBranchIcon from "@lucide/svelte/icons/git-branch";
 import LayersIcon from "@lucide/svelte/icons/layers";
@@ -173,7 +173,7 @@ async function archive() {
   try {
     await archiveWorkspace(fetch, ws.workspace.id);
     toast.success(`Archived ${ws.workspace.name}`);
-    await goto("/workspaces", { invalidateAll: true });
+    await goto("/workspaces", { refreshAll: true });
   } catch (e) {
     toast.error(e instanceof Error ? e.message : "Failed to archive the workspace");
     archiving = false;

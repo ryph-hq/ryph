@@ -1,5 +1,5 @@
 import { getContext, setContext } from "svelte";
-import type { RunSkillsView } from "$lib/utils/skills";
+import type { RunSkillsView } from "#lib/utils/skills.ts";
 
 // The skills a page's run holds, so a read of one in the transcript can say it loaded that skill
 // rather than show a temp path. A page that holds no run sets nothing, and those reads stay reads.

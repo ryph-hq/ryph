@@ -1,4 +1,4 @@
-import { PREVIEW_ID, previewOpenHref } from "$lib/utils/previews";
+import { PREVIEW_ID, previewOpenHref } from "#lib/utils/previews.ts";
 
 /**
  * Where a preview link that could not be opened lands (`/previews/<previewId>` failed): the open

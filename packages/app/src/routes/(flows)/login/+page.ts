@@ -1,9 +1,9 @@
 import { redirect } from "@sveltejs/kit";
 import type { PageLoad } from "./$types";
-import { safeBackTo } from "$lib/utils/safe-path";
-import { getAuthSettings, needsBootstrap } from "$lib/api/auth";
-import { listProviders } from "$lib/api/identities";
-import { linkProblemOf } from "$lib/utils/auth/link-problems";
+import { safeBackTo } from "#lib/utils/safe-path.ts";
+import { getAuthSettings, needsBootstrap } from "#lib/api/auth.ts";
+import { listProviders } from "#lib/api/identities.ts";
+import { linkProblemOf } from "#lib/utils/auth/link-problems.ts";
 
 export const load: PageLoad = async ({ parent, url, fetch }) => {
   const { user } = await parent();

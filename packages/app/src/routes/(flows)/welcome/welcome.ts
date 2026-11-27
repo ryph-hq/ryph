@@ -1,15 +1,15 @@
 // The welcome flow's rules, apart from its page so they are tested on their own: which step it
 // opens on, what the quick agent is sent, and how the image downloads read.
 
-import type { CreateAgentInput } from "$lib/api/agents";
-import type { ImageName, ImageStatus } from "$lib/api/images";
+import type { CreateAgentInput } from "#lib/api/agents.ts";
+import type { ImageName, ImageStatus } from "#lib/api/images.ts";
 import {
   DEFAULT_MEMORY_BUDGET_TOKENS,
   type Harness,
   type Provider,
   type ProviderKey,
-} from "$lib/api/types";
-import { can } from "$lib/utils/auth/capabilities";
+} from "#lib/api/types.ts";
+import { can } from "#lib/utils/auth/capabilities.ts";
 import { effectiveEmail } from "../agents/shared/agent-steps";
 import { createBrowserEnabled } from "../agents/shared/browser-policy";
 import { composeForgePolicy, forgePolicyToFields } from "../agents/shared/forge-policy";

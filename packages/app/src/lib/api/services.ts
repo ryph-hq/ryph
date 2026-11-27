@@ -1,4 +1,4 @@
-import { browser } from "$app/environment";
+import { browser } from "$app/env";
 import { z } from "zod";
 import { apiCall } from "./call";
 

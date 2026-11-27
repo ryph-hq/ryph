@@ -1,12 +1,12 @@
 <script lang="ts">
-import type { SkillPolicy, SkillsOverview } from "$lib/api/types";
-import SkillRow from "$lib/components/skill-row/skill-row.svelte";
-import ToggleRow from "$lib/components/toggle-row/toggle-row.svelte";
-import { Badge } from "$lib/components/ui/badge";
-import { Button } from "$lib/components/ui/button";
-import * as Field from "$lib/components/ui/field";
-import { Switch } from "$lib/components/ui/switch";
-import { forgeRepoLabel } from "$lib/utils/forge";
+import type { SkillPolicy, SkillsOverview } from "#lib/api/types.ts";
+import SkillRow from "#lib/components/skill-row/skill-row.svelte";
+import ToggleRow from "#lib/components/toggle-row/toggle-row.svelte";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import * as Field from "#lib/components/ui/field/index.ts";
+import { Switch } from "#lib/components/ui/switch/index.ts";
+import { forgeRepoLabel } from "#lib/utils/forge.ts";
 import ExternalLinkIcon from "@lucide/svelte/icons/external-link";
 import XIcon from "@lucide/svelte/icons/x";
 import { tick } from "svelte";

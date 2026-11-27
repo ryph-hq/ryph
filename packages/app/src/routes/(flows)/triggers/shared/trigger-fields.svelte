@@ -1,14 +1,14 @@
 <script lang="ts">
-import { PRESET_ICONS } from "$lib/automations/preset-icons";
-import { presetById, type PresetId, PRESETS } from "$lib/automations/presets";
-import CopyButton from "$lib/components/copy-button/copy-button.svelte";
-import PickCard from "$lib/components/pick-card/pick-card.svelte";
-import { Badge } from "$lib/components/ui/badge";
-import * as Collapsible from "$lib/components/ui/collapsible";
-import * as Field from "$lib/components/ui/field";
-import { Input } from "$lib/components/ui/input";
-import * as Select from "$lib/components/ui/select";
-import * as ToggleGroup from "$lib/components/ui/toggle-group";
+import { PRESET_ICONS } from "#lib/automations/preset-icons.ts";
+import { presetById, type PresetId, PRESETS } from "#lib/automations/presets.ts";
+import CopyButton from "#lib/components/copy-button/copy-button.svelte";
+import PickCard from "#lib/components/pick-card/pick-card.svelte";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import * as Collapsible from "#lib/components/ui/collapsible/index.ts";
+import * as Field from "#lib/components/ui/field/index.ts";
+import { Input } from "#lib/components/ui/input/index.ts";
+import * as Select from "#lib/components/ui/select/index.ts";
+import * as ToggleGroup from "#lib/components/ui/toggle-group/index.ts";
 import ChevronRightIcon from "@lucide/svelte/icons/chevron-right";
 import ClockIcon from "@lucide/svelte/icons/clock";
 import WebhookIcon from "@lucide/svelte/icons/webhook";

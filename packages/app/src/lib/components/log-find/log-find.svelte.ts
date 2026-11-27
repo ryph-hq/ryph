@@ -1,4 +1,4 @@
-import { logMatchLines, MAX_LOG_MATCHES } from "$lib/utils/checks";
+import { logMatchLines, MAX_LOG_MATCHES } from "#lib/utils/checks.ts";
 
 /**
  * Find in a log: what the find bar holds and where it is in the matches. The log is read through

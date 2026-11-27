@@ -1,10 +1,10 @@
 import { error } from "@sveltejs/kit";
 import type { PageLoad } from "./$types";
-import { browser } from "$app/environment";
-import { ApiError } from "$lib/api/call";
-import { getCheckSuite } from "$lib/api/checks";
-import type { CheckSuiteView } from "$lib/api/types";
-import { shortCommit } from "$lib/utils/environments";
+import { browser } from "$app/env";
+import { ApiError } from "#lib/api/call.ts";
+import { getCheckSuite } from "#lib/api/checks.ts";
+import type { CheckSuiteView } from "#lib/api/types.ts";
+import { shortCommit } from "#lib/utils/environments.ts";
 
 /**
  * The suite this browser last showed, as the page last had it.

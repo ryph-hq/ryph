@@ -1,10 +1,10 @@
 import { redirect } from "@sveltejs/kit";
-import { can } from "$lib/utils/auth/capabilities";
+import { can } from "#lib/utils/auth/capabilities.ts";
 import type { PageLoad } from "./$types";
-import { getEgress } from "$lib/api/egress";
-import { getModelAccess, getPlatformModelPolicyOrNull } from "$lib/api/provider-keys";
-import { getProvidersOrEmpty } from "$lib/api/providers";
-import { getReservedCapacityOrNull } from "$lib/api/reserved-capacity";
+import { getEgress } from "#lib/api/egress.ts";
+import { getModelAccess, getPlatformModelPolicyOrNull } from "#lib/api/provider-keys.ts";
+import { getProvidersOrEmpty } from "#lib/api/providers.ts";
+import { getReservedCapacityOrNull } from "#lib/api/reserved-capacity.ts";
 
 // How the platform itself behaves, for everyone on the instance: the model its background work
 // uses, what runs may reach on the internet, and the room held for runs of each size. That last

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { TranscriptRow } from "$lib/components/run-history/run-history.svelte";
+import type { TranscriptRow } from "#lib/components/run-history/run-history.svelte.ts";
 import { TranscriptArrivals } from "./arrivals";
 
 const at = "2026-10-12T00:00:00Z";

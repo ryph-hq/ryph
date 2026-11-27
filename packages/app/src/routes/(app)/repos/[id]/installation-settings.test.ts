@@ -1,19 +1,19 @@
 import { render } from "svelte/server";
 import { describe, expect, it, vi } from "vitest";
 import type { ComponentProps } from "svelte";
-import type { ConnectedRepo } from "$lib/api/types";
+import type { ConnectedRepo } from "#lib/api/types.ts";
 import { load } from "./+page";
 import Page from "./+page.svelte";
 
-vi.mock("$lib/api/environments", () => ({
+vi.mock("#lib/api/environments.ts", () => ({
   streamEnvironmentDefinition: () => null,
   getEnvironmentOrError: () => Promise.resolve({ environment: null, error: null }),
 }));
-vi.mock("$lib/api/checks", () => ({ streamRepoChecks: () => Promise.resolve(null) }));
-vi.mock("$lib/api/services", () => ({ streamRepoServices: () => Promise.resolve(null) }));
-vi.mock("$lib/api/run-sizes", () => ({ getRunSizesOrNull: () => Promise.resolve(null) }));
-vi.mock("$lib/api/forge", async (original) => ({
-  ...await original<typeof import("$lib/api/forge")>(),
+vi.mock("#lib/api/checks.ts", () => ({ streamRepoChecks: () => Promise.resolve(null) }));
+vi.mock("#lib/api/services.ts", () => ({ streamRepoServices: () => Promise.resolve(null) }));
+vi.mock("#lib/api/run-sizes.ts", () => ({ getRunSizesOrNull: () => Promise.resolve(null) }));
+vi.mock("#lib/api/forge.ts", async (original) => ({
+  ...await original<typeof import("#lib/api/forge.ts")>(),
   getForges: () => Promise.resolve(null),
 }));
 

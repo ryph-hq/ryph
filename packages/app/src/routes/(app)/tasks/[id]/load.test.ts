@@ -3,9 +3,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 // The load remembers, per browser, which task it has already shown once: that is what tells a
 // poll behind an open page apart from a first look at one, and only the first may fail the page.
 // On the server there is no page on screen to keep, so every load there IS a first one.
-vi.mock("$app/environment", () => ({ browser: true, building: false, dev: true, version: "t" }));
-import type { HistoryWindow } from "$lib/api/history";
-import type { RunUsageState } from "$lib/api/model-usage";
+vi.mock("$app/env", () => ({ browser: true, building: false, dev: true, version: "t" }));
+import type { HistoryWindow } from "#lib/api/history.ts";
+import type { RunUsageState } from "#lib/api/model-usage.ts";
 import { hold, type Holding } from "./holding";
 import { load } from "./+page";
 

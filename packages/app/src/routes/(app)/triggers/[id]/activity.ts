@@ -2,7 +2,7 @@
 // is one) and one row per fire that started nothing. The fire log itself is one row per request,
 // so a response that twenty fires joined was twenty identical lines.
 
-import type { AutomationFire, ResponseListItem } from "$lib/api/types";
+import type { AutomationFire, ResponseListItem } from "#lib/api/types.ts";
 
 export type ActivityRow =
   | {

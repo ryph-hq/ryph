@@ -1,5 +1,5 @@
-import { ApiError } from "$lib/api/call";
-import type { Patch, SystemPayload } from "$lib/api/types";
+import { ApiError } from "#lib/api/call.ts";
+import type { Patch, SystemPayload } from "#lib/api/types.ts";
 
 // A patch to a repo on this machine lands as a branch its owner checks out, and git hook files in
 // it run on their computer then. The control plane holds such a patch for a person, whatever the

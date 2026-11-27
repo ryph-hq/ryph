@@ -1,10 +1,10 @@
 <script lang="ts">
-import { invalidateAll } from "$app/navigation";
+import { refreshAll } from "$app/navigation";
 import { page } from "$app/state";
-import { Button } from "$lib/components/ui/button";
-import * as Empty from "$lib/components/ui/empty";
-import { Spinner } from "$lib/components/ui/spinner";
-import { cn } from "$lib/utils";
+import { Button } from "#lib/components/ui/button/index.ts";
+import * as Empty from "#lib/components/ui/empty/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
+import { cn } from "#lib/utils.ts";
 import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
 import CloudOffIcon from "@lucide/svelte/icons/cloud-off";
 import LockIcon from "@lucide/svelte/icons/lock";
@@ -24,8 +24,8 @@ let {
   class?: string;
 } = $props();
 
-// The control plane's own status when a read of it is what failed: the page's is 500 for any
-// error SvelteKit did not throw itself. See `$lib/utils/page-error.ts`.
+// The control plane's own status when a read of it is what failed: `handleError` makes it the
+// page's. See `#lib/utils/page-error.ts`.
 const status = $derived(page.error?.status ?? page.status);
 const message = $derived(page.error?.message ?? "");
 
@@ -79,7 +79,7 @@ let retrying = $state(false);
 async function retry() {
   retrying = true;
   try {
-    await invalidateAll();
+    await refreshAll();
   } finally {
     retrying = false;
   }

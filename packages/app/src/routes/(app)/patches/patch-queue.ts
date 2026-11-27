@@ -6,7 +6,7 @@
 // re-reads every five seconds while anything is advancing, and a merge that compared the head
 // by array identity threw away every page the reader had asked for each time it did.
 
-import type { PatchWithContext } from "$lib/api/types";
+import type { PatchWithContext } from "#lib/api/types.ts";
 
 /** A page of the queue, as `GET /v1/patches` answers it. */
 export interface PatchPageLike {

@@ -1,12 +1,12 @@
 <script lang="ts">
-import FlowStep from "$lib/components/flow-step/flow-step.svelte";
-import { Button } from "$lib/components/ui/button";
-import * as Field from "$lib/components/ui/field";
-import { Input } from "$lib/components/ui/input";
-import { Spinner } from "$lib/components/ui/spinner";
-import { LINK_PROBLEMS } from "$lib/utils/auth/link-problems";
-import ForgeIcon from "$lib/components/forge-icon/forge-icon.svelte";
-import { providerLabel } from "$lib/utils/providers";
+import FlowStep from "#lib/components/flow-step/flow-step.svelte";
+import { Button } from "#lib/components/ui/button/index.ts";
+import * as Field from "#lib/components/ui/field/index.ts";
+import { Input } from "#lib/components/ui/input/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
+import { LINK_PROBLEMS } from "#lib/utils/auth/link-problems.ts";
+import ForgeIcon from "#lib/components/forge-icon/forge-icon.svelte";
+import { providerLabel } from "#lib/utils/providers.ts";
 import ArrowRightIcon from "@lucide/svelte/icons/arrow-right";
 import FingerprintIcon from "@lucide/svelte/icons/scan-face";
 import KeyRoundIcon from "@lucide/svelte/icons/key-round";

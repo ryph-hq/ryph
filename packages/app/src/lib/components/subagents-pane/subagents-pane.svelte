@@ -1,20 +1,20 @@
 <script lang="ts">
-import { getLaneWindow, subscribeRunEvents } from "$lib/api/history";
-import LiveChip from "$lib/components/browser-pane/live-chip.svelte";
-import { RunHistory } from "$lib/components/run-history/run-history.svelte";
-import RunTranscript from "$lib/components/run-transcript/run-transcript.svelte";
-import { Badge } from "$lib/components/ui/badge";
-import { Button } from "$lib/components/ui/button";
-import * as Empty from "$lib/components/ui/empty";
-import { Spinner } from "$lib/components/ui/spinner";
-import { formatDateTime, formatTime } from "$lib/utils/format";
+import { getLaneWindow, subscribeRunEvents } from "#lib/api/history.ts";
+import LiveChip from "#lib/components/browser-pane/live-chip.svelte";
+import { RunHistory } from "#lib/components/run-history/run-history.svelte.ts";
+import RunTranscript from "#lib/components/run-transcript/run-transcript.svelte";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import * as Empty from "#lib/components/ui/empty/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
+import { formatDateTime, formatTime } from "#lib/utils/format.ts";
 import {
   modeLabel,
   pickSubagent,
   type Subagent,
   subagentStatus,
   type SubagentTone,
-} from "$lib/utils/subagents";
+} from "#lib/utils/subagents.ts";
 import BanIcon from "@lucide/svelte/icons/ban";
 import BotIcon from "@lucide/svelte/icons/bot";
 import CircleCheckIcon from "@lucide/svelte/icons/circle-check";

@@ -1,18 +1,18 @@
 <script lang="ts">
-import PageTitle from "$lib/components/page-title/page-title.svelte";
+import PageTitle from "#lib/components/page-title/page-title.svelte";
 import { goto } from "$app/navigation";
 import { navigating } from "$app/state";
-import { costLabel, isIncluded, type UsageReport, type UsageTotals } from "$lib/api/model-usage";
-import { Badge } from "$lib/components/ui/badge";
-import { Button } from "$lib/components/ui/button";
-import * as Card from "$lib/components/ui/card";
-import * as Empty from "$lib/components/ui/empty";
-import * as Table from "$lib/components/ui/table";
-import * as Tabs from "$lib/components/ui/tabs";
-import { formatCount, formatUsd } from "$lib/utils/format";
+import { costLabel, isIncluded, type UsageReport, type UsageTotals } from "#lib/api/model-usage.ts";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import * as Card from "#lib/components/ui/card/index.ts";
+import * as Empty from "#lib/components/ui/empty/index.ts";
+import * as Table from "#lib/components/ui/table/index.ts";
+import * as Tabs from "#lib/components/ui/tabs/index.ts";
+import { formatCount, formatUsd } from "#lib/utils/format.ts";
 import ChartColumnIcon from "@lucide/svelte/icons/chart-column";
 import KeyRoundIcon from "@lucide/svelte/icons/key-round";
-import { AWAITING_PROMPT_LABEL } from "$lib/utils/task-prompt";
+import { AWAITING_PROMPT_LABEL } from "#lib/utils/task-prompt.ts";
 import DailyCostChart from "./daily-cost-chart.svelte";
 import type { PageProps } from "./$types";
 
@@ -105,7 +105,7 @@ const costCell = costLabel;
        page below IS the panel. -->
   <Tabs.Root
     value={String(data.days)}
-    onValueChange={(days) => void goto(`?days=${days}`, { keepFocus: true })}
+    onValueChange={(days) => void goto(`?days=${days}`, { reset: false })}
   >
     <Tabs.List aria-label="Time window">
       {#each WINDOWS as days (days)}

@@ -1,9 +1,9 @@
 import { redirect } from "@sveltejs/kit";
 import type { PageLoad } from "./$types";
-import { getAgents } from "$lib/api/agents";
-import { getChatrooms } from "$lib/api/chatrooms";
-import { getConnectedRepos } from "$lib/api/repos";
-import { getWorkspaces } from "$lib/api/workspaces";
+import { getAgents } from "#lib/api/agents.ts";
+import { getChatrooms } from "#lib/api/chatrooms.ts";
+import { getConnectedRepos } from "#lib/api/repos.ts";
+import { getWorkspaces } from "#lib/api/workspaces.ts";
 
 export const load: PageLoad = async ({ parent, url, fetch }) => {
   const { user } = await parent();

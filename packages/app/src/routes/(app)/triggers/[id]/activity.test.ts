@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { AutomationFire, ResponseListItem } from "$lib/api/types";
+import type { AutomationFire, ResponseListItem } from "#lib/api/types.ts";
 import { activityRows, lasted } from "./activity";
 
 const fire = (id: string, firedAt: string, outcome: string, taskId: string | null = null) =>

@@ -1,6 +1,6 @@
 <script lang="ts">
-import { can } from "$lib/utils/auth/capabilities";
-import PageTitle from "$lib/components/page-title/page-title.svelte";
+import { can } from "#lib/utils/auth/capabilities.ts";
+import PageTitle from "#lib/components/page-title/page-title.svelte";
 import { invalidate } from "$app/navigation";
 import {
   archiveProviderKey,
@@ -8,37 +8,42 @@ import {
   isProviderMissing,
   isSecretRequired,
   updateProviderKey,
-} from "$lib/api/provider-keys";
-import { archiveProvider, createProvider, getProvider, updateProvider } from "$lib/api/providers";
-import { CHATGPT_MANAGE_USAGE_URL, refreshPlanModels } from "$lib/api/chatgpt-plan";
-import type { Provider, ProviderDetail, ProviderKey } from "$lib/api/types";
-import * as Alert from "$lib/components/ui/alert";
-import * as AlertDialog from "$lib/components/ui/alert-dialog";
-import { pageHeader } from "$lib/components/page-header/page-header.svelte";
-import { Badge } from "$lib/components/ui/badge";
-import { Button } from "$lib/components/ui/button";
-import * as Card from "$lib/components/ui/card";
-import * as Dialog from "$lib/components/ui/dialog";
-import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
-import * as Empty from "$lib/components/ui/empty";
-import * as Field from "$lib/components/ui/field";
-import { Input } from "$lib/components/ui/input";
-import { Label } from "$lib/components/ui/label";
-import { Switch } from "$lib/components/ui/switch";
-import ProviderMark from "$lib/components/model-keys/provider-mark.svelte";
-import ChatgptSignInDialog from "$lib/components/model-keys/chatgpt-sign-in-dialog.svelte";
-import EndpointFields from "$lib/components/model-keys/endpoint-fields.svelte";
-import KeySecretFields from "$lib/components/model-keys/key-secret-fields.svelte";
-import { planAccountLine, planStatusBadge } from "$lib/components/model-keys/plan-key";
+} from "#lib/api/provider-keys.ts";
+import {
+  archiveProvider,
+  createProvider,
+  getProvider,
+  updateProvider,
+} from "#lib/api/providers.ts";
+import { CHATGPT_MANAGE_USAGE_URL, refreshPlanModels } from "#lib/api/chatgpt-plan.ts";
+import type { Provider, ProviderDetail, ProviderKey } from "#lib/api/types.ts";
+import * as Alert from "#lib/components/ui/alert/index.ts";
+import * as AlertDialog from "#lib/components/ui/alert-dialog/index.ts";
+import { pageHeader } from "#lib/components/page-header/page-header.svelte.ts";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import * as Card from "#lib/components/ui/card/index.ts";
+import * as Dialog from "#lib/components/ui/dialog/index.ts";
+import * as DropdownMenu from "#lib/components/ui/dropdown-menu/index.ts";
+import * as Empty from "#lib/components/ui/empty/index.ts";
+import * as Field from "#lib/components/ui/field/index.ts";
+import { Input } from "#lib/components/ui/input/index.ts";
+import { Label } from "#lib/components/ui/label/index.ts";
+import { Switch } from "#lib/components/ui/switch/index.ts";
+import ProviderMark from "#lib/components/model-keys/provider-mark.svelte";
+import ChatgptSignInDialog from "#lib/components/model-keys/chatgpt-sign-in-dialog.svelte";
+import EndpointFields from "#lib/components/model-keys/endpoint-fields.svelte";
+import KeySecretFields from "#lib/components/model-keys/key-secret-fields.svelte";
+import { planAccountLine, planStatusBadge } from "#lib/components/model-keys/plan-key.ts";
 import {
   keyProviderOptions,
   planSignInOffered,
   providerOptionLabel,
-} from "$lib/components/model-keys/provider-options";
-import * as Select from "$lib/components/ui/select";
-import { Spinner } from "$lib/components/ui/spinner";
-import * as Table from "$lib/components/ui/table";
-import { formatDateTime } from "$lib/utils/format";
+} from "#lib/components/model-keys/provider-options.ts";
+import * as Select from "#lib/components/ui/select/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
+import * as Table from "#lib/components/ui/table/index.ts";
+import { formatDateTime } from "#lib/utils/format.ts";
 import ArchiveIcon from "@lucide/svelte/icons/archive";
 import CircleAlertIcon from "@lucide/svelte/icons/circle-alert";
 import ExternalLinkIcon from "@lucide/svelte/icons/external-link";
@@ -59,7 +64,7 @@ import {
   type EndpointFormState,
   endpointShapeChanged,
   newEndpointForm,
-} from "$lib/components/model-keys/custom-endpoint-form";
+} from "#lib/components/model-keys/custom-endpoint-form.ts";
 import type { PageProps } from "./$types";
 
 let { data }: PageProps = $props();

@@ -1,19 +1,19 @@
 import { render } from "svelte/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ComponentProps } from "svelte";
-import type { ConnectedRepo, GitlabMode } from "$lib/api/types";
+import type { ConnectedRepo, GitlabMode } from "#lib/api/types.ts";
 
 const forge = vi.hoisted(() => ({ gitlab: null as GitlabMode | null }));
 
-vi.mock("$lib/api/environments", () => ({
+vi.mock("#lib/api/environments.ts", () => ({
   streamEnvironmentDefinition: () => null,
   getEnvironmentOrError: () => Promise.resolve({ environment: null, error: null }),
 }));
-vi.mock("$lib/api/checks", () => ({ streamRepoChecks: () => Promise.resolve(null) }));
-vi.mock("$lib/api/services", () => ({ streamRepoServices: () => Promise.resolve(null) }));
-vi.mock("$lib/api/run-sizes", () => ({ getRunSizesOrNull: () => Promise.resolve(null) }));
-vi.mock("$lib/api/forge", async (original) => ({
-  ...await original<typeof import("$lib/api/forge")>(),
+vi.mock("#lib/api/checks.ts", () => ({ streamRepoChecks: () => Promise.resolve(null) }));
+vi.mock("#lib/api/services.ts", () => ({ streamRepoServices: () => Promise.resolve(null) }));
+vi.mock("#lib/api/run-sizes.ts", () => ({ getRunSizesOrNull: () => Promise.resolve(null) }));
+vi.mock("#lib/api/forge.ts", async (original) => ({
+  ...await original<typeof import("#lib/api/forge.ts")>(),
   getForges: () =>
     Promise.resolve({
       providers: forge.gitlab ? ["gitlab"] : [],
@@ -25,7 +25,7 @@ vi.mock("$lib/api/forge", async (original) => ({
 const { load } = await import("./+page");
 const { default: Page } = await import("./+page.svelte");
 const { default: HookPanel } = await import(
-  "$lib/components/gitlab-hook/gitlab-hook-panel.svelte"
+  "#lib/components/gitlab-hook/gitlab-hook-panel.svelte"
 );
 
 const repo: ConnectedRepo = {

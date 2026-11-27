@@ -1,8 +1,8 @@
 import { redirect } from "@sveltejs/kit";
-import { can } from "$lib/utils/auth/capabilities";
+import { can } from "#lib/utils/auth/capabilities.ts";
 import type { PageLoad } from "./$types";
-import { getConnectedRepos } from "$lib/api/repos";
-import { getSkills } from "$lib/api/skills";
+import { getConnectedRepos } from "#lib/api/repos.ts";
+import { getSkills } from "#lib/api/skills.ts";
 
 // Every member reads what skills the deployment's runs get; only an admin changes it, and only an
 // admin needs the connected repos, to pick the org skills repo from.

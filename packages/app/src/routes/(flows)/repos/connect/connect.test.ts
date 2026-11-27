@@ -1,6 +1,6 @@
 import { isRedirect } from "@sveltejs/kit";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ForgeProvider, GithubMode, GitlabMode, RadicleMode } from "$lib/api/types";
+import type { ForgeProvider, GithubMode, GitlabMode, RadicleMode } from "#lib/api/types.ts";
 
 const providers = vi.hoisted(() => ({
   current: [] as ForgeProvider[] | null,
@@ -9,8 +9,8 @@ const providers = vi.hoisted(() => ({
   radicle: null as RadicleMode | null,
 }));
 
-vi.mock("$lib/api/forge", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("$lib/api/forge")>()),
+vi.mock("#lib/api/forge.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("#lib/api/forge.ts")>()),
   getForges: () =>
     providers.current === null ? Promise.reject(new Error("forge unreachable")) : Promise.resolve({
       providers: providers.current,
@@ -21,8 +21,8 @@ vi.mock("$lib/api/forge", async (importOriginal) => ({
 }));
 const installationRepos = vi.hoisted(() => ({ status: 200 }));
 
-vi.mock("$lib/api/repos", async () => {
-  const { ApiError } = await import("$lib/api/call");
+vi.mock("#lib/api/repos.ts", async () => {
+  const { ApiError } = await import("#lib/api/call.ts");
   return {
     getInstallations: () => Promise.resolve([]),
     getInstallationRepos: () =>

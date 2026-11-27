@@ -3,7 +3,7 @@ import {
   ensureFreshSessionResult,
   renewSessionResult,
   type SessionReadiness,
-} from "$lib/utils/auth/auth";
+} from "#lib/utils/auth/auth.ts";
 import { apiCall } from "./call";
 import { whileVisible } from "./visible-stream";
 import {

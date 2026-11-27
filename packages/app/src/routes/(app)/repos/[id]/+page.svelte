@@ -1,12 +1,12 @@
 <script lang="ts">
-import { can } from "$lib/utils/auth/capabilities";
-import ObjectHeader from "$lib/components/object-header/object-header.svelte";
-import RepoChecksPanel from "$lib/components/repo-checks-panel/repo-checks-panel.svelte";
-import RepoServicesPanel from "$lib/components/repo-services-panel/repo-services-panel.svelte";
-import AsyncPanel from "$lib/components/async-panel/async-panel.svelte";
+import { can } from "#lib/utils/auth/capabilities.ts";
+import ObjectHeader from "#lib/components/object-header/object-header.svelte";
+import RepoChecksPanel from "#lib/components/repo-checks-panel/repo-checks-panel.svelte";
+import RepoServicesPanel from "#lib/components/repo-services-panel/repo-services-panel.svelte";
+import AsyncPanel from "#lib/components/async-panel/async-panel.svelte";
 import { goto, invalidate } from "$app/navigation";
-import { isWebLink } from "$lib/api/forge";
-import { ApiError } from "$lib/api/call";
+import { isWebLink } from "#lib/api/forge.ts";
+import { ApiError } from "#lib/api/call.ts";
 import {
   addCommandAllowlistEntry,
   archiveConnectedRepo,
@@ -14,29 +14,29 @@ import {
   type GitlabHookStatus,
   removeCommandAllowlistEntry,
   updateConnectedRepo,
-} from "$lib/api/repos";
-import type { CommandAllowlistEntry, SubmissionPolicy } from "$lib/api/types";
-import CommandBlock from "$lib/components/command-block/command-block.svelte";
-import CopyButton from "$lib/components/copy-button/copy-button.svelte";
-import EnvironmentPanel from "$lib/components/environment-panel/environment-panel.svelte";
-import ForgeIcon from "$lib/components/forge-icon/forge-icon.svelte";
-import GitlabHookPanel from "$lib/components/gitlab-hook/gitlab-hook-panel.svelte";
-import SettingsSection from "$lib/components/settings-section/settings-section.svelte";
-import SizeClassSelect from "$lib/components/size-class-select/size-class-select.svelte";
-import * as Alert from "$lib/components/ui/alert";
-import * as AlertDialog from "$lib/components/ui/alert-dialog";
-import { Badge } from "$lib/components/ui/badge";
-import { Button } from "$lib/components/ui/button";
-import * as Field from "$lib/components/ui/field";
-import { Input } from "$lib/components/ui/input";
-import { Label } from "$lib/components/ui/label";
-import { Separator } from "$lib/components/ui/separator";
-import { Spinner } from "$lib/components/ui/spinner";
-import { Switch } from "$lib/components/ui/switch";
-import * as ToggleGroup from "$lib/components/ui/toggle-group";
-import { formatDateTime } from "$lib/utils/format";
-import { changeRequestNoun, isDid, localRepoName, shortenDid } from "$lib/utils/forge";
-import { gitlabProjectPage } from "$lib/utils/gitlab";
+} from "#lib/api/repos.ts";
+import type { CommandAllowlistEntry, SubmissionPolicy } from "#lib/api/types.ts";
+import CommandBlock from "#lib/components/command-block/command-block.svelte";
+import CopyButton from "#lib/components/copy-button/copy-button.svelte";
+import EnvironmentPanel from "#lib/components/environment-panel/environment-panel.svelte";
+import ForgeIcon from "#lib/components/forge-icon/forge-icon.svelte";
+import GitlabHookPanel from "#lib/components/gitlab-hook/gitlab-hook-panel.svelte";
+import SettingsSection from "#lib/components/settings-section/settings-section.svelte";
+import SizeClassSelect from "#lib/components/size-class-select/size-class-select.svelte";
+import * as Alert from "#lib/components/ui/alert/index.ts";
+import * as AlertDialog from "#lib/components/ui/alert-dialog/index.ts";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import * as Field from "#lib/components/ui/field/index.ts";
+import { Input } from "#lib/components/ui/input/index.ts";
+import { Label } from "#lib/components/ui/label/index.ts";
+import { Separator } from "#lib/components/ui/separator/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
+import { Switch } from "#lib/components/ui/switch/index.ts";
+import * as ToggleGroup from "#lib/components/ui/toggle-group/index.ts";
+import { formatDateTime } from "#lib/utils/format.ts";
+import { changeRequestNoun, isDid, localRepoName, shortenDid } from "#lib/utils/forge.ts";
+import { gitlabProjectPage } from "#lib/utils/gitlab.ts";
 import ExternalLinkIcon from "@lucide/svelte/icons/external-link";
 import EyeIcon from "@lucide/svelte/icons/eye";
 import GitBranchIcon from "@lucide/svelte/icons/git-branch";
@@ -204,7 +204,7 @@ async function disconnect() {
   try {
     await archiveConnectedRepo(fetch, repo.id);
     toast.success(`Disconnected ${title}`);
-    await goto("/repos", { invalidateAll: true });
+    await goto("/repos", { refreshAll: true });
   } catch (e) {
     toast.error(e instanceof Error ? e.message : "Failed to disconnect the repository");
     disconnecting = false;

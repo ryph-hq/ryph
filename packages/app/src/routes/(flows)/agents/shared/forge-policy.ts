@@ -11,9 +11,9 @@ import {
   MAX_FORGE_CAP,
   type McpServer,
   PLATFORM_FORGE_SERVER_ID,
-} from "$lib/api/types";
-import type { ToolAccessState } from "$lib/api/mcp-servers";
-import { forgeRepoLabel } from "$lib/utils/forge";
+} from "#lib/api/types.ts";
+import type { ToolAccessState } from "#lib/api/mcp-servers.ts";
+import { forgeRepoLabel } from "#lib/utils/forge.ts";
 
 /** The orchestrator's ceilings on a policy's two lists. */
 export const MAX_FORGE_REPOS = 20;

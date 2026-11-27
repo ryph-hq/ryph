@@ -3,7 +3,7 @@
 // is OFF, so the form edits a copy of the policy itself: there is nothing to translate, only the
 // defaults to tell apart from a choice.
 
-import { DEFAULT_SKILL_POLICY, type SkillPolicy, type SkillsOverview } from "$lib/api/types";
+import { DEFAULT_SKILL_POLICY, type SkillPolicy, type SkillsOverview } from "#lib/api/types.ts";
 
 /** The form's copy of a policy: the stored one, or the defaults for an agent that has none. */
 export function skillPolicyToFields(policy: SkillPolicy | null): SkillPolicy {

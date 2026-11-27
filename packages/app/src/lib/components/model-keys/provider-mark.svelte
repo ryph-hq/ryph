@@ -1,5 +1,5 @@
 <script lang="ts">
-import { cn } from "$lib/utils";
+import { cn } from "#lib/utils.ts";
 
 let { provider, label, class: className }: { provider: string; label: string; class?: string } =
   $props();

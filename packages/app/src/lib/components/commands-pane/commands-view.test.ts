@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { BackgroundJob, CommandsMessage } from "$lib/api/background";
+import type { BackgroundJob, CommandsMessage } from "#lib/api/background.ts";
 import { CommandsState } from "./commands-state.svelte";
 import {
   applyCommandsEvent,

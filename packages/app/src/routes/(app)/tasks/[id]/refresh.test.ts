@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { RUN_REFRESH_MS } from "$lib/utils/run-refresh";
+import { RUN_REFRESH_MS } from "#lib/utils/run-refresh.ts";
 import {
   MOVING_REFRESH_MS,
   refreshCadence,

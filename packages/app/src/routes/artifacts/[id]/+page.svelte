@@ -1,17 +1,17 @@
 <script lang="ts">
 import { goto } from "$app/navigation";
-import { deleteArtifact } from "$lib/api/artifacts";
-import ArtifactFrame from "$lib/components/artifact-frame/artifact-frame.svelte";
-import RyphLogo from "$lib/components/ryph-logo/ryph-logo.svelte";
-import * as AlertDialog from "$lib/components/ui/alert-dialog";
-import { Badge } from "$lib/components/ui/badge";
-import { Button } from "$lib/components/ui/button";
-import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
-import * as Popover from "$lib/components/ui/popover";
-import { Separator } from "$lib/components/ui/separator";
-import { Spinner } from "$lib/components/ui/spinner";
-import { artifactHref } from "$lib/utils/artifacts";
-import { formatDateTime, formatRelativeTime } from "$lib/utils/format";
+import { deleteArtifact } from "#lib/api/artifacts.ts";
+import ArtifactFrame from "#lib/components/artifact-frame/artifact-frame.svelte";
+import RyphLogo from "#lib/components/ryph-logo/ryph-logo.svelte";
+import * as AlertDialog from "#lib/components/ui/alert-dialog/index.ts";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import * as DropdownMenu from "#lib/components/ui/dropdown-menu/index.ts";
+import * as Popover from "#lib/components/ui/popover/index.ts";
+import { Separator } from "#lib/components/ui/separator/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
+import { artifactHref } from "#lib/utils/artifacts.ts";
+import { formatDateTime, formatRelativeTime } from "#lib/utils/format.ts";
 import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
 import EllipsisIcon from "@lucide/svelte/icons/ellipsis";
 import HistoryIcon from "@lucide/svelte/icons/history";
@@ -48,8 +48,7 @@ function showVersion(value: string) {
   const n = Number(value);
   if (!Number.isInteger(n) || n === data.version) return;
   void goto(n === latest ? artifactHref(artifact.id) : artifactHref(artifact.id, n), {
-    keepFocus: true,
-    noScroll: true,
+    reset: false,
   });
 }
 

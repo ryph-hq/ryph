@@ -1,5 +1,5 @@
 import { getContext, setContext } from "svelte";
-import type { Subagent } from "$lib/utils/subagents";
+import type { Subagent } from "#lib/utils/subagents.ts";
 
 // The run's subagents as the page holds them, for the transcript: a subagent call, or the notice
 // of one's end, names the subagent as the Subagents tab lists it, and opens it there. A page

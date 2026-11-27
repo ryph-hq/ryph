@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { EgressCeiling } from "$lib/api/types";
+import type { EgressCeiling } from "#lib/api/types.ts";
 import { hostCovered, networkPolicyProblem } from "./network-policy";
-import { hostGrammarProblem } from "$lib/utils/egress-hosts";
+import { hostGrammarProblem } from "#lib/utils/egress-hosts.ts";
 
 const ceiling: EgressCeiling = {
   mode: "proxy",

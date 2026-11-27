@@ -1,36 +1,36 @@
 <script lang="ts">
-import ObjectHeader from "$lib/components/object-header/object-header.svelte";
+import ObjectHeader from "#lib/components/object-header/object-header.svelte";
 import { goto, invalidate } from "$app/navigation";
 import {
   deleteAutomation,
   disableAutomation,
   enableAutomation,
   rotateAutomationSecret,
-} from "$lib/api/automations";
-import { CONVERSATION_NOUN, TERMINAL_RUN_STATES } from "$lib/api/types";
-import { PRESET_ICONS } from "$lib/automations/preset-icons";
+} from "#lib/api/automations.ts";
+import { CONVERSATION_NOUN, TERMINAL_RUN_STATES } from "#lib/api/types.ts";
+import { PRESET_ICONS } from "#lib/automations/preset-icons.ts";
 import {
   awaitingPaste,
   formatLabel,
   presetOfFormat,
   responseSummary,
   secretIsPasted,
-} from "$lib/automations/presets";
-import PasteSecret from "$lib/components/webhook-setup/paste-secret.svelte";
-import WebhookSetup from "$lib/components/webhook-setup/webhook-setup.svelte";
-import RunStateBadge from "$lib/components/run-state-badge/run-state-badge.svelte";
-import { Badge } from "$lib/components/ui/badge";
-import { Button } from "$lib/components/ui/button";
-import * as AlertDialog from "$lib/components/ui/alert-dialog";
-import * as Alert from "$lib/components/ui/alert";
-import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
-import { Spinner } from "$lib/components/ui/spinner";
-import * as Dialog from "$lib/components/ui/dialog";
-import * as Sheet from "$lib/components/ui/sheet";
-import * as Empty from "$lib/components/ui/empty";
-import { formatDateTime, formatRelativeTime } from "$lib/utils/format";
-import { refreshWhileLive } from "$lib/utils/live-refresh.svelte";
-import { forgeRepoLabel } from "$lib/utils/forge";
+} from "#lib/automations/presets.ts";
+import PasteSecret from "#lib/components/webhook-setup/paste-secret.svelte";
+import WebhookSetup from "#lib/components/webhook-setup/webhook-setup.svelte";
+import RunStateBadge from "#lib/components/run-state-badge/run-state-badge.svelte";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import * as AlertDialog from "#lib/components/ui/alert-dialog/index.ts";
+import * as Alert from "#lib/components/ui/alert/index.ts";
+import * as DropdownMenu from "#lib/components/ui/dropdown-menu/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
+import * as Dialog from "#lib/components/ui/dialog/index.ts";
+import * as Sheet from "#lib/components/ui/sheet/index.ts";
+import * as Empty from "#lib/components/ui/empty/index.ts";
+import { formatDateTime, formatRelativeTime } from "#lib/utils/format.ts";
+import { refreshWhileLive } from "#lib/utils/live-refresh.svelte.ts";
+import { forgeRepoLabel } from "#lib/utils/forge.ts";
 import CircleSlashIcon from "@lucide/svelte/icons/circle-slash";
 import ClockIcon from "@lucide/svelte/icons/clock";
 import CopyIcon from "@lucide/svelte/icons/copy";

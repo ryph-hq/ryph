@@ -1,14 +1,14 @@
 import { error } from "@sveltejs/kit";
 import type { PageLoad } from "./$types";
-import { ApiError } from "$lib/api/call";
-import { streamRepoChecks } from "$lib/api/checks";
-import { streamRepoServices } from "$lib/api/services";
-import { getEnvironmentOrError, streamEnvironmentDefinition } from "$lib/api/environments";
-import { getForges, githubUserLogin, radicleUserMode } from "$lib/api/forge";
-import { getCommandAllowlist, getConnectedRepo, getRepoRadicleInfo } from "$lib/api/repos";
-import { getRunSizesOrNull } from "$lib/api/run-sizes";
-import type { CommandAllowlistEntry, RadicleRepoInfo } from "$lib/api/types";
-import { localRepoName, shortenRid } from "$lib/utils/forge";
+import { ApiError } from "#lib/api/call.ts";
+import { streamRepoChecks } from "#lib/api/checks.ts";
+import { streamRepoServices } from "#lib/api/services.ts";
+import { getEnvironmentOrError, streamEnvironmentDefinition } from "#lib/api/environments.ts";
+import { getForges, githubUserLogin, radicleUserMode } from "#lib/api/forge.ts";
+import { getCommandAllowlist, getConnectedRepo, getRepoRadicleInfo } from "#lib/api/repos.ts";
+import { getRunSizesOrNull } from "#lib/api/run-sizes.ts";
+import type { CommandAllowlistEntry, RadicleRepoInfo } from "#lib/api/types.ts";
+import { localRepoName, shortenRid } from "#lib/utils/forge.ts";
 
 export const load: PageLoad = async ({ fetch, params, depends }) => {
   depends("app:repo");

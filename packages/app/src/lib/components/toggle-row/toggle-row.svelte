@@ -1,6 +1,6 @@
 <script lang="ts">
-import { Label } from "$lib/components/ui/label";
-import { Switch } from "$lib/components/ui/switch";
+import { Label } from "#lib/components/ui/label/index.ts";
+import { Switch } from "#lib/components/ui/switch/index.ts";
 import type { Snippet } from "svelte";
 
 // One permission as a row: what it is, a line on what it means, and the switch that grants it.

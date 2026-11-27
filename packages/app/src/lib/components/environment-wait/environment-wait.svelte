@@ -1,11 +1,11 @@
 <script lang="ts">
 import ChevronRightIcon from "@lucide/svelte/icons/chevron-right";
-import type { EnvironmentView } from "$lib/api/types";
-import * as Alert from "$lib/components/ui/alert";
-import { Badge } from "$lib/components/ui/badge";
-import { Button } from "$lib/components/ui/button";
-import { Spinner } from "$lib/components/ui/spinner";
-import { buildKindLabel, buildProgress, environmentStatusLabel } from "$lib/utils/environments";
+import type { EnvironmentView } from "#lib/api/types.ts";
+import * as Alert from "#lib/components/ui/alert/index.ts";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
+import { buildKindLabel, buildProgress, environmentStatusLabel } from "#lib/utils/environments.ts";
 
 let { environmentId, build, now, starting = false, onstart }: {
   environmentId: string;

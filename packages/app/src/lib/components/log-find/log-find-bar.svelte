@@ -1,5 +1,5 @@
 <script lang="ts">
-import * as InputGroup from "$lib/components/ui/input-group";
+import * as InputGroup from "#lib/components/ui/input-group/index.ts";
 import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
 import ChevronUpIcon from "@lucide/svelte/icons/chevron-up";
 import SearchIcon from "@lucide/svelte/icons/search";

@@ -1,9 +1,9 @@
 import { redirect } from "@sveltejs/kit";
-import { can } from "$lib/utils/auth/capabilities";
+import { can } from "#lib/utils/auth/capabilities.ts";
 import type { PageLoad } from "./$types";
-import { listInvites, listUsers } from "$lib/api/admin";
-import { getAuthSettings } from "$lib/api/auth";
-import { listProviders } from "$lib/api/identities";
+import { listInvites, listUsers } from "#lib/api/admin.ts";
+import { getAuthSettings } from "#lib/api/auth.ts";
+import { listProviders } from "#lib/api/identities.ts";
 
 // Everyone on the instance and everyone invited to it: a pending invite is a member who has not
 // joined yet, so the two are one page.

@@ -1,8 +1,8 @@
 // How the memory pages name things a person reads: a subject by its short repo name and forge, a
 // kind or a trust level in words. Pure, so the list and the detail page say the same thing.
 
-import type { ForgeProvider, MemoryKind, MemorySubject, MemoryTrust } from "$lib/api/types";
-import { shortenRid } from "$lib/utils/forge";
+import type { ForgeProvider, MemoryKind, MemorySubject, MemoryTrust } from "#lib/api/types.ts";
+import { shortenRid } from "#lib/utils/forge.ts";
 
 /** The host of a GitLab instance URL, lowercased as the service spells it, or null. */
 export function gitlabHostOf(url: string | null | undefined): string | null {

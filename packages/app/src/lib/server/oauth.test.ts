@@ -1,8 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const publicEnv = vi.hoisted(() => ({ env: {} as Record<string, string | undefined> }));
-vi.mock("$env/dynamic/public", () => publicEnv);
-vi.mock("$env/dynamic/private", () => ({ env: {} }));
+vi.mock(
+  "$app/env/public",
+  async () => (await import("#lib/testing/env-mock.ts")).envMock(() => publicEnv.env),
+);
+vi.mock("$app/env/private", async () => (await import("#lib/testing/env-mock.ts")).envMock({}));
 
 const { authorizeUrl, beginOAuth, endOAuth, OAUTH_STATE_COOKIE, pkcePair } = await import(
   "./oauth"

@@ -1,9 +1,9 @@
 import { redirect } from "@sveltejs/kit";
-import { ApiError } from "$lib/api/call";
+import { ApiError } from "#lib/api/call.ts";
 import type { PageLoad } from "./$types";
-import { getForges, githubUserLogin, radicleUserMode } from "$lib/api/forge";
-import { getInstallationRepos, getInstallations } from "$lib/api/repos";
-import { safeBackTo, withBackTo } from "$lib/utils/safe-path";
+import { getForges, githubUserLogin, radicleUserMode } from "#lib/api/forge.ts";
+import { getInstallationRepos, getInstallations } from "#lib/api/repos.ts";
+import { safeBackTo, withBackTo } from "#lib/utils/safe-path.ts";
 
 export const load: PageLoad = async ({ parent, url, fetch }) => {
   const { user } = await parent();

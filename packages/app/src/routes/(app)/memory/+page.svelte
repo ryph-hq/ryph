@@ -1,7 +1,7 @@
 <script lang="ts">
-import { can } from "$lib/utils/auth/capabilities";
+import { can } from "#lib/utils/auth/capabilities.ts";
 import { page } from "$app/state";
-import PageTitle from "$lib/components/page-title/page-title.svelte";
+import PageTitle from "#lib/components/page-title/page-title.svelte";
 import { goto, invalidate } from "$app/navigation";
 import {
   acceptMemoryProposal,
@@ -10,7 +10,7 @@ import {
   getMemories,
   rejectMemoryProposal,
   resolveMemoryProposals,
-} from "$lib/api/memory";
+} from "#lib/api/memory.ts";
 import {
   type Memory,
   type MemoryKind,
@@ -20,22 +20,22 @@ import {
   type MemorySubject,
   memorySubjectKey,
   memoryTrustSchema,
-} from "$lib/api/types";
-import { SubjectPicker } from "$lib/components/subject-picker";
-import { Badge } from "$lib/components/ui/badge";
-import { Button } from "$lib/components/ui/button";
-import { Checkbox } from "$lib/components/ui/checkbox";
-import * as Dialog from "$lib/components/ui/dialog";
-import * as Empty from "$lib/components/ui/empty";
-import * as Field from "$lib/components/ui/field";
-import * as InputGroup from "$lib/components/ui/input-group";
-import { Label } from "$lib/components/ui/label";
-import * as Select from "$lib/components/ui/select";
-import { Spinner } from "$lib/components/ui/spinner";
-import * as Tabs from "$lib/components/ui/tabs";
-import { Textarea } from "$lib/components/ui/textarea";
-import AgentAvatar from "$lib/components/agent-avatar/agent-avatar.svelte";
-import ForgeIcon from "$lib/components/forge-icon/forge-icon.svelte";
+} from "#lib/api/types.ts";
+import { SubjectPicker } from "#lib/components/subject-picker/index.ts";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import { Checkbox } from "#lib/components/ui/checkbox/index.ts";
+import * as Dialog from "#lib/components/ui/dialog/index.ts";
+import * as Empty from "#lib/components/ui/empty/index.ts";
+import * as Field from "#lib/components/ui/field/index.ts";
+import * as InputGroup from "#lib/components/ui/input-group/index.ts";
+import { Label } from "#lib/components/ui/label/index.ts";
+import * as Select from "#lib/components/ui/select/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
+import * as Tabs from "#lib/components/ui/tabs/index.ts";
+import { Textarea } from "#lib/components/ui/textarea/index.ts";
+import AgentAvatar from "#lib/components/agent-avatar/agent-avatar.svelte";
+import ForgeIcon from "#lib/components/forge-icon/forge-icon.svelte";
 import BuildingIcon from "@lucide/svelte/icons/building-2";
 import PencilIcon from "@lucide/svelte/icons/pencil";
 import PinIcon from "@lucide/svelte/icons/pin";
@@ -61,7 +61,7 @@ const canManage = $derived(can(data.user, "memory:manage"));
 // ── filters ─────────────────────────────────────────────────────────────────────────────────
 
 // The form's own copy of the URL's filters: typed into, then pushed back as a navigation so a
-// filtered view stays a link. `keepFocus` so the search box does not lose the cursor mid-word.
+// filtered view stays a link. `reset: false` so the search box does not lose the cursor mid-word.
 // Seeded once from the load and re-seeded by the effect below on every navigation.
 // svelte-ignore state_referenced_locally
 let filters = $state<BrowseFilters>({ ...data.filters });
@@ -70,7 +70,7 @@ $effect(() => {
 });
 
 async function applyFilters() {
-  await goto(`/memory${filtersToSearch(filters)}`, { keepFocus: true });
+  await goto(`/memory${filtersToSearch(filters)}`, { reset: false });
 }
 
 function onSearch(event: SubmitEvent) {

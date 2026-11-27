@@ -1,12 +1,12 @@
 import { SvelteSet } from "svelte/reactivity";
-import { type ContextUsage, contextUsageOf } from "$lib/components/run-context/context-usage";
-import { getRunEventsBefore, type HistoryPage, type HistoryWindow } from "$lib/api/history";
-import { mergeToolCalls, type ToolCall, workspaceRootOf } from "$lib/api/tools";
-import type { HistoryEvent, RunEvent, RunMessage, RunnerResult } from "$lib/api/types";
-import { type BackgroundNotice, backgroundNoticeOf } from "$lib/utils/background";
-import { isInboxDelivery } from "$lib/utils/run-refresh";
-import { type SubagentNotice, subagentNoticeOf } from "$lib/utils/subagents";
-import { isPlatformInbound } from "$lib/components/run-transcript/platform-notice";
+import { type ContextUsage, contextUsageOf } from "#lib/components/run-context/context-usage.ts";
+import { getRunEventsBefore, type HistoryPage, type HistoryWindow } from "#lib/api/history.ts";
+import { mergeToolCalls, type ToolCall, workspaceRootOf } from "#lib/api/tools.ts";
+import type { HistoryEvent, RunEvent, RunMessage, RunnerResult } from "#lib/api/types.ts";
+import { type BackgroundNotice, backgroundNoticeOf } from "#lib/utils/background.ts";
+import { isInboxDelivery } from "#lib/utils/run-refresh.ts";
+import { type SubagentNotice, subagentNoticeOf } from "#lib/utils/subagents.ts";
+import { isPlatformInbound } from "#lib/components/run-transcript/platform-notice.ts";
 
 /** How many events one scroll upwards asks for. */
 export const OLDER_PAGE = 200;

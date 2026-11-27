@@ -1,10 +1,10 @@
 import type { PageLoad } from "./$types";
-import { getAgents } from "$lib/api/agents";
-import { getLimitsOrNull } from "$lib/api/limits";
-import { getModelAccess } from "$lib/api/provider-keys";
-import { getProvidersOrEmpty } from "$lib/api/providers";
-import { getConnectedRepos, getRepoRadicleInfo } from "$lib/api/repos";
-import { getWorkspaces } from "$lib/api/workspaces";
+import { getAgents } from "#lib/api/agents.ts";
+import { getLimitsOrNull } from "#lib/api/limits.ts";
+import { getModelAccess } from "#lib/api/provider-keys.ts";
+import { getProvidersOrEmpty } from "#lib/api/providers.ts";
+import { getConnectedRepos, getRepoRadicleInfo } from "#lib/api/repos.ts";
+import { getWorkspaces } from "#lib/api/workspaces.ts";
 
 export const load: PageLoad = async ({ fetch }) => {
   const [agents, repos, workspaces, limits, providers, providerKeys] = await Promise.all([

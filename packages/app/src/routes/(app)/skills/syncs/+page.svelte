@@ -1,16 +1,16 @@
 <script lang="ts">
-import { getSkillSyncs } from "$lib/api/skills";
-import type { SkillSync } from "$lib/api/types";
-import ForgeRepoLabel from "$lib/components/forge-repo-label/forge-repo-label.svelte";
-import PageTitle from "$lib/components/page-title/page-title.svelte";
-import { Badge } from "$lib/components/ui/badge";
-import { Button } from "$lib/components/ui/button";
-import * as Collapsible from "$lib/components/ui/collapsible";
-import * as Empty from "$lib/components/ui/empty";
-import { Spinner } from "$lib/components/ui/spinner";
-import { shortCommit } from "$lib/utils/environments";
-import { formatDateTime, formatRelativeTime } from "$lib/utils/format";
-import { commitUrl, skillCount, SYNC_TRIGGER_LABEL, syncFailureTitle } from "$lib/utils/skills";
+import { getSkillSyncs } from "#lib/api/skills.ts";
+import type { SkillSync } from "#lib/api/types.ts";
+import ForgeRepoLabel from "#lib/components/forge-repo-label/forge-repo-label.svelte";
+import PageTitle from "#lib/components/page-title/page-title.svelte";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import * as Collapsible from "#lib/components/ui/collapsible/index.ts";
+import * as Empty from "#lib/components/ui/empty/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
+import { shortCommit } from "#lib/utils/environments.ts";
+import { formatDateTime, formatRelativeTime } from "#lib/utils/format.ts";
+import { commitUrl, skillCount, SYNC_TRIGGER_LABEL, syncFailureTitle } from "#lib/utils/skills.ts";
 import ChevronRightIcon from "@lucide/svelte/icons/chevron-right";
 import GitBranchIcon from "@lucide/svelte/icons/git-branch";
 import HistoryIcon from "@lucide/svelte/icons/history";

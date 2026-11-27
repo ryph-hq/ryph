@@ -1,16 +1,16 @@
 <script lang="ts">
 import { page } from "$app/state";
-import SkillFacts, { type ExtraFact } from "$lib/components/skill-facts/skill-facts.svelte";
-import SkillFiles from "$lib/components/skill-files/skill-files.svelte";
-import SkillExamplePrompt from "$lib/components/skill-header/skill-example-prompt.svelte";
-import SkillHeader from "$lib/components/skill-header/skill-header.svelte";
-import * as Alert from "$lib/components/ui/alert";
-import { Badge } from "$lib/components/ui/badge";
-import { Button } from "$lib/components/ui/button";
-import { shortCommit } from "$lib/utils/environments";
-import { formatDateTime } from "$lib/utils/format";
-import { presentationFacts, skillTitle } from "$lib/utils/skill-presentation";
-import { commitUrl, shortDigest, skillDirUrl } from "$lib/utils/skills";
+import SkillFacts, { type ExtraFact } from "#lib/components/skill-facts/skill-facts.svelte";
+import SkillFiles from "#lib/components/skill-files/skill-files.svelte";
+import SkillExamplePrompt from "#lib/components/skill-header/skill-example-prompt.svelte";
+import SkillHeader from "#lib/components/skill-header/skill-header.svelte";
+import * as Alert from "#lib/components/ui/alert/index.ts";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import { shortCommit } from "#lib/utils/environments.ts";
+import { formatDateTime } from "#lib/utils/format.ts";
+import { presentationFacts, skillTitle } from "#lib/utils/skill-presentation.ts";
+import { commitUrl, shortDigest, skillDirUrl } from "#lib/utils/skills.ts";
 import ExternalLinkIcon from "@lucide/svelte/icons/external-link";
 import TriangleAlertIcon from "@lucide/svelte/icons/triangle-alert";
 import type { PageProps } from "./$types";

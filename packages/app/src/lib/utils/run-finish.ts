@@ -6,7 +6,7 @@
 // subagent or an answer, or still fixing a failed check): the work is not done, so Finish stays
 // hidden and Cancel stays on screen. The orchestrator refuses that finish too.
 
-import type { TaskRun } from "$lib/api/types";
+import type { TaskRun } from "#lib/api/types.ts";
 
 type FinishFacts = Pick<TaskRun, "phase" | "declaredOutcome" | "agentFinished" | "desiredState">;
 

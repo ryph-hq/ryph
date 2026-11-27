@@ -1,7 +1,7 @@
 import { redirect } from "@sveltejs/kit";
-import { can } from "$lib/utils/auth/capabilities";
+import { can } from "#lib/utils/auth/capabilities.ts";
 import type { PageLoad } from "./$types";
-import { getChatrooms } from "$lib/api/chatrooms";
+import { getChatrooms } from "#lib/api/chatrooms.ts";
 
 export const load: PageLoad = async ({ fetch, depends, parent }) => {
   // Listing chatrooms takes `chat:read`; the nav hides the page from everyone else, and a typed

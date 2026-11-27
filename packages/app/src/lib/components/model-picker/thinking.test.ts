@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type DeclaredModel, type Provider, THINKING_LEVELS } from "$lib/api/types";
+import { type DeclaredModel, type Provider, THINKING_LEVELS } from "#lib/api/types.ts";
 import { declaredToPi } from "./models";
 import {
   offersThinking,

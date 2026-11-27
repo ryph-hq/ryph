@@ -1,6 +1,6 @@
 <script lang="ts">
-import { agentAvatarUri } from "$lib/utils/avatar";
-import { cn } from "$lib/utils";
+import { agentAvatarUri } from "#lib/utils/avatar.ts";
+import { cn } from "#lib/utils.ts";
 
 let {
   agentId,

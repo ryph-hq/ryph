@@ -5,7 +5,7 @@ import { cubicOut } from "svelte/easing";
 import { prefersReducedMotion } from "svelte/motion";
 import { page } from "$app/state";
 import { untrack } from "svelte";
-import * as Sheet from "$lib/components/ui/sheet";
+import * as Sheet from "#lib/components/ui/sheet/index.ts";
 import { DETAILS_PANE_MIN, detailsPane } from "./details-pane.svelte";
 
 let {

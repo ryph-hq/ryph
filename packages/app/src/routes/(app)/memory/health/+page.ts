@@ -1,5 +1,5 @@
 import type { PageLoad } from "./$types";
-import { getMemoryHealth } from "$lib/api/memory";
+import { getMemoryHealth } from "#lib/api/memory.ts";
 
 export const load: PageLoad = async ({ fetch, depends }) => {
   depends("app:memory");

@@ -1,9 +1,9 @@
 <script lang="ts">
-import type { CheckResultState, CheckSuiteState } from "$lib/api/types";
-import { Badge } from "$lib/components/ui/badge";
-import { TONES } from "$lib/components/ui/badge/tones";
-import { Spinner } from "$lib/components/ui/spinner";
-import { checkStateLabel, checkTone } from "$lib/utils/checks";
+import type { CheckResultState, CheckSuiteState } from "#lib/api/types.ts";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import { TONES } from "#lib/components/ui/badge/tones.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
+import { checkStateLabel, checkTone } from "#lib/utils/checks.ts";
 import BanIcon from "@lucide/svelte/icons/ban";
 import CheckIcon from "@lucide/svelte/icons/check";
 import ClockIcon from "@lucide/svelte/icons/clock";

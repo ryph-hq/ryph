@@ -1,6 +1,6 @@
 <script lang="ts">
-import JumpToBottom from "$lib/components/run-transcript/jump-to-bottom.svelte";
-import type { JobTone } from "$lib/utils/background";
+import JumpToBottom from "#lib/components/run-transcript/jump-to-bottom.svelte";
+import type { JobTone } from "#lib/utils/background.ts";
 import type { Snippet } from "svelte";
 import type { OutputBuffer } from "./commands-view";
 import { type LinesChange, lineTone, type OutputLine, OutputLines } from "./output-lines";

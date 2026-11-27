@@ -1,8 +1,8 @@
 import { error, redirect } from "@sveltejs/kit";
-import { can } from "$lib/utils/auth/capabilities";
+import { can } from "#lib/utils/auth/capabilities.ts";
 import type { PageLoad } from "./$types";
-import { ApiError } from "$lib/api/call";
-import { getOrgSkill, getSkillBundle, getSkills } from "$lib/api/skills";
+import { ApiError } from "#lib/api/call.ts";
+import { getOrgSkill, getSkillBundle, getSkills } from "#lib/api/skills.ts";
 
 /**
  * One skill of the org skills repo: the version agents get now, its files, and the versions

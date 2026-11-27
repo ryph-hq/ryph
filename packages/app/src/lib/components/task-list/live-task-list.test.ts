@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { TaskPage, TaskSummary } from "$lib/api/types";
+import type { TaskPage, TaskSummary } from "#lib/api/types.ts";
 import { LiveTaskList } from "./live-task-list.svelte";
-import { subscribeTasks } from "$lib/api/tasks";
+import { subscribeTasks } from "#lib/api/tasks.ts";
 
-vi.mock("$lib/api/tasks", async (original) => ({
-  ...await original<typeof import("$lib/api/tasks")>(),
+vi.mock("#lib/api/tasks.ts", async (original) => ({
+  ...await original<typeof import("#lib/api/tasks.ts")>(),
   subscribeTasks: vi.fn(),
 }));
 

@@ -1,4 +1,4 @@
-import type { RunSize } from "$lib/api/types";
+import type { RunSize } from "#lib/api/types.ts";
 
 /**
  * One class's quantities in words, for the option list and the hint under it:

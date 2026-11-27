@@ -1,6 +1,6 @@
 import type { RequestHandler } from "@sveltejs/kit";
-import { go, openPreview } from "$lib/server/preview-open";
-import { PREVIEW_ID, RUN_ID, taskPath } from "$lib/utils/previews";
+import { go, openPreview } from "#lib/server/preview-open.ts";
+import { PREVIEW_ID, RUN_ID, taskPath } from "#lib/utils/previews.ts";
 
 /**
  * Opens a run's preview: `/previews/<runId>/<previewId>`, from the run page's open actions.

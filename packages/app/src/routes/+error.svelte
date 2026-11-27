@@ -1,8 +1,8 @@
 <script lang="ts">
 import { page } from "$app/state";
-import ErrorState from "$lib/components/error-state/error-state.svelte";
-import RyphLogo from "$lib/components/ryph-logo/ryph-logo.svelte";
-import { scopeFor } from "$lib/utils/page-error";
+import ErrorState from "#lib/components/error-state/error-state.svelte";
+import RyphLogo from "#lib/components/ryph-logo/ryph-logo.svelte";
+import { scopeFor } from "#lib/utils/page-error.ts";
 
 // Only what no group's boundary caught lands here: a path no route matches, or a failure in a
 // layout above the groups. Neither has a shell to keep, so this draws the flows' bare frame.

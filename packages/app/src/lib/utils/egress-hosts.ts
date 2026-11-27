@@ -1,7 +1,7 @@
 // The two host rules every egress form needs: how a typed list becomes hostnames, and why one
 // of them is not a hostname at all.
 //
-// Lives in $lib rather than beside one form because there are two — an agent narrowing what it
+// Lives in #lib rather than beside one form because there are two — an agent narrowing what it
 // may reach, and an admin setting what this deployment allows at all — and they have to judge a
 // hostname identically. A form that judged it differently from the API would submit an entry the
 // API then refuses with a zod 400, which surfaces as a generic "something went wrong" rather

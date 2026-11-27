@@ -4,9 +4,9 @@
   guess is fixed the way it was made. Any spelling of the URL; the service stores it canonical.
 -->
 <script lang="ts">
-import * as Field from "$lib/components/ui/field";
-import { Input } from "$lib/components/ui/input";
-import * as Select from "$lib/components/ui/select";
+import * as Field from "#lib/components/ui/field/index.ts";
+import { Input } from "#lib/components/ui/input/index.ts";
+import * as Select from "#lib/components/ui/select/index.ts";
 
 let {
   id,

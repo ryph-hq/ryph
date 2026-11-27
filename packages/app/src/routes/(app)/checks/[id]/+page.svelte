@@ -1,22 +1,22 @@
 <script lang="ts">
-import { goto, invalidate, replaceState } from "$app/navigation";
+import { goto, invalidate } from "$app/navigation";
 import { page } from "$app/state";
-import { checkLogHref, getCheckLog, rerunCheckSuite } from "$lib/api/checks";
-import type { CheckView } from "$lib/api/types";
-import CheckStateBadge from "$lib/components/check-state-badge/check-state-badge.svelte";
-import CheckStateIcon from "$lib/components/check-state-icon/check-state-icon.svelte";
-import CopyButton from "$lib/components/copy-button/copy-button.svelte";
-import LogFindBar from "$lib/components/log-find/log-find-bar.svelte";
-import { LogFind } from "$lib/components/log-find/log-find.svelte";
-import LogView from "$lib/components/log-view/log-view.svelte";
-import PageTitle from "$lib/components/page-title/page-title.svelte";
-import { Badge } from "$lib/components/ui/badge";
-import { Button } from "$lib/components/ui/button";
-import * as Empty from "$lib/components/ui/empty";
-import { Separator } from "$lib/components/ui/separator";
-import { Spinner } from "$lib/components/ui/spinner";
-import { Toggle } from "$lib/components/ui/toggle";
-import { can } from "$lib/utils/auth/capabilities";
+import { checkLogHref, getCheckLog, rerunCheckSuite } from "#lib/api/checks.ts";
+import type { CheckView } from "#lib/api/types.ts";
+import CheckStateBadge from "#lib/components/check-state-badge/check-state-badge.svelte";
+import CheckStateIcon from "#lib/components/check-state-icon/check-state-icon.svelte";
+import CopyButton from "#lib/components/copy-button/copy-button.svelte";
+import LogFindBar from "#lib/components/log-find/log-find-bar.svelte";
+import { LogFind } from "#lib/components/log-find/log-find.svelte.ts";
+import LogView from "#lib/components/log-view/log-view.svelte";
+import PageTitle from "#lib/components/page-title/page-title.svelte";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import * as Empty from "#lib/components/ui/empty/index.ts";
+import { Separator } from "#lib/components/ui/separator/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
+import { Toggle } from "#lib/components/ui/toggle/index.ts";
+import { can } from "#lib/utils/auth/capabilities.ts";
 import {
   canRerunSuite,
   checkDurationMs,
@@ -30,12 +30,12 @@ import {
   suiteImageLabel,
   timeoutLabel,
   watchedChange,
-} from "$lib/utils/checks";
-import { shortCommit } from "$lib/utils/environments";
-import { forgeRepoLabel, localRepoName, providerOfRepoRef } from "$lib/utils/forge";
-import { formatDateTime, formatElapsed } from "$lib/utils/format";
-import { liveClock } from "$lib/utils/live-clock.svelte";
-import { refreshWhileLive } from "$lib/utils/live-refresh.svelte.js";
+} from "#lib/utils/checks.ts";
+import { shortCommit } from "#lib/utils/environments.ts";
+import { forgeRepoLabel, localRepoName, providerOfRepoRef } from "#lib/utils/forge.ts";
+import { formatDateTime, formatElapsed } from "#lib/utils/format.ts";
+import { liveClock } from "#lib/utils/live-clock.svelte.ts";
+import { refreshWhileLive } from "#lib/utils/live-refresh.svelte.ts";
 import ExternalLinkIcon from "@lucide/svelte/icons/external-link";
 import RotateCwIcon from "@lucide/svelte/icons/rotate-cw";
 import ScrollTextIcon from "@lucide/svelte/icons/scroll-text";
@@ -43,7 +43,7 @@ import WrapTextIcon from "@lucide/svelte/icons/wrap-text";
 import { untrack } from "svelte";
 import { toast } from "svelte-sonner";
 import type { PageProps } from "./$types";
-import InheritedBadge from "$lib/components/inherited-badge/inherited-badge.svelte";
+import InheritedBadge from "#lib/components/inherited-badge/inherited-badge.svelte";
 
 let { data }: PageProps = $props();
 
@@ -109,9 +109,9 @@ $effect.pre(() => {
 function select(name: string) {
   named = name;
   find.index = 0;
-  const url = new URL(page.url);
+  const url = new URL(page.url.href);
   url.searchParams.set("check", name);
-  replaceState(url, page.state);
+  void goto(url, { shallow: true, replace: true, state: page.state });
 }
 
 // Whole logs, read when a check is shown and kept per generation: a re-run is new output under

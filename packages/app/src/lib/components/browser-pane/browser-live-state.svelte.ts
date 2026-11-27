@@ -1,4 +1,4 @@
-import type { LiveMessage, LiveSource } from "$lib/api/browser-live";
+import type { LiveMessage, LiveSource } from "#lib/api/browser-live.ts";
 import { applyMessage, type LiveView } from "./live-view";
 
 /**

@@ -44,7 +44,7 @@ for (const { name, signIn } of methods) {
         await signIn(backTo);
 
         expect(invalidate).not.toHaveBeenCalled();
-        expect(goto).toHaveBeenCalledExactlyOnceWith(backTo ?? "/agents", { invalidateAll: true });
+        expect(goto).toHaveBeenCalledExactlyOnceWith(backTo ?? "/agents", { refreshAll: true });
         expect(toast.error).not.toHaveBeenCalled();
       },
     );
@@ -60,7 +60,7 @@ for (const { name, signIn } of methods) {
 
       await signIn(data.backTo);
 
-      expect(goto).toHaveBeenCalledExactlyOnceWith("/settings/profile", { invalidateAll: true });
+      expect(goto).toHaveBeenCalledExactlyOnceWith("/settings/profile", { refreshAll: true });
     });
 
     it("does not navigate when authentication is rejected", async () => {

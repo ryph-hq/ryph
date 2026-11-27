@@ -1,5 +1,5 @@
 import { getContext, setContext } from "svelte";
-import type { BackgroundJob } from "$lib/api/background";
+import type { BackgroundJob } from "#lib/api/background.ts";
 
 // The run's background commands as the page holds them, for the transcript: a background tool
 // call or a job's notice names the job as the Commands tab lists it, and opens it there. A page

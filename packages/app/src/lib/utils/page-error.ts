@@ -1,24 +1,26 @@
-import { ApiError } from "$lib/api/call";
-import { markWelcomeDone } from "$lib/utils/welcome";
+import { ApiError } from "#lib/api/call.ts";
+import { markWelcomeDone } from "#lib/utils/welcome.ts";
 
 /**
- * What an error page is told about a load that threw something other than SvelteKit's own
- * `error()` — the body of both sides' `handleError` hook.
+ * What an error page is told about a failure — the body of both sides' `handleError` hook,
+ * which SvelteKit calls for every error, tagged with the `kind` it was.
  *
  * Nearly every load here is a control-plane read, and a read that fails throws an `ApiError` —
  * which SvelteKit does not know, so on its own it files every one of them as a 500 with the
  * message "Internal Error". A task that does not exist then looked exactly like the server
  * falling over. The control plane already said which it was; this passes its status and its
- * words through, so the error page can tell "no such task" from "try again in a moment".
+ * words through, and the status becomes the page's own, so the error page can tell "no such task"
+ * from "try again in a moment".
  *
- * The page's own status stays what SvelteKit decided (a hook cannot change it), which is why the
- * boundary reads `page.error.status` first. Anything else keeps SvelteKit's own message: an
- * exception from our code has nothing in it a reader can act on.
+ * An `error()` of ours (`app`) and SvelteKit's own 404s and 405s (`framework`) are already safe
+ * to show and keep what they say. Any other exception keeps SvelteKit's placeholder: it has
+ * nothing in it a reader can act on.
  */
-export function describeError(error: unknown, status: number, message: string): App.Error {
+export function describeError(kind: string, error: unknown): Partial<App.Error> {
+  if (kind !== "unknown") return error as App.Error;
   const described = error instanceof ApiError
     ? { message: error.message, status: error.status }
-    : { message, status };
+    : { message: "Internal Error", status: 500 };
   // A 4xx is an answer, not a fault — a mistyped task ID is not worth a stack trace in the log.
   // Installing the hook replaces SvelteKit's own logging, so the rest is logged here.
   if (described.status >= 500) console.error(error);

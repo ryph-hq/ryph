@@ -1,13 +1,13 @@
 <script lang="ts">
-import type { SkillPresentation } from "$lib/api/types";
-import { cn } from "$lib/utils";
+import type { SkillPresentation } from "#lib/api/types.ts";
+import { cn } from "#lib/utils.ts";
 import {
   hasBrandColor,
   iconIsMask,
   skillIconSrc,
   skillMonogram,
   skillTint,
-} from "$lib/utils/skill-presentation";
+} from "#lib/utils/skill-presentation.ts";
 
 let {
   name,

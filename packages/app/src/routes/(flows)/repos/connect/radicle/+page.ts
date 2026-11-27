@@ -1,7 +1,7 @@
 import { redirect } from "@sveltejs/kit";
 import type { PageLoad } from "./$types";
-import { getForges, getRadicleIdentity, radicleUserMode } from "$lib/api/forge";
-import { safeBackTo } from "$lib/utils/safe-path";
+import { getForges, getRadicleIdentity, radicleUserMode } from "#lib/api/forge.ts";
+import { safeBackTo } from "#lib/utils/safe-path.ts";
 
 export const load: PageLoad = async ({ parent, url, fetch }) => {
   const { user } = await parent();

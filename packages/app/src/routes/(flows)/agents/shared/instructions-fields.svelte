@@ -1,6 +1,6 @@
 <script lang="ts">
-import * as Field from "$lib/components/ui/field";
-import { Textarea } from "$lib/components/ui/textarea";
+import * as Field from "#lib/components/ui/field/index.ts";
+import { Textarea } from "#lib/components/ui/textarea/index.ts";
 
 let { systemPrompt = $bindable() }: { systemPrompt: string } = $props();
 </script>

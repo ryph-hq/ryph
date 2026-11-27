@@ -1,14 +1,14 @@
 <script lang="ts">
-import type { EnvironmentStatus, EnvironmentView } from "$lib/api/types";
-import { Badge } from "$lib/components/ui/badge";
-import { TONES } from "$lib/components/ui/badge/tones";
-import { Spinner } from "$lib/components/ui/spinner";
+import type { EnvironmentStatus, EnvironmentView } from "#lib/api/types.ts";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import { TONES } from "#lib/components/ui/badge/tones.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
 import {
   buildStatusShortLabel,
   environmentStatusLabel,
   isReadyWithSetupWarnings,
   setupWarningLabel,
-} from "$lib/utils/environments";
+} from "#lib/utils/environments.ts";
 import CheckIcon from "@lucide/svelte/icons/check";
 import ClockIcon from "@lucide/svelte/icons/clock";
 import TriangleAlertIcon from "@lucide/svelte/icons/triangle-alert";

@@ -1,5 +1,5 @@
 <script lang="ts">
-import ErrorState from "$lib/components/error-state/error-state.svelte";
+import ErrorState from "#lib/components/error-state/error-state.svelte";
 
 // Its own boundary, not the app's, so the section's layout — and with it the list its load
 // returned — stays: the shell draws the task pane off `page.data.tasks`, and an error caught

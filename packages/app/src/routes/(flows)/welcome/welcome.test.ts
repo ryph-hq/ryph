@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Harness, Provider, ProviderKey } from "$lib/api/types";
+import type { Harness, Provider, ProviderKey } from "#lib/api/types.ts";
 import {
   backgroundProviderKeys,
   composeQuickAgent,

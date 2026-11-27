@@ -1,7 +1,7 @@
 import type { RequestEvent } from "@sveltejs/kit";
-import { RYPH_API_URL, sessionHeaders } from "$lib/server/auth";
-import { getUserData } from "$lib/utils/auth/jwt";
-import { openablePreviewUrl } from "$lib/utils/previews";
+import { RYPH_API_URL, sessionHeaders } from "#lib/server/auth.ts";
+import { getUserData } from "#lib/utils/auth/jwt.ts";
+import { openablePreviewUrl } from "#lib/utils/previews.ts";
 
 /** A redirect nothing keeps: the answer is a one-time way in. */
 export function go(location: string, status = 303): Response {

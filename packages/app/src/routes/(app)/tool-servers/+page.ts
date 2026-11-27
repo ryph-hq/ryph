@@ -1,5 +1,5 @@
 import type { PageLoad } from "./$types";
-import { getMcpCatalogue, getToolAccess } from "$lib/api/mcp-servers";
+import { getMcpCatalogue, getToolAccess } from "#lib/api/mcp-servers.ts";
 
 export const load: PageLoad = async ({ fetch, depends }) => {
   depends("app:tool-servers");

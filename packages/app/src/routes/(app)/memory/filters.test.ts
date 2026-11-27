@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Memory } from "$lib/api/types";
+import type { Memory } from "#lib/api/types.ts";
 import {
   filtersToSearch,
   joinPages,

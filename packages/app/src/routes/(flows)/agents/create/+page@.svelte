@@ -1,15 +1,15 @@
 <script lang="ts">
-import { can } from "$lib/utils/auth/capabilities";
-import { goto, pushState } from "$app/navigation";
+import { can } from "#lib/utils/auth/capabilities.ts";
+import { goto } from "$app/navigation";
 import { page } from "$app/state";
-import { createAgent } from "$lib/api/agents";
-import SteppedFlow, { type FlowStepItem } from "$lib/components/stepped-flow/stepped-flow.svelte";
-import ReviewFact from "$lib/components/stepped-flow/review-fact.svelte";
-import ReviewSection from "$lib/components/stepped-flow/review-section.svelte";
-import { stepOf } from "$lib/components/stepped-flow/steps";
-import UnsavedChangesGuard from "$lib/components/unsaved-changes-guard/unsaved-changes-guard.svelte";
-import { Button } from "$lib/components/ui/button";
-import { Spinner } from "$lib/components/ui/spinner";
+import { createAgent } from "#lib/api/agents.ts";
+import SteppedFlow, { type FlowStepItem } from "#lib/components/stepped-flow/stepped-flow.svelte";
+import ReviewFact from "#lib/components/stepped-flow/review-fact.svelte";
+import ReviewSection from "#lib/components/stepped-flow/review-section.svelte";
+import { stepOf } from "#lib/components/stepped-flow/steps.ts";
+import UnsavedChangesGuard from "#lib/components/unsaved-changes-guard/unsaved-changes-guard.svelte";
+import { Button } from "#lib/components/ui/button/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
 import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
 import ArrowRightIcon from "@lucide/svelte/icons/arrow-right";
 import PlusIcon from "@lucide/svelte/icons/plus";
@@ -35,7 +35,7 @@ import IdentityFields from "../shared/identity-fields.svelte";
 import InstructionsFields from "../shared/instructions-fields.svelte";
 import MemoryFields from "../shared/memory-fields.svelte";
 import { composeMemoryPolicy } from "../shared/memory-policy";
-import type { ModelPolicy } from "$lib/api/types";
+import type { ModelPolicy } from "#lib/api/types.ts";
 import {
   composeModelPolicy,
   defaultModelThinkingLevels,
@@ -45,8 +45,8 @@ import {
   offersThinking,
   THINKING_LABELS,
   thinkingToSend,
-} from "$lib/components/model-picker/thinking";
-import { formatElapsed } from "$lib/utils/format";
+} from "#lib/components/model-picker/thinking.ts";
+import { formatElapsed } from "#lib/utils/format.ts";
 import LimitPolicyFields from "../shared/limit-policy-fields.svelte";
 import {
   composeLimitPolicy,
@@ -205,11 +205,11 @@ function statusOf(id: AgentStepId): FlowStepItem["status"] {
 const index = $derived(STEPS.findIndex((step) => step.id === current));
 
 // The step on screen lives in the history entry's state (shallow routing), so the browser's
-// back and forward buttons walk the steps: `pushState` adds an entry without a navigation —
+// back and forward buttons walk the steps: a shallow `goto` adds an entry without a navigation —
 // no load runs, the leave guard is not asked — and a popstate to one of these entries only
 // hands the state back.
 function go(id: AgentStepId) {
-  if (id !== current) pushState("", { step: id });
+  if (id !== current) void goto("", { shallow: true, state: { step: id } });
 }
 
 function next() {

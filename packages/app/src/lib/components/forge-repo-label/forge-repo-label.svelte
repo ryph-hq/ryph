@@ -1,7 +1,7 @@
 <script lang="ts">
-import type { ForgeProvider } from "$lib/api/types";
-import CopyButton from "$lib/components/copy-button/copy-button.svelte";
-import { forgeRepoLabel, providerOfRepoRef } from "$lib/utils/forge";
+import type { ForgeProvider } from "#lib/api/types.ts";
+import CopyButton from "#lib/components/copy-button/copy-button.svelte";
+import { forgeRepoLabel, providerOfRepoRef } from "#lib/utils/forge.ts";
 
 let {
   repoRef,

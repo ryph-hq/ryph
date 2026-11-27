@@ -1,5 +1,5 @@
 <script lang="ts">
-import * as Alert from "$lib/components/ui/alert";
+import * as Alert from "#lib/components/ui/alert/index.ts";
 import UserIcon from "@lucide/svelte/icons/user";
 </script>
 

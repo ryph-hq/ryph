@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { EnvironmentView, SubjectEnvironment } from "$lib/api/types";
+import type { EnvironmentView, SubjectEnvironment } from "#lib/api/types.ts";
 import {
   buildDurationMs,
   buildKindLabel,

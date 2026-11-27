@@ -1,7 +1,7 @@
 import { error } from "@sveltejs/kit";
 import type { PageLoad } from "./$types";
-import { ApiError } from "$lib/api/call";
-import { getCheckApproval } from "$lib/api/checks";
+import { ApiError } from "#lib/api/call.ts";
+import { getCheckApproval } from "#lib/api/checks.ts";
 
 /**
  * An outside contribution waiting for someone to approve its checks: where the comment on its

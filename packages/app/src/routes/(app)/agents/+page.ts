@@ -1,5 +1,5 @@
 import type { PageLoad } from "./$types";
-import { getAgents } from "$lib/api/agents";
+import { getAgents } from "#lib/api/agents.ts";
 
 export const load: PageLoad = async ({ fetch, depends }) => {
   depends("app:agents");

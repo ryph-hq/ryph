@@ -9,8 +9,8 @@ import {
   memoryStatusSchema,
   type MemoryTrust,
   memoryTrustSchema,
-} from "$lib/api/types";
-import type { MemoryFilters } from "$lib/api/memory";
+} from "#lib/api/types.ts";
+import type { MemoryFilters } from "#lib/api/memory.ts";
 
 export interface BrowseFilters {
   /** "" = every subject; else `org` or `repo:<url>`. */

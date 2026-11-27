@@ -1,7 +1,7 @@
 <script lang="ts">
 import AppWindowIcon from "@lucide/svelte/icons/app-window";
-import { cn } from "$lib/utils";
-import { ensureFreshSession } from "$lib/utils/auth/auth";
+import { cn } from "#lib/utils.ts";
+import { ensureFreshSession } from "#lib/utils/auth/auth.ts";
 import { artifactThumbnailHref, ThumbnailState } from "./thumbnail-state.svelte";
 import { lazyThumbnail } from "./lazy-thumbnail";
 

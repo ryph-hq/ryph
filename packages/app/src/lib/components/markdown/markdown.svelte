@@ -1,8 +1,8 @@
 <script lang="ts">
-import type { ResultImage } from "$lib/api/types";
-import { renderMarkdown } from "$lib/utils/markdown";
-import AttachmentImages from "$lib/components/attachment-images/attachment-images.svelte";
-import CodeView from "$lib/components/code-view/code-view.svelte";
+import type { ResultImage } from "#lib/api/types.ts";
+import { renderMarkdown } from "#lib/utils/markdown.ts";
+import AttachmentImages from "#lib/components/attachment-images/attachment-images.svelte";
+import CodeView from "#lib/components/code-view/code-view.svelte";
 import { getAllContexts, mount, unmount, untrack } from "svelte";
 
 let { content, breaks = true, compact = false, images, imageRunId, class: className = "" }: {

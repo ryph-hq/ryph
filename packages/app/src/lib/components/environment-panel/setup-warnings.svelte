@@ -1,7 +1,7 @@
 <script lang="ts">
-import type { EnvironmentView } from "$lib/api/types";
-import * as Alert from "$lib/components/ui/alert";
-import { setupUnfinished, setupWarningLabel } from "$lib/utils/environments";
+import type { EnvironmentView } from "#lib/api/types.ts";
+import * as Alert from "#lib/components/ui/alert/index.ts";
+import { setupUnfinished, setupWarningLabel } from "#lib/utils/environments.ts";
 import TriangleAlertIcon from "@lucide/svelte/icons/triangle-alert";
 
 // The repos whose setup.yml did not finish when a build baked it, or whose tree was put back. The

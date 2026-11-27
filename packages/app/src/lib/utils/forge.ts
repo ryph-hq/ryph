@@ -6,7 +6,7 @@
  * one is the first seven characters of a 40-hex object id, and a RID is too long to print whole
  * anywhere but a tooltip.
  */
-import type { ForgeProvider, ThreadKind } from "$lib/api/types";
+import type { ForgeProvider, ThreadKind } from "#lib/api/types.ts";
 
 /** A Radicle repository id: `rad:` plus a base58btc multibase string. */
 const RID_PATTERN = /^rad:z[1-9A-HJ-NP-Za-km-z]+$/;

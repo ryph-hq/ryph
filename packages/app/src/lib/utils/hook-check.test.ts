@@ -5,8 +5,8 @@ import {
   patchWithContextSchema,
   runMessageSchema,
   systemPayloadSchema,
-} from "$lib/api/types";
-import { ApiError } from "$lib/api/call";
+} from "#lib/api/types.ts";
+import { ApiError } from "#lib/api/call.ts";
 import {
   approvalHookPaths,
   approvalRefusal,
@@ -168,7 +168,7 @@ describe("approving names the hook files on screen", () => {
   };
 
   it("sends the files it was given, and nothing when there are none to name", async () => {
-    const { approvePatch } = await import("$lib/api/patches");
+    const { approvePatch } = await import("#lib/api/patches.ts");
     const named = capture();
     await approvePatch(named.f, "p-0123456789", undefined, [".husky/pre-commit"]);
     expect(named.seen.body).toEqual({ hookPaths: [".husky/pre-commit"] });

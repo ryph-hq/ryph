@@ -1,8 +1,8 @@
 <script lang="ts">
 import type { Snippet } from "svelte";
-import * as Collapsible from "$lib/components/ui/collapsible";
+import * as Collapsible from "#lib/components/ui/collapsible/index.ts";
 import ChevronRightIcon from "@lucide/svelte/icons/chevron-right";
-import { formatTime } from "$lib/utils/format";
+import { formatTime } from "#lib/utils/format.ts";
 import type { PlatformNoticeSummary } from "./platform-notice";
 
 let { summary, at, details, open = false, ontoggle, actions, children }: {

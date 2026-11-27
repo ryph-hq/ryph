@@ -2,15 +2,6 @@
 // for information about these interfaces
 declare global {
   namespace App {
-    interface Error {
-      message: string;
-      /**
-       * The status the failure really had, when it differs from the page's: a control-plane
-       * refusal reaches SvelteKit as an unexpected error and the page says 500 whatever the
-       * control plane said. See `$lib/utils/page-error.ts`.
-       */
-      status?: number;
-    }
     interface Locals {
       accessToken?: string;
       refreshToken?: string;
@@ -24,7 +15,7 @@ declare global {
       breadcrumb?: string;
     }
     /**
-     * Shallow-routing state (`pushState` from `$app/navigation`), which the browser's back and
+     * Shallow-routing state (a shallow `goto` from `$app/navigation`), which the browser's back and
      * forward buttons walk without a navigation — a stepped flow keeps the step on screen here.
      */
     interface PageState {

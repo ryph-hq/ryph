@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { CheckSuiteListItem } from "$lib/api/types";
+import type { CheckSuiteListItem } from "#lib/api/types.ts";
 import { appendSuitePage, type DeeperSuites, mergeSuiteHead } from "./recent";
 
 const AT = (n: number) => `2026-09-${String(n).padStart(2, "0")}T00:00:00.000Z`;

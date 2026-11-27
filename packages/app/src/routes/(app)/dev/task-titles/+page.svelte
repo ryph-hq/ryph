@@ -1,9 +1,9 @@
 <script lang="ts">
 import { onDestroy } from "svelte";
-import AgentAvatar from "$lib/components/agent-avatar/agent-avatar.svelte";
-import RunStateBadge from "$lib/components/run-state-badge/run-state-badge.svelte";
-import { Button } from "$lib/components/ui/button";
-import TitleTransition from "$lib/components/task-title/task-title.svelte";
+import AgentAvatar from "#lib/components/agent-avatar/agent-avatar.svelte";
+import RunStateBadge from "#lib/components/run-state-badge/run-state-badge.svelte";
+import { Button } from "#lib/components/ui/button/index.ts";
+import TitleTransition from "#lib/components/task-title/task-title.svelte";
 
 const titles = [
   null,

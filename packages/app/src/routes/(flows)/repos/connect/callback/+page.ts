@@ -1,6 +1,6 @@
 import { redirect } from "@sveltejs/kit";
 import type { PageLoad } from "./$types";
-import { safeBackTo } from "$lib/utils/safe-path";
+import { safeBackTo } from "#lib/utils/safe-path.ts";
 
 /**
  * GitHub's post-install redirect lands here with `?installation_id=` (plus a

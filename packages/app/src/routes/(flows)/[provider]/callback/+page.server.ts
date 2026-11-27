@@ -1,9 +1,9 @@
 import { redirect } from "@sveltejs/kit";
 import { z } from "zod";
 import type { PageServerLoad } from "./$types";
-import { RYPH_API_URL, sessionHeaders, setAuthCookies, tokenPairSchema } from "$lib/server/auth";
-import { endOAuth } from "$lib/server/oauth";
-import { oauthFailure } from "$lib/server/oauth-failure";
+import { RYPH_API_URL, sessionHeaders, setAuthCookies, tokenPairSchema } from "#lib/server/auth.ts";
+import { endOAuth } from "#lib/server/oauth.ts";
+import { oauthFailure } from "#lib/server/oauth-failure.ts";
 
 /**
  * The provider's OAuth redirect lands here with `?code&state`. The state must match the

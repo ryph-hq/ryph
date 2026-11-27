@@ -1,12 +1,12 @@
 import { redirect } from "@sveltejs/kit";
 import type { PageLoad } from "./$types";
-import { getAgents } from "$lib/api/agents";
-import { getForges } from "$lib/api/forge";
-import { getHarnesses } from "$lib/api/harnesses";
-import { getModelAccess, getPlatformModelPolicyOrNull } from "$lib/api/provider-keys";
-import { getProvidersOrEmpty } from "$lib/api/providers";
-import { getConnectedRepos } from "$lib/api/repos";
-import { mayBeWelcomed } from "$lib/utils/welcome";
+import { getAgents } from "#lib/api/agents.ts";
+import { getForges } from "#lib/api/forge.ts";
+import { getHarnesses } from "#lib/api/harnesses.ts";
+import { getModelAccess, getPlatformModelPolicyOrNull } from "#lib/api/provider-keys.ts";
+import { getProvidersOrEmpty } from "#lib/api/providers.ts";
+import { getConnectedRepos } from "#lib/api/repos.ts";
+import { mayBeWelcomed } from "#lib/utils/welcome.ts";
 
 export const load: PageLoad = async ({ parent, url, fetch, depends }) => {
   const { user } = await parent();

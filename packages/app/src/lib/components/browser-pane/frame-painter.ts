@@ -1,4 +1,4 @@
-import type { LiveFrame } from "$lib/api/browser-live";
+import type { LiveFrame } from "#lib/api/browser-live.ts";
 
 /**
  * Draws the live frames onto a canvas.

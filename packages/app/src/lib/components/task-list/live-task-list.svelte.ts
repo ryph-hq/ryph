@@ -6,8 +6,8 @@ import {
   taskFiltersToParams,
   type TaskStreamState,
   type TaskStreamSubscription,
-} from "$lib/api/tasks";
-import type { TaskPage, TaskSummary } from "$lib/api/types";
+} from "#lib/api/tasks.ts";
+import type { TaskPage, TaskSummary } from "#lib/api/types.ts";
 
 /**
  * Newest first, ties broken by id — exactly the server's `ORDER BY created_at DESC, id DESC`.

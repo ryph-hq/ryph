@@ -1,7 +1,7 @@
 // How the skills screens say what the control plane answers: versions, commits, sync outcomes and
 // failures in a person's words, and a skill's files in the order someone reads them.
 
-import { isWebLink } from "$lib/api/forge";
+import { isWebLink } from "#lib/api/forge.ts";
 import type {
   ForgeProvider,
   RunEvent,
@@ -10,7 +10,7 @@ import type {
   SkillSyncAnswer,
   SkillSyncFailure,
   SkillSyncTrigger,
-} from "$lib/api/types";
+} from "#lib/api/types.ts";
 
 /** Where a skill lives in a repo, and the one file every skill has. */
 export const SKILLS_DIR = ".agents/skills";

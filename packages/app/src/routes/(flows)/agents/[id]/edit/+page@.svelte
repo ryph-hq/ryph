@@ -1,8 +1,8 @@
 <script lang="ts">
-import { can } from "$lib/utils/auth/capabilities";
-import { goto, pushState } from "$app/navigation";
+import { can } from "#lib/utils/auth/capabilities.ts";
+import { goto } from "$app/navigation";
 import { page } from "$app/state";
-import { archiveAgent, updateAgent } from "$lib/api/agents";
+import { archiveAgent, updateAgent } from "#lib/api/agents.ts";
 import type {
   ForgePolicy,
   ModelPolicy,
@@ -10,13 +10,13 @@ import type {
   RunLimits,
   SkillPolicy,
   ToolPolicy,
-} from "$lib/api/types";
-import SteppedFlow, { type FlowStepItem } from "$lib/components/stepped-flow/stepped-flow.svelte";
-import { stepOf } from "$lib/components/stepped-flow/steps";
-import UnsavedChangesGuard from "$lib/components/unsaved-changes-guard/unsaved-changes-guard.svelte";
-import { Badge } from "$lib/components/ui/badge";
-import { Button } from "$lib/components/ui/button";
-import { Spinner } from "$lib/components/ui/spinner";
+} from "#lib/api/types.ts";
+import SteppedFlow, { type FlowStepItem } from "#lib/components/stepped-flow/stepped-flow.svelte";
+import { stepOf } from "#lib/components/stepped-flow/steps.ts";
+import UnsavedChangesGuard from "#lib/components/unsaved-changes-guard/unsaved-changes-guard.svelte";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
 import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
 import ArrowRightIcon from "@lucide/svelte/icons/arrow-right";
 import CheckIcon from "@lucide/svelte/icons/check";
@@ -227,10 +227,10 @@ const steps = $derived<FlowStepItem[]>(STEPS.map((step) => ({
 })));
 
 // The step on screen lives in the history entry's state (shallow routing), so the browser's
-// back and forward buttons walk the steps: `pushState` adds an entry without a navigation —
+// back and forward buttons walk the steps: a shallow `goto` adds an entry without a navigation —
 // no load runs, the leave guard is not asked — and a popstate only hands the state back.
 function go(id: AgentStepId) {
-  if (id !== current) pushState("", { step: id });
+  if (id !== current) void goto("", { shallow: true, state: { step: id } });
 }
 
 /**

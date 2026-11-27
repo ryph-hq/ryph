@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ApiError } from "$lib/api/call";
+import { ApiError } from "#lib/api/call.ts";
 import { localRepoFailure, pathProblem, withoutTrailingSlash } from "./refusal";
 
 const refused = (body: Record<string, unknown>) => new ApiError(422, body, "x");

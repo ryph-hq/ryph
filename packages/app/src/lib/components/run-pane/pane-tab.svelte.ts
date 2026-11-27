@@ -1,4 +1,4 @@
-import { browser } from "$app/environment";
+import { browser } from "$app/env";
 
 /** The tabs of a run's details pane. */
 export type RunPaneTab = "actions" | "browser" | "commands" | "subagents" | "details" | "usage";

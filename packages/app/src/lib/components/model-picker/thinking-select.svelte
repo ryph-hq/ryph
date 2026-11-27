@@ -1,8 +1,8 @@
 <script lang="ts">
-import type { ThinkingLevel } from "$lib/api/types";
-import * as Field from "$lib/components/ui/field";
-import * as Select from "$lib/components/ui/select";
-import { cn } from "$lib/utils";
+import type { ThinkingLevel } from "#lib/api/types.ts";
+import * as Field from "#lib/components/ui/field/index.ts";
+import * as Select from "#lib/components/ui/select/index.ts";
+import { cn } from "#lib/utils.ts";
 import { THINKING_LABELS, thinkingInvalid } from "./thinking";
 
 // One thinking level, or the default. A level the model does not list stays picked and is marked

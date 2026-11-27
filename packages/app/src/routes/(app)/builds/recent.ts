@@ -4,7 +4,7 @@
 // Held rows are snapshots: one still building when 50 newer builds push it below the head keeps
 // showing "building" until the page reloads.
 
-import type { BuildListItem } from "$lib/api/types";
+import type { BuildListItem } from "#lib/api/types.ts";
 
 export interface BuildPageLike {
   builds: BuildListItem[];

@@ -1,6 +1,6 @@
 <script lang="ts">
 import { beforeNavigate, goto } from "$app/navigation";
-import * as AlertDialog from "$lib/components/ui/alert-dialog";
+import * as AlertDialog from "#lib/components/ui/alert-dialog/index.ts";
 
 // Stops a page with unsaved changes from being left by accident. Mounted by any page that can
 // say whether it is dirty: an in-app navigation — a link, the back button — is held while this
@@ -23,6 +23,8 @@ let pending = $state<URL | null>(null);
 let leaving = false;
 
 beforeNavigate((navigation) => {
+  // A flow moving between its own steps (a shallow `goto`) is not leaving the form.
+  if (navigation.shallow && navigation.type === "goto") return;
   if (!dirty || leaving) return;
   // A `leave` is the browser going elsewhere: cancelling it is how SvelteKit shows the native
   // "changes you made may not be saved" prompt — the one prompt allowed on unload.

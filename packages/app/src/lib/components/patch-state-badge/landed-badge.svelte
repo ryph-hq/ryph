@@ -1,7 +1,7 @@
 <script lang="ts">
-import type { Patch } from "$lib/api/types";
-import { Badge } from "$lib/components/ui/badge";
-import { formatDateTime } from "$lib/utils/format";
+import type { Patch } from "#lib/api/types.ts";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import { formatDateTime } from "#lib/utils/format.ts";
 
 // How a patch's change request ended on the forge: merged, merged without this patch, merged
 // with nobody able to confirm whether this patch was in it, or closed without merging.

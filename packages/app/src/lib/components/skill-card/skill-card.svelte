@@ -1,15 +1,15 @@
 <script lang="ts">
-import type { SkillPresentation } from "$lib/api/types";
-import SkillMark from "$lib/components/skill-mark/skill-mark.svelte";
-import * as Card from "$lib/components/ui/card";
-import { cn } from "$lib/utils";
+import type { SkillPresentation } from "#lib/api/types.ts";
+import SkillMark from "#lib/components/skill-mark/skill-mark.svelte";
+import * as Card from "#lib/components/ui/card/index.ts";
+import { cn } from "#lib/utils.ts";
 import {
   hasBrandColor,
   skillSummary,
   skillTint,
   skillTitle,
   titleIsName,
-} from "$lib/utils/skill-presentation";
+} from "#lib/utils/skill-presentation.ts";
 import type { Snippet } from "svelte";
 
 let {

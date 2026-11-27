@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Provider, ProviderKey } from "$lib/api/types";
+import type { Provider, ProviderKey } from "#lib/api/types.ts";
 import {
   composeModelPolicy,
   defaultModelThinkingLevels,

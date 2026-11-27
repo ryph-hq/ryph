@@ -9,7 +9,7 @@ import type {
   SignalMapping,
   WebhookFormat,
   WebhookPresetFormat,
-} from "$lib/api/types";
+} from "#lib/api/types.ts";
 
 export type PresetId =
   | "grafana"

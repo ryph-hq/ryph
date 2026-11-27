@@ -1,7 +1,7 @@
 <script lang="ts">
-import * as Field from "$lib/components/ui/field";
-import { Label } from "$lib/components/ui/label";
-import { Switch } from "$lib/components/ui/switch";
+import * as Field from "#lib/components/ui/field/index.ts";
+import { Label } from "#lib/components/ui/label/index.ts";
+import { Switch } from "#lib/components/ui/switch/index.ts";
 
 let {
   canOpenPatches = $bindable(),

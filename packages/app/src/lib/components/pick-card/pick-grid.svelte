@@ -1,6 +1,6 @@
 <script lang="ts" generics="T">
-import { Button } from "$lib/components/ui/button";
-import * as InputGroup from "$lib/components/ui/input-group";
+import { Button } from "#lib/components/ui/button/index.ts";
+import * as InputGroup from "#lib/components/ui/input-group/index.ts";
 import SearchIcon from "@lucide/svelte/icons/search";
 import { RadioGroup } from "bits-ui";
 import type { Snippet } from "svelte";

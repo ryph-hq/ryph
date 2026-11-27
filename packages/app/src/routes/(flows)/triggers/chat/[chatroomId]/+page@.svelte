@@ -1,5 +1,5 @@
 <script lang="ts">
-import { goto, pushState } from "$app/navigation";
+import { goto } from "$app/navigation";
 import { page } from "$app/state";
 import {
   accessProblem,
@@ -14,27 +14,27 @@ import {
   saveCommandRoom,
   targetToFields,
   VISIBILITY_LABEL,
-} from "$lib/api/command-rooms";
+} from "#lib/api/command-rooms.ts";
 import {
   type ChatChannel,
   CHATROOM_KIND_LABEL,
   GROUP_NOUN,
   isOneConversation,
-} from "$lib/api/types";
-import ReviewFact from "$lib/components/stepped-flow/review-fact.svelte";
-import ReviewSection from "$lib/components/stepped-flow/review-section.svelte";
-import SteppedFlow, { type FlowStepItem } from "$lib/components/stepped-flow/stepped-flow.svelte";
-import { stepOf } from "$lib/components/stepped-flow/steps";
-import UnsavedChangesGuard from "$lib/components/unsaved-changes-guard/unsaved-changes-guard.svelte";
-import * as AlertDialog from "$lib/components/ui/alert-dialog";
-import { Badge } from "$lib/components/ui/badge";
-import { Button } from "$lib/components/ui/button";
-import { Checkbox } from "$lib/components/ui/checkbox";
-import * as Field from "$lib/components/ui/field";
-import { Input } from "$lib/components/ui/input";
-import { Label } from "$lib/components/ui/label";
-import * as Select from "$lib/components/ui/select";
-import { Spinner } from "$lib/components/ui/spinner";
+} from "#lib/api/types.ts";
+import ReviewFact from "#lib/components/stepped-flow/review-fact.svelte";
+import ReviewSection from "#lib/components/stepped-flow/review-section.svelte";
+import SteppedFlow, { type FlowStepItem } from "#lib/components/stepped-flow/stepped-flow.svelte";
+import { stepOf } from "#lib/components/stepped-flow/steps.ts";
+import UnsavedChangesGuard from "#lib/components/unsaved-changes-guard/unsaved-changes-guard.svelte";
+import * as AlertDialog from "#lib/components/ui/alert-dialog/index.ts";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import { Checkbox } from "#lib/components/ui/checkbox/index.ts";
+import * as Field from "#lib/components/ui/field/index.ts";
+import { Input } from "#lib/components/ui/input/index.ts";
+import { Label } from "#lib/components/ui/label/index.ts";
+import * as Select from "#lib/components/ui/select/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
 import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
 import ArrowRightIcon from "@lucide/svelte/icons/arrow-right";
 import CheckIcon from "@lucide/svelte/icons/check";
@@ -134,7 +134,7 @@ const steps = $derived<FlowStepItem[]>(STEPS.map((s) => ({ ...s, status: statusO
 
 // The step on screen lives in the history entry (shallow routing), so back and forward walk it.
 function go(id: StepId) {
-  if (id !== current) pushState("", { step: id });
+  if (id !== current) void goto("", { shallow: true, state: { step: id } });
 }
 let deleteOpen = $state(false);
 let deleting = $state(false);

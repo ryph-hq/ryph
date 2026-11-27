@@ -1,10 +1,10 @@
 import { redirect } from "@sveltejs/kit";
-import { can } from "$lib/utils/auth/capabilities";
+import { can } from "#lib/utils/auth/capabilities.ts";
 import type { PageLoad } from "./$types";
-import { getAgents } from "$lib/api/agents";
-import { getUsageReportOrOff } from "$lib/api/model-usage";
-import { getModelAccess } from "$lib/api/provider-keys";
-import { getTasksByIds } from "$lib/api/tasks";
+import { getAgents } from "#lib/api/agents.ts";
+import { getUsageReportOrOff } from "#lib/api/model-usage.ts";
+import { getModelAccess } from "#lib/api/provider-keys.ts";
+import { getTasksByIds } from "#lib/api/tasks.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const WINDOW_DAYS = [7, 30, 90];

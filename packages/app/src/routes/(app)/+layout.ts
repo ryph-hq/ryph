@@ -1,10 +1,15 @@
-import { browser } from "$app/environment";
+import { browser } from "$app/env";
 import { redirect } from "@sveltejs/kit";
 import type { LayoutLoad } from "./$types";
-import { getAgents } from "$lib/api/agents";
-import { getModelAccess } from "$lib/api/provider-keys";
-import { refreshSession } from "$lib/utils/auth/auth";
-import { isFreshInstance, markWelcomeDone, mayBeWelcomed, welcomeFlagIn } from "$lib/utils/welcome";
+import { getAgents } from "#lib/api/agents.ts";
+import { getModelAccess } from "#lib/api/provider-keys.ts";
+import { refreshSession } from "#lib/utils/auth/auth.ts";
+import {
+  isFreshInstance,
+  markWelcomeDone,
+  mayBeWelcomed,
+  welcomeFlagIn,
+} from "#lib/utils/welcome.ts";
 
 export const load: LayoutLoad = async ({ parent, url, fetch }) => {
   const parentData = await parent();

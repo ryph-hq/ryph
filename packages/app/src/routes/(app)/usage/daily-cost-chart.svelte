@@ -1,5 +1,5 @@
 <script lang="ts">
-import { formatUsd } from "$lib/utils/format";
+import { formatUsd } from "#lib/utils/format.ts";
 
 // One series, one colour: what each UTC day cost. Columns grow from a single baseline, capped at
 // 24px with a 2px gap between neighbours; every column's whole slot is its hover and focus target,

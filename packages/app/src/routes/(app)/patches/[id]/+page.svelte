@@ -1,33 +1,33 @@
 <script lang="ts">
-import { browser } from "$app/environment";
-import { ApiError } from "$lib/api/call";
-import { type ApprovalBasis, getPatchDiff } from "$lib/api/patches";
-import { isPatchAdvancing } from "$lib/api/types";
-import CheckStateBadge from "$lib/components/check-state-badge/check-state-badge.svelte";
-import ForgeRepoLabel from "$lib/components/forge-repo-label/forge-repo-label.svelte";
-import Markdown from "$lib/components/markdown/markdown.svelte";
-import PageTitle from "$lib/components/page-title/page-title.svelte";
-import HookWarning from "$lib/components/hook-warning/hook-warning.svelte";
-import PatchActions from "$lib/components/patch-actions/patch-actions.svelte";
-import PatchDiff from "$lib/components/patch-diff/patch-diff.svelte";
-import PatchStateBadge from "$lib/components/patch-state-badge/patch-state-badge.svelte";
-import LandedBadge from "$lib/components/patch-state-badge/landed-badge.svelte";
-import * as Alert from "$lib/components/ui/alert";
-import { Button } from "$lib/components/ui/button";
-import { Separator } from "$lib/components/ui/separator";
-import { Skeleton } from "$lib/components/ui/skeleton";
-import { Spinner } from "$lib/components/ui/spinner";
-import { countsLabel, isSuiteSettled } from "$lib/utils/checks";
-import { shortCommit } from "$lib/utils/environments";
-import { formatDateTime, formatRelativeTime } from "$lib/utils/format";
-import { diffBaseBranch } from "$lib/utils/patch-diff";
+import { browser } from "$app/env";
+import { ApiError } from "#lib/api/call.ts";
+import { type ApprovalBasis, getPatchDiff } from "#lib/api/patches.ts";
+import { isPatchAdvancing } from "#lib/api/types.ts";
+import CheckStateBadge from "#lib/components/check-state-badge/check-state-badge.svelte";
+import ForgeRepoLabel from "#lib/components/forge-repo-label/forge-repo-label.svelte";
+import Markdown from "#lib/components/markdown/markdown.svelte";
+import PageTitle from "#lib/components/page-title/page-title.svelte";
+import HookWarning from "#lib/components/hook-warning/hook-warning.svelte";
+import PatchActions from "#lib/components/patch-actions/patch-actions.svelte";
+import PatchDiff from "#lib/components/patch-diff/patch-diff.svelte";
+import PatchStateBadge from "#lib/components/patch-state-badge/patch-state-badge.svelte";
+import LandedBadge from "#lib/components/patch-state-badge/landed-badge.svelte";
+import * as Alert from "#lib/components/ui/alert/index.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import { Separator } from "#lib/components/ui/separator/index.ts";
+import { Skeleton } from "#lib/components/ui/skeleton/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
+import { countsLabel, isSuiteSettled } from "#lib/utils/checks.ts";
+import { shortCommit } from "#lib/utils/environments.ts";
+import { formatDateTime, formatRelativeTime } from "#lib/utils/format.ts";
+import { diffBaseBranch } from "#lib/utils/patch-diff.ts";
 import {
   HOOK_CHECKING_LABEL,
   hookCheckNotice,
   isCheckingHooks,
   isHeld,
-} from "$lib/utils/hook-check";
-import { refreshWhileLive } from "$lib/utils/live-refresh.svelte.js";
+} from "#lib/utils/hook-check.ts";
+import { refreshWhileLive } from "#lib/utils/live-refresh.svelte.ts";
 import CircleAlertIcon from "@lucide/svelte/icons/circle-alert";
 import GitBranchIcon from "@lucide/svelte/icons/git-branch";
 import type { PageProps } from "./$types";

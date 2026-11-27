@@ -1,9 +1,9 @@
 <script lang="ts">
-import type { CheckSuiteView } from "$lib/api/types";
-import CheckStateBadge from "$lib/components/check-state-badge/check-state-badge.svelte";
-import { Badge } from "$lib/components/ui/badge";
-import { countsLabel, partialLabel, suiteCounts } from "$lib/utils/checks";
-import { shortCommit } from "$lib/utils/environments";
+import type { CheckSuiteView } from "#lib/api/types.ts";
+import CheckStateBadge from "#lib/components/check-state-badge/check-state-badge.svelte";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import { countsLabel, partialLabel, suiteCounts } from "#lib/utils/checks.ts";
+import { shortCommit } from "#lib/utils/environments.ts";
 import ChevronRightIcon from "@lucide/svelte/icons/chevron-right";
 import CheckSuiteChecks from "./check-suite-checks.svelte";
 

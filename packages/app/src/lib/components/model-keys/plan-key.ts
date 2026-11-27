@@ -1,4 +1,4 @@
-import type { ChatgptPlan, ChatgptPlanStatus } from "$lib/api/types";
+import type { ChatgptPlan, ChatgptPlanStatus } from "#lib/api/types.ts";
 
 // How a ChatGPT plan key reads on its card: the account, the plan, and whether it works.
 

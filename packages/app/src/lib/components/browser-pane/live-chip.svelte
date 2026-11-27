@@ -1,6 +1,6 @@
 <script lang="ts">
-import { Badge } from "$lib/components/ui/badge";
-import { Spinner } from "$lib/components/ui/spinner";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
 import type { Chip } from "./live-view";
 
 let { chip, retrying = false }: { chip: Chip; retrying?: boolean } = $props();

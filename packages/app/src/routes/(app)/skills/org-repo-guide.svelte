@@ -1,7 +1,7 @@
 <script lang="ts">
-import CodeView from "$lib/components/code-view/code-view.svelte";
-import CopyButton from "$lib/components/copy-button/copy-button.svelte";
-import { EXAMPLE_SKILL, SKILL_FILE } from "$lib/utils/skills";
+import CodeView from "#lib/components/code-view/code-view.svelte";
+import CopyButton from "#lib/components/copy-button/copy-button.svelte";
+import { EXAMPLE_SKILL, SKILL_FILE } from "#lib/utils/skills.ts";
 import FileTextIcon from "@lucide/svelte/icons/file-text";
 import FolderIcon from "@lucide/svelte/icons/folder";
 

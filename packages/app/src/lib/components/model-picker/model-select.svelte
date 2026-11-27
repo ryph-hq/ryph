@@ -1,10 +1,10 @@
 <script lang="ts">
 import { tick } from "svelte";
-import type { DeclaredModel } from "$lib/api/types";
-import * as Field from "$lib/components/ui/field";
-import { Input } from "$lib/components/ui/input";
-import * as Select from "$lib/components/ui/select";
-import { cn } from "$lib/utils";
+import type { DeclaredModel } from "#lib/api/types.ts";
+import * as Field from "#lib/components/ui/field/index.ts";
+import { Input } from "#lib/components/ui/input/index.ts";
+import * as Select from "#lib/components/ui/select/index.ts";
+import { cn } from "#lib/utils.ts";
 import { priceHint, priceLabel } from "./models";
 
 // One model, picked from a list with a way out: "Custom model" swaps in a text field for an id

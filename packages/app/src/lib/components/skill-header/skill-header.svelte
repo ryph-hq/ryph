@@ -1,8 +1,8 @@
 <script lang="ts">
-import type { SkillPresentation } from "$lib/api/types";
-import ObjectHeader from "$lib/components/object-header/object-header.svelte";
-import SkillMark from "$lib/components/skill-mark/skill-mark.svelte";
-import { skillSummary, skillTitle, titleIsName } from "$lib/utils/skill-presentation";
+import type { SkillPresentation } from "#lib/api/types.ts";
+import ObjectHeader from "#lib/components/object-header/object-header.svelte";
+import SkillMark from "#lib/components/skill-mark/skill-mark.svelte";
+import { skillSummary, skillTitle, titleIsName } from "#lib/utils/skill-presentation.ts";
 import type { Snippet } from "svelte";
 
 let {

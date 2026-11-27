@@ -1,8 +1,8 @@
-import { env } from "$env/dynamic/public";
+import * as env from "$app/env/public";
 import type { Cookies } from "@sveltejs/kit";
 import { z } from "zod";
-import { COMMON_COOKIE_OPTIONS } from "$lib/server/auth";
-import { safeBackTo } from "$lib/utils/safe-path";
+import { COMMON_COOKIE_OPTIONS } from "#lib/server/auth.ts";
+import { safeBackTo } from "#lib/utils/safe-path.ts";
 
 /**
  * What the token leg needs again from the authorize leg, where the provider asks for it: GitLab

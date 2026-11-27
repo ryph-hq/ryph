@@ -1,9 +1,9 @@
 <script lang="ts">
-import { getRepoServices, type RepoServices } from "$lib/api/services";
-import * as Alert from "$lib/components/ui/alert";
-import { Button } from "$lib/components/ui/button";
-import { Skeleton } from "$lib/components/ui/skeleton";
-import * as Table from "$lib/components/ui/table";
+import { getRepoServices, type RepoServices } from "#lib/api/services.ts";
+import * as Alert from "#lib/components/ui/alert/index.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import { Skeleton } from "#lib/components/ui/skeleton/index.ts";
+import * as Table from "#lib/components/ui/table/index.ts";
 import TriangleAlertIcon from "@lucide/svelte/icons/triangle-alert";
 
 let { services, connectedRepoId, defaultBranch }: {

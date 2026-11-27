@@ -1,13 +1,13 @@
 <script lang="ts">
-import { type Chatroom, CONVERSATION_NOUN, isOneConversation } from "$lib/api/types";
-import { presetById, type ResponseChoice, withArticle } from "$lib/automations/presets";
-import PickCard from "$lib/components/pick-card/pick-card.svelte";
-import ResponseRoomFields from "$lib/components/response-room-fields/response-room-fields.svelte";
-import * as Alert from "$lib/components/ui/alert";
-import { Badge } from "$lib/components/ui/badge";
-import { Checkbox } from "$lib/components/ui/checkbox";
-import * as Field from "$lib/components/ui/field";
-import { Input } from "$lib/components/ui/input";
+import { type Chatroom, CONVERSATION_NOUN, isOneConversation } from "#lib/api/types.ts";
+import { presetById, type ResponseChoice, withArticle } from "#lib/automations/presets.ts";
+import PickCard from "#lib/components/pick-card/pick-card.svelte";
+import ResponseRoomFields from "#lib/components/response-room-fields/response-room-fields.svelte";
+import * as Alert from "#lib/components/ui/alert/index.ts";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import { Checkbox } from "#lib/components/ui/checkbox/index.ts";
+import * as Field from "#lib/components/ui/field/index.ts";
+import { Input } from "#lib/components/ui/input/index.ts";
 import LayersIcon from "@lucide/svelte/icons/layers";
 import MessageSquarePlusIcon from "@lucide/svelte/icons/message-square-plus";
 import MessagesSquareIcon from "@lucide/svelte/icons/messages-square";

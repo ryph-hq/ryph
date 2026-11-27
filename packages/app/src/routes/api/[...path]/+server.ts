@@ -9,7 +9,7 @@ import {
   RYPH_MCP_GATEWAY_CONTROL_URL,
   RYPH_MEMORY_URL,
   RYPH_MODEL_PROXY_CONTROL_URL,
-} from "$lib/server/auth";
+} from "#lib/server/auth.ts";
 import {
   forwardedResponseHeaders,
   isAppRoutePath,

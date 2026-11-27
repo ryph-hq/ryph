@@ -4,11 +4,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 // The single-user login link: opening it spends nothing, and only the Continue button's POST trades
 // the token for a session. A dead link is sent to sign-in with a reason rather than an error page.
 
-vi.mock("$env/dynamic/private", () => ({ env: { RYPH_PROXY_SECRET: "hop" } }));
-vi.mock("$app/environment", () => ({ dev: true }));
+vi.mock(
+  "$app/env/private",
+  async () => (await import("#lib/testing/env-mock.ts")).envMock({ RYPH_PROXY_SECRET: "hop" }),
+);
+vi.mock("$app/env", () => ({ dev: true }));
 
 import * as route from "./+page.server";
-import { linkProblemOf } from "$lib/utils/auth/link-problems";
+import { linkProblemOf } from "#lib/utils/auth/link-problems.ts";
 
 type Sent = { url: string; headers: Headers; body: unknown };
 

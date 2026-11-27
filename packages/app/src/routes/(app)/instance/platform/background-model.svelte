@@ -1,14 +1,14 @@
 <script lang="ts">
 import { invalidate } from "$app/navigation";
-import { clearPlatformModelPolicy, setPlatformModelPolicy } from "$lib/api/provider-keys";
-import { Button } from "$lib/components/ui/button";
-import * as Field from "$lib/components/ui/field";
-import ModelSelect from "$lib/components/model-picker/model-select.svelte";
-import { modelsForKey } from "$lib/components/model-picker/models";
-import * as Select from "$lib/components/ui/select";
-import { Spinner } from "$lib/components/ui/spinner";
+import { clearPlatformModelPolicy, setPlatformModelPolicy } from "#lib/api/provider-keys.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import * as Field from "#lib/components/ui/field/index.ts";
+import ModelSelect from "#lib/components/model-picker/model-select.svelte";
+import { modelsForKey } from "#lib/components/model-picker/models.ts";
+import * as Select from "#lib/components/ui/select/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
 import { toast } from "svelte-sonner";
-import type { PlatformModelPolicy, Provider, ProviderKey } from "$lib/api/types";
+import type { PlatformModelPolicy, Provider, ProviderKey } from "#lib/api/types.ts";
 
 let { providerKeys, providers, platformPolicy }: {
   providerKeys: ProviderKey[];

@@ -1,6 +1,6 @@
 <script lang="ts">
 import ImageOffIcon from "@lucide/svelte/icons/image-off";
-import { Spinner } from "$lib/components/ui/spinner";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
 import { attemptUrl, ImageRetry } from "./image-retry.svelte";
 
 // One image of a run, as a button that opens it full size. Until it has loaded, the box holds a

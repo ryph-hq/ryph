@@ -1,9 +1,9 @@
 <script lang="ts">
 import { page } from "$app/state";
-import TaskStreamStatus from "$lib/components/task-stream-status/task-stream-status.svelte";
-import type { LiveTaskList } from "$lib/components/task-list/live-task-list.svelte";
-import { Button } from "$lib/components/ui/button";
-import { Spinner } from "$lib/components/ui/spinner";
+import TaskStreamStatus from "#lib/components/task-stream-status/task-stream-status.svelte";
+import type { LiveTaskList } from "#lib/components/task-list/live-task-list.svelte.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
 import TaskRow from "./task-row.svelte";
 import PlusIcon from "@lucide/svelte/icons/plus";
 

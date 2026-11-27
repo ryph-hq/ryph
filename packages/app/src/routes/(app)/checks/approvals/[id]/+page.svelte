@@ -1,18 +1,18 @@
 <script lang="ts">
-import { invalidateAll } from "$app/navigation";
-import { approveCheckRun } from "$lib/api/checks";
-import PageTitle from "$lib/components/page-title/page-title.svelte";
-import * as Alert from "$lib/components/ui/alert";
-import { Badge } from "$lib/components/ui/badge";
-import { Button } from "$lib/components/ui/button";
-import * as Card from "$lib/components/ui/card";
-import { Spinner } from "$lib/components/ui/spinner";
-import { can } from "$lib/utils/auth/capabilities";
-import { approvalReturnTo, approvalStateLabel } from "$lib/utils/check-approval";
-import { shortCommit } from "$lib/utils/environments";
-import { forgeRepoLabel, repoThreadLabel, subjectLabel } from "$lib/utils/forge";
-import { formatDateTime } from "$lib/utils/format";
-import { providerLabel } from "$lib/utils/providers";
+import { refreshAll } from "$app/navigation";
+import { approveCheckRun } from "#lib/api/checks.ts";
+import PageTitle from "#lib/components/page-title/page-title.svelte";
+import * as Alert from "#lib/components/ui/alert/index.ts";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import * as Card from "#lib/components/ui/card/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
+import { can } from "#lib/utils/auth/capabilities.ts";
+import { approvalReturnTo, approvalStateLabel } from "#lib/utils/check-approval.ts";
+import { shortCommit } from "#lib/utils/environments.ts";
+import { forgeRepoLabel, repoThreadLabel, subjectLabel } from "#lib/utils/forge.ts";
+import { formatDateTime } from "#lib/utils/format.ts";
+import { providerLabel } from "#lib/utils/providers.ts";
 import CircleCheckIcon from "@lucide/svelte/icons/circle-check";
 import ExternalLinkIcon from "@lucide/svelte/icons/external-link";
 import PlayIcon from "@lucide/svelte/icons/play";
@@ -51,11 +51,11 @@ async function approve() {
       window.location.assign(back);
       return;
     }
-    await invalidateAll();
+    await refreshAll();
   } catch (e) {
     failure = e instanceof Error ? e.message : "The checks could not be approved";
     // The approval may have moved on meanwhile (a newer push, the change request closed).
-    await invalidateAll();
+    await refreshAll();
   } finally {
     approving = false;
   }

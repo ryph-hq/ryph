@@ -1,4 +1,4 @@
-import type { Role } from "$lib/utils/auth/capabilities";
+import type { Role } from "#lib/utils/auth/capabilities.ts";
 import { z } from "zod";
 import { apiCall } from "./call";
 import {

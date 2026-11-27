@@ -1,5 +1,5 @@
 <script lang="ts">
-import { Button } from "$lib/components/ui/button";
+import { Button } from "#lib/components/ui/button/index.ts";
 import CheckIcon from "@lucide/svelte/icons/check";
 import CopyIcon from "@lucide/svelte/icons/copy";
 import { toast } from "svelte-sonner";

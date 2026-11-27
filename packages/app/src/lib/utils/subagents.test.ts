@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { LaneSummary } from "$lib/api/history";
-import type { ToolCall } from "$lib/api/tools";
-import type { HistoryEvent } from "$lib/api/types";
+import type { LaneSummary } from "#lib/api/history.ts";
+import type { ToolCall } from "#lib/api/tools.ts";
+import type { HistoryEvent } from "#lib/api/types.ts";
 import {
   laneMarkOf,
   laneRunning,

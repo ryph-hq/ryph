@@ -1,8 +1,8 @@
 <script lang="ts">
-import { blobPath } from "$lib/brand/blob";
-import BlobFill from "$lib/brand/blob-fill.svelte";
-import { BlobMotion } from "$lib/brand/blob-motion";
-import { cn } from "$lib/utils";
+import { blobPath } from "#lib/brand/blob.ts";
+import BlobFill from "#lib/brand/blob-fill.svelte";
+import { BlobMotion } from "#lib/brand/blob-motion.ts";
+import { cn } from "#lib/utils.ts";
 
 let {
   mood = "idle",

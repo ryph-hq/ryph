@@ -14,7 +14,7 @@ import {
   slugProblem,
   withReasoning,
 } from "./custom-endpoint-form";
-import type { ProviderDetail } from "$lib/api/types";
+import type { ProviderDetail } from "#lib/api/types.ts";
 
 const modelRow = (over: Partial<ReturnType<typeof emptyModelRow>> = {}) => ({
   ...emptyModelRow(),

@@ -7,7 +7,7 @@ import type {
   CreateCatalogueServerInput,
   CreateCustomServerInput,
   McpCredentialInput,
-} from "$lib/api/mcp-servers";
+} from "#lib/api/mcp-servers.ts";
 import type {
   CatalogueEntry,
   CatalogueSetting,
@@ -15,7 +15,7 @@ import type {
   HostStatus,
   McpCatalogue,
   McpServer,
-} from "$lib/api/types";
+} from "#lib/api/types.ts";
 
 /**
  * A remote preset's row: the vendor's own endpoint, configured from a catalogue entry. It has

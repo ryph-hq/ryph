@@ -1,5 +1,5 @@
 import { json, type RequestHandler } from "@sveltejs/kit";
-import { clearAuthCookies, revokeRefreshToken } from "$lib/server/auth";
+import { clearAuthCookies, revokeRefreshToken } from "#lib/server/auth.ts";
 
 export const POST: RequestHandler = async (event) => {
   const { locals } = event;

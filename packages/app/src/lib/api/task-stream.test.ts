@@ -2,11 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ensureFreshSessionResult as ensureFreshSession,
   renewSessionResult as renewSession,
-} from "$lib/utils/auth/auth";
+} from "#lib/utils/auth/auth.ts";
 import { subscribeTasks, type TaskStreamSubscription } from "./tasks";
 import { HIDDEN_CLOSE_MS } from "./visible-stream";
 
-vi.mock("$lib/utils/auth/auth", () => ({
+vi.mock("#lib/utils/auth/auth.ts", () => ({
   ensureFreshSessionResult: vi.fn(),
   renewSessionResult: vi.fn(),
 }));

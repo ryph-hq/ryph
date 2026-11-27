@@ -1,25 +1,25 @@
 <script lang="ts">
-import type { CheckSuiteView, Patch } from "$lib/api/types";
-import Markdown from "$lib/components/markdown/markdown.svelte";
-import ThreadLabel from "$lib/components/thread-label/thread-label.svelte";
-import { Badge } from "$lib/components/ui/badge";
-import { Button } from "$lib/components/ui/button";
-import { Spinner } from "$lib/components/ui/spinner";
-import { isSuiteSettled } from "$lib/utils/checks";
-import { shortCommit } from "$lib/utils/environments";
-import { formatDateTime, formatTime } from "$lib/utils/format";
+import type { CheckSuiteView, Patch } from "#lib/api/types.ts";
+import Markdown from "#lib/components/markdown/markdown.svelte";
+import ThreadLabel from "#lib/components/thread-label/thread-label.svelte";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
+import { isSuiteSettled } from "#lib/utils/checks.ts";
+import { shortCommit } from "#lib/utils/environments.ts";
+import { formatDateTime, formatTime } from "#lib/utils/format.ts";
 import ChevronRightIcon from "@lucide/svelte/icons/chevron-right";
 import FileDiffIcon from "@lucide/svelte/icons/file-diff";
 import PaneCard from "./pane-card.svelte";
-import HookWarning from "$lib/components/hook-warning/hook-warning.svelte";
-import { getPatchesRefresh } from "$lib/components/tool-call/patches-context";
+import HookWarning from "#lib/components/hook-warning/hook-warning.svelte";
+import { getPatchesRefresh } from "#lib/components/tool-call/patches-context.ts";
 import {
   HOOK_CHECKING_LABEL,
   HOOK_HELD_LABEL,
   isCheckingHooks,
   isHeld,
   isLocalPatch,
-} from "$lib/utils/hook-check";
+} from "#lib/utils/hook-check.ts";
 
 let {
   patch,

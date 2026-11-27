@@ -4,12 +4,12 @@ export type ComposerBox = { rect: DOMRect; radius: string };
 </script>
 
 <script lang="ts">
-import { ATTACHMENT_MIMES, deleteAttachment, uploadAttachment } from "$lib/api/attachments";
-import * as InputGroup from "$lib/components/ui/input-group";
-import { Button } from "$lib/components/ui/button";
-import RunContext from "$lib/components/run-context/run-context.svelte";
-import type { ContextUsage } from "$lib/components/run-context/context-usage";
-import { Spinner } from "$lib/components/ui/spinner";
+import { ATTACHMENT_MIMES, deleteAttachment, uploadAttachment } from "#lib/api/attachments.ts";
+import * as InputGroup from "#lib/components/ui/input-group/index.ts";
+import { Button } from "#lib/components/ui/button/index.ts";
+import RunContext from "#lib/components/run-context/run-context.svelte";
+import type { ContextUsage } from "#lib/components/run-context/context-usage.ts";
+import { Spinner } from "#lib/components/ui/spinner/index.ts";
 import CornerDownLeftIcon from "@lucide/svelte/icons/corner-down-left";
 import ImagePlusIcon from "@lucide/svelte/icons/image-plus";
 import RotateCwIcon from "@lucide/svelte/icons/rotate-cw";

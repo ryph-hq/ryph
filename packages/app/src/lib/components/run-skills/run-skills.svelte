@@ -1,9 +1,9 @@
 <script lang="ts">
-import type { RunEvent, RunSkills } from "$lib/api/types";
-import ForgeRepoLabel from "$lib/components/forge-repo-label/forge-repo-label.svelte";
-import { Badge } from "$lib/components/ui/badge";
-import { shortCommit } from "$lib/utils/environments";
-import { runSkillsView } from "$lib/utils/skills";
+import type { RunEvent, RunSkills } from "#lib/api/types.ts";
+import ForgeRepoLabel from "#lib/components/forge-repo-label/forge-repo-label.svelte";
+import { Badge } from "#lib/components/ui/badge/index.ts";
+import { shortCommit } from "#lib/utils/environments.ts";
+import { runSkillsView } from "#lib/utils/skills.ts";
 
 let { skills, events, settled }: {
   skills: RunSkills;

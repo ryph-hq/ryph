@@ -2,8 +2,8 @@
 import { cubicOut } from "svelte/easing";
 import { prefersReducedMotion } from "svelte/motion";
 import { fade, fly } from "svelte/transition";
-import { cn } from "$lib/utils";
-import { AWAITING_PROMPT_LABEL } from "$lib/utils/task-prompt";
+import { cn } from "#lib/utils.ts";
+import { AWAITING_PROMPT_LABEL } from "#lib/utils/task-prompt.ts";
 
 let { title, compact = false }: { title: string | null; compact?: boolean } = $props();
 let height = $state<number>();

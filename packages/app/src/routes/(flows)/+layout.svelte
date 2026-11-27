@@ -1,5 +1,5 @@
 <script lang="ts">
-import RyphLogo from "$lib/components/ryph-logo/ryph-logo.svelte";
+import RyphLogo from "#lib/components/ryph-logo/ryph-logo.svelte";
 
 let { children } = $props();
 </script>

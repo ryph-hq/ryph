@@ -1,6 +1,6 @@
 import type { PageLoad } from "./$types";
-import { getForges, githubUserLogin, radicleUserMode } from "$lib/api/forge";
-import { getConnectedRepos, getRepoRadicleInfo } from "$lib/api/repos";
+import { getForges, githubUserLogin, radicleUserMode } from "#lib/api/forge.ts";
+import { getConnectedRepos, getRepoRadicleInfo } from "#lib/api/repos.ts";
 
 export const load: PageLoad = async ({ fetch, depends }) => {
   depends("app:repos");

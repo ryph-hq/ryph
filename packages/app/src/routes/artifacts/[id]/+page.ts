@@ -1,10 +1,10 @@
-import { browser } from "$app/environment";
+import { browser } from "$app/env";
 import { error, redirect } from "@sveltejs/kit";
-import { getArtifact } from "$lib/api/artifacts";
-import { ApiError } from "$lib/api/call";
-import { refreshSession } from "$lib/utils/auth/auth";
-import { can } from "$lib/utils/auth/capabilities";
-import { pickVersion } from "$lib/utils/artifacts";
+import { getArtifact } from "#lib/api/artifacts.ts";
+import { ApiError } from "#lib/api/call.ts";
+import { refreshSession } from "#lib/utils/auth/auth.ts";
+import { can } from "#lib/utils/auth/capabilities.ts";
+import { pickVersion } from "#lib/utils/artifacts.ts";
 import type { PageLoad } from "./$types";
 
 /**

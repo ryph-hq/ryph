@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { LaneSummary } from "$lib/api/history";
-import type { HistoryEvent } from "$lib/api/types";
+import type { LaneSummary } from "#lib/api/history.ts";
+import type { HistoryEvent } from "#lib/api/types.ts";
 import { LanesState } from "./lanes-state.svelte";
 
 // The tab's list as the live feed moves it: a lane's later summary replaces its earlier one, and

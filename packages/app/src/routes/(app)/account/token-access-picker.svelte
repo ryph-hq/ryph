@@ -1,9 +1,9 @@
 <script lang="ts">
-import { Checkbox } from "$lib/components/ui/checkbox";
-import * as Field from "$lib/components/ui/field";
-import { Label } from "$lib/components/ui/label";
-import { Toggle } from "$lib/components/ui/toggle";
-import * as ToggleGroup from "$lib/components/ui/toggle-group";
+import { Checkbox } from "#lib/components/ui/checkbox/index.ts";
+import * as Field from "#lib/components/ui/field/index.ts";
+import { Label } from "#lib/components/ui/label/index.ts";
+import { Toggle } from "#lib/components/ui/toggle/index.ts";
+import * as ToggleGroup from "#lib/components/ui/toggle-group/index.ts";
 import { untrack } from "svelte";
 import { type AccessPreset, groupCapabilities, presetCaps } from "./token-access";
 

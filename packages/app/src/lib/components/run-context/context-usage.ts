@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { HistoryEvent } from "$lib/api/types";
+import type { HistoryEvent } from "#lib/api/types.ts";
 
 const count = z.number().finite().nonnegative();
 const schema = z.object({

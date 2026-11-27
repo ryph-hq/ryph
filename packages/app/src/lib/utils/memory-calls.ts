@@ -2,7 +2,7 @@
 // these as signals and proposals, but answers nothing by run, so the run's own calls are the record
 // a run's page has of them.
 
-import type { ToolCall } from "$lib/api/tools";
+import type { ToolCall } from "#lib/api/tools.ts";
 
 /** The slug the memory server's tools are mounted under. */
 export const MEMORY_SERVER = "memory";
