@@ -83,7 +83,7 @@ export async function seedCatalogue(
   at: string,
 ): Promise<void> {
   const claim = crypto.randomUUID();
-  if (!(await store.claimOpenRouterSync(claim, 60_000))) throw new Error("sync claim held");
+  if ((await store.claimOpenRouterSync(claim, 60_000)) === null) throw new Error("sync claim held");
   await store.upsertOpenRouterCatalogue(models, at, claim);
   await store.endOpenRouterSync(claim, null);
 }
@@ -91,6 +91,6 @@ export async function seedCatalogue(
 /** Writes a sync state straight into `store`, under a claim of its own. */
 export async function seedSyncState(store: KeyStore, state: OpenRouterSyncEnd): Promise<void> {
   const claim = crypto.randomUUID();
-  if (!(await store.claimOpenRouterSync(claim, 60_000))) throw new Error("sync claim held");
+  if ((await store.claimOpenRouterSync(claim, 60_000)) === null) throw new Error("sync claim held");
   await store.endOpenRouterSync(claim, state);
 }

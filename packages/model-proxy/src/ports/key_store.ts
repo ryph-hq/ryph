@@ -185,15 +185,17 @@ export interface KeyStore {
   /** Replaces the enabled set with exactly `ids`. The caller checks they are usable. */
   setOpenRouterEnabled(ids: readonly string[], at: string): Promise<void>;
   /** Where the catalogue sync stands, `syncing` read from the claim; null before the first
-   * attempt. */
+   * claim. A claim that ended with no state written leaves every time null. */
   getOpenRouterSync(): Promise<OpenRouterSync | null>;
   /**
    * Takes the deployment's one sync claim as `claim` (a token unique to this sync) for `forMs`,
-   * when nobody holds it or the last holder's claim has lapsed. Atomic: of two callers at once,
-   * one gets true. The lapse is timed on the store's own clock, the one clock every replica
-   * shares, so no two processes whose clocks disagree can both hold it.
+   * when nobody holds it or the last holder's claim has lapsed, and answers the store's time as
+   * it took it (an ISO string): the sync's time. Null when it was not taken. Atomic: of two
+   * callers at once, one gets a time. The lapse is timed on the store's own clock, the one clock
+   * every replica shares, so no two processes whose clocks disagree can both hold it; and the
+   * sync is stamped by it for the same reason.
    */
-  claimOpenRouterSync(claim: string, forMs: number): Promise<boolean>;
+  claimOpenRouterSync(claim: string, forMs: number): Promise<string | null>;
   /**
    * Ends the sync holding `claim`: writes how it went (unless `state` is null) and gives the claim
    * up, in one step, and only while the claim is still held. False when it was not, and nothing

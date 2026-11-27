@@ -221,6 +221,9 @@ export function openRouterRoutes(deps: OpenRouterRoutesDeps): Route[] {
     if (!body.ok) return body.res;
     const state = await catalogue.sync({ force: body.data.force });
     const answer = await catalogueBody();
+    // A sync this answered as still running is, whatever the store read a moment later says: it
+    // may be this process's own, not yet holding the claim. The picker reads again while it runs.
+    if (state.syncing) answer.sync.syncing = true;
     if (state.error !== null) {
       return json(502, {
         error: `could not sync OpenRouter's models: ${state.error}`,

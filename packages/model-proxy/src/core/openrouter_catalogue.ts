@@ -20,10 +20,21 @@
 // - `syncing` is the claim's: true on every replica while any replica syncs
 // - who cannot claim: a background or lazy sync leaves it to the holder; a sync someone waits on
 //   (an admin's "Sync now", a first key's save) waits the holder out and answers what it found,
-//   and a forced one then runs its own
-// - in this process a second caller joins the sync in flight rather than asking the store again
-// - each sync's time is later than the last one's, whatever this replica's clock says: the miss
-//   count tells this sync's rows from the last one's by it, and a state never goes back in time
+//   and a forced one then runs its own. A plain one answers only a sync that ENDED after it began
+//   waiting, with a state written: one that ended writing nothing (its store was down) is no
+//   answer, and neither is a state no sync has written yet
+// - in this process a second caller joins the sync in flight rather than asking the store again,
+//   and a second forced one joins the forced one waiting its turn
+// - a sync someone waits on is answered within `SYNC_WAIT_MS` of its call, whatever it waits for:
+//   the syncs in flight here and the claim another replica holds. Past that it answers the state
+//   as it stands, as still running (`OPENROUTER_SYNC_STILL_RUNNING`), and what it waited for runs
+//   on in the background; the picker reads again while a sync runs
+// - a sync's time is the STORE's clock, taken with the claim, never this replica's: the miss count
+//   tells this sync's rows from the last one's by it, and the state's times are what every
+//   replica judges staleness by. A replica whose clock runs fast would otherwise stamp a time in
+//   the future, and every replica would think the catalogue fresh until that time came
+// - a sync whose time is in the future, by this replica's clock or the store's, is stale: a state
+//   that some clock stamped wrong never stops the next sync
 // - a failed sync changes no model row: the old catalogue stands, and the state says what failed
 // - a list with no model in it is a failure, not an empty catalogue: it would mark every model
 //   unlisted, and with that take every enabled one away from agents
@@ -61,8 +72,12 @@ export const SYNC_CLAIM_MS = 2 * 60 * 1000;
 /** How often a sync that waits out another's claim looks again. */
 const CLAIM_POLL_MS = 250;
 
-/** How long a sync waits out others' claims before it gives up: one whole claim, and a margin. */
-const CLAIM_WAIT_MS = SYNC_CLAIM_MS + 30_000;
+/** How long a sync someone waits on may take to answer, from the call: one whole claim of
+ * another replica's, and a margin. */
+export const SYNC_WAIT_MS = SYNC_CLAIM_MS + 30_000;
+
+/** The error of a sync that was still waiting when its time to answer ran out. */
+export const OPENROUTER_SYNC_STILL_RUNNING = "another sync is still running";
 
 export interface OpenRouterCatalogueDeps {
   store: KeyStore;
@@ -80,10 +95,11 @@ export interface OpenRouterCatalogueDeps {
 
 export interface OpenRouterCatalogue {
   /** Syncs now — or, when a sync is running anywhere, waits for it and answers the state it
-   * left — and answers that state. Never throws for OpenRouter's sake: a failure is in the
-   * state's `error`. `force` takes a list that lost more than half the models the last one
-   * listed; only an admin's "Sync now" passes it, and it waits out a sync in flight and then runs
-   * its own, rather than answering the other's. */
+   * left — and answers that state, within `SYNC_WAIT_MS` (past it, the state as it stands, as
+   * still running). Never throws for OpenRouter's sake: a failure is in the state's `error`.
+   * `force` takes a list that lost more than half the models the last one listed; only an
+   * admin's "Sync now" passes it, and it waits out a sync in flight and then runs its own, rather
+   * than answering the other's. */
   sync(opts?: { force?: boolean }): Promise<OpenRouterSync>;
   /** Starts a sync when the last one is older than `maxAgeMs` and no attempt failed in the last
    * few minutes. Resolves once that is decided, with whether a sync is now running anywhere: from
@@ -100,6 +116,8 @@ export interface OpenRouterCatalogue {
 export function makeOpenRouterCatalogue(deps: OpenRouterCatalogueDeps): OpenRouterCatalogue {
   const sleep = deps.sleep ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)));
   let inFlight: Promise<OpenRouterSync> | null = null;
+  /** A forced sync waiting in this process for `inFlight` to end, which later ones join. */
+  let queuedForce: Promise<OpenRouterSync> | null = null;
 
   /** A sync's failure, as the state records it. */
   class SyncRefused extends Error {
@@ -108,33 +126,47 @@ export function makeOpenRouterCatalogue(deps: OpenRouterCatalogueDeps): OpenRout
     }
   }
 
-  const ageOf = (iso: string | null | undefined) =>
-    iso === null || iso === undefined ? Infinity : deps.now().getTime() - Date.parse(iso);
+  /** How long ago `iso` was at `nowMs`. A time in the future, or none, is infinitely long ago:
+   * a clock that stamped it wrong must not hold the next sync off until it comes. */
+  const ageOf = (iso: string | null | undefined, nowMs: number) => {
+    const age = iso === null || iso === undefined ? NaN : nowMs - Date.parse(iso);
+    return Number.isFinite(age) && age >= 0 ? age : Infinity;
+  };
 
-  /** Whether `state` needs no sync: synced within `maxAgeMs`, or failed too recently to retry. */
-  const fresh = (state: OpenRouterSync | null, maxAgeMs: number) =>
-    ageOf(state?.syncedAt) < maxAgeMs ||
+  /** Whether `state` needs no sync at `nowMs`: synced within `maxAgeMs`, or failed too recently
+   * to retry. */
+  const fresh = (state: OpenRouterSync | null, maxAgeMs: number, nowMs: number) =>
+    ageOf(state?.syncedAt, nowMs) < maxAgeMs ||
     (state?.error !== null && state?.error !== undefined &&
-      ageOf(state.attemptedAt) < RETRY_AFTER_MS);
+      ageOf(state.attemptedAt, nowMs) < RETRY_AFTER_MS);
 
-  /** One sync, under `claim`, which this has taken. `ifOlderThan` makes it a stale sync, which
-   * gives the claim back unused when another replica synced between the look and the claim. */
+  /**
+   * One sync, under `claim`, which this has taken at `at` by the store's clock. `ifOlderThan`
+   * makes it a stale sync, which gives the claim back unused when another replica synced between
+   * the look and the claim. `answerIfMovedFrom` makes it a plain sync someone waits on, which
+   * gives the claim back and answers the state when a sync ended, with a state written, since
+   * the caller first looked (when it saw `attemptedAt`).
+   */
   const runClaimed = async (
     claim: string,
-    opts: { force: boolean; ifOlderThan?: number },
+    at: string,
+    opts: { force: boolean; ifOlderThan?: number; answerIfMovedFrom?: string | null },
   ): Promise<OpenRouterSync> => {
-    let at = deps.now().toISOString();
     // Undefined until the store answers: a sync whose first read failed has no state to keep.
     let previous: OpenRouterSync | null | undefined;
     try {
       previous = await deps.store.getOpenRouterSync();
-      if (opts.ifOlderThan !== undefined && fresh(previous, opts.ifOlderThan)) {
+      if (opts.ifOlderThan !== undefined && fresh(previous, opts.ifOlderThan, Date.parse(at))) {
         await deps.store.endOpenRouterSync(claim, null);
         return { ...previous!, syncing: false };
       }
-      // Later than the last sync's, whichever replica's clock that was: see the invariants.
-      const last = previous?.attemptedAt ? Date.parse(previous.attemptedAt) : -Infinity;
-      if (!(Date.parse(at) > last)) at = new Date(last + 1).toISOString();
+      if (
+        opts.answerIfMovedFrom !== undefined && previous !== null &&
+        previous.attemptedAt !== null && previous.attemptedAt !== opts.answerIfMovedFrom
+      ) {
+        await deps.store.endOpenRouterSync(claim, null);
+        return { ...previous, syncing: false };
+      }
       const rows = catalogueOf(await deps.api.listModels());
       if (rows.length === 0) throw new SyncRefused("OpenRouter's model list had no model in it");
       if (rows.length > MAX_CATALOGUE_MODELS) {
@@ -200,40 +232,36 @@ export function makeOpenRouterCatalogue(deps: OpenRouterCatalogueDeps): OpenRout
     }
   };
 
-  /** A sync someone waits on: this process's claim, or the end of another's. */
-  const waitedSync = async (force: boolean): Promise<OpenRouterSync> => {
-    const at = deps.now().toISOString();
+  /** The state as it stands, answered as a sync still running: what a caller whose time ran out
+   * is told. */
+  const stillRunning = async (): Promise<OpenRouterSync> => {
+    const state = await deps.store.getOpenRouterSync().catch(() => null);
+    return {
+      syncedAt: state?.syncedAt ?? null,
+      attemptedAt: state?.attemptedAt ?? null,
+      error: OPENROUTER_SYNC_STILL_RUNNING,
+      errorCode: null,
+      syncing: true,
+    };
+  };
+
+  /** A sync someone waits on, until `deadlineMs`: this process's claim, or the end of another's. */
+  const waitedSync = async (force: boolean, deadlineMs: number): Promise<OpenRouterSync> => {
     try {
-      // The state as it stood when another sync was first seen holding the claim: once it has
-      // moved on and the claim is free, that sync has ended, and what it found is the answer to
-      // a plain sync. A forced one claims after it instead.
-      let before: OpenRouterSync | null | undefined;
-      for (let tries = 0;; tries++) {
-        if (before !== undefined) {
-          const state = await deps.store.getOpenRouterSync();
-          if (!force && !state?.syncing && state?.attemptedAt !== before?.attemptedAt) {
-            return state!;
-          }
-        }
+      // The state as it stood before this tried for the claim: once a sync has ended since,
+      // having written a state, what it found is the answer to a plain sync. A forced one claims
+      // after it instead.
+      const seen = force ? undefined : (await deps.store.getOpenRouterSync())?.attemptedAt ?? null;
+      for (;;) {
         const claim = crypto.randomUUID();
-        if (await deps.store.claimOpenRouterSync(claim, SYNC_CLAIM_MS)) {
-          return await runClaimed(claim, { force });
-        }
-        if (before === undefined) {
-          before = await deps.store.getOpenRouterSync();
-          // The holder ended between the claim and the look: what it found is the answer.
-          if (!force && before !== null && !before.syncing) return before;
-        }
-        if (tries * CLAIM_POLL_MS >= CLAIM_WAIT_MS) {
+        const at = await deps.store.claimOpenRouterSync(claim, SYNC_CLAIM_MS);
+        if (at !== null) return await runClaimed(claim, at, { force, answerIfMovedFrom: seen });
+        if (seen !== undefined) {
           const state = await deps.store.getOpenRouterSync();
-          return {
-            syncedAt: state?.syncedAt ?? null,
-            attemptedAt: state?.attemptedAt ?? null,
-            error: "another sync is still running",
-            errorCode: null,
-            syncing: state?.syncing ?? true,
-          };
+          const ended = state !== null && !state.syncing && state.attemptedAt !== null;
+          if (ended && state.attemptedAt !== seen) return state;
         }
+        if (deps.now().getTime() >= deadlineMs) return await stillRunning();
         await sleep(CLAIM_POLL_MS);
       }
     } catch (err) {
@@ -246,11 +274,29 @@ export function makeOpenRouterCatalogue(deps: OpenRouterCatalogueDeps): OpenRout
       const state = await deps.store.getOpenRouterSync().catch(() => null);
       return {
         syncedAt: state?.syncedAt ?? null,
-        attemptedAt: at,
+        attemptedAt: state?.attemptedAt ?? null,
         error: "the sync failed",
         errorCode: null,
         syncing: state?.syncing ?? false,
       };
+    }
+  };
+
+  /** `work`'s answer, or, once `deadlineMs` passes first, the state as still running. Looks at
+   * the time every `CLAIM_POLL_MS`, so a test's clock can move it. */
+  const within = async (
+    work: Promise<OpenRouterSync>,
+    deadlineMs: number,
+  ): Promise<OpenRouterSync> => {
+    const done = work.then((state) => ({ state }));
+    for (;;) {
+      const left = deadlineMs - deps.now().getTime();
+      if (left <= 0) return await stillRunning();
+      const first = await Promise.race([
+        done,
+        sleep(Math.min(left, CLAIM_POLL_MS)).then(() => null),
+      ]);
+      if (first !== null) return first.state;
     }
   };
 
@@ -262,27 +308,43 @@ export function makeOpenRouterCatalogue(deps: OpenRouterCatalogueDeps): OpenRout
     return started;
   };
 
+  /** A forced sync, run once the one in flight here ends (it may refuse the very list the admin
+   * means to take), or the forced one already waiting for that, which takes the same next list. */
+  const forced = (deadlineMs: number): Promise<OpenRouterSync> => {
+    if (queuedForce !== null) return queuedForce;
+    if (inFlight === null) return track(waitedSync(true, deadlineMs));
+    queuedForce = (async () => {
+      while (inFlight !== null) await inFlight;
+      queuedForce = null;
+      return await track(waitedSync(true, deadlineMs));
+    })();
+    return queuedForce;
+  };
+
   const sync = async (opts: { force?: boolean } = {}): Promise<OpenRouterSync> => {
-    if (opts.force !== true) return await (inFlight ?? track(waitedSync(false)));
-    // A forced sync must be the one that runs: the one in flight may refuse the very list the
-    // admin means to take.
-    while (inFlight !== null) await inFlight;
-    return await track(waitedSync(true));
+    const deadlineMs = deps.now().getTime() + SYNC_WAIT_MS;
+    const work = opts.force === true
+      ? forced(deadlineMs)
+      : inFlight ?? queuedForce ?? track(waitedSync(false, deadlineMs));
+    return await within(work, deadlineMs);
   };
 
   const startIfStale = async (maxAgeMs = OPENROUTER_SYNC_MAX_AGE_MS): Promise<boolean> => {
-    if (inFlight !== null) return true;
+    if (inFlight !== null || queuedForce !== null) return true;
     const state = await deps.store.getOpenRouterSync();
     // Another caller may have started one while the state was read.
-    if (inFlight !== null) return true;
+    if (inFlight !== null || queuedForce !== null) return true;
     if (state?.syncing === true) return true;
-    if (fresh(state, maxAgeMs)) return false;
+    // This replica's clock decides only whether to look closer: the sync checks again by the
+    // store's, once it holds the claim.
+    if (fresh(state, maxAgeMs, deps.now().getTime())) return false;
     const claim = crypto.randomUUID();
     // Taken before this resolves, so the state reads `syncing` from here on, everywhere. One
     // that cannot be taken is another sync's, running now.
-    if (!(await deps.store.claimOpenRouterSync(claim, SYNC_CLAIM_MS))) return true;
+    const at = await deps.store.claimOpenRouterSync(claim, SYNC_CLAIM_MS);
+    if (at === null) return true;
     // Nobody awaits it here, so its failure is logged rather than left unhandled.
-    track(runClaimed(claim, { force: false, ifOlderThan: maxAgeMs })).catch((err) =>
+    track(runClaimed(claim, at, { force: false, ifOlderThan: maxAgeMs })).catch((err) =>
       deps.diag.warn("openrouter.sync_failed", { error: shortError(err) })
     );
     return true;
@@ -294,7 +356,7 @@ export function makeOpenRouterCatalogue(deps: OpenRouterCatalogueDeps): OpenRout
     async syncIfStale(maxAgeMs) {
       if (await startIfStale(maxAgeMs)) await inFlight?.catch(() => {});
     },
-    syncing: () => inFlight !== null,
+    syncing: () => inFlight !== null || queuedForce !== null,
   };
 }
 

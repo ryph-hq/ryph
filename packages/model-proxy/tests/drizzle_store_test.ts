@@ -323,6 +323,31 @@ test("the OpenRouter catalogue round-trips through both stores identically", asy
   }
 });
 
+test("a claim that ends writing nothing leaves the same state in both stores", async () => {
+  const handle = await makeTestDb();
+  const stores = { drizzle: drizzleKeyStore(handle), memory: memoryKeyStore() };
+  try {
+    const states = [];
+    for (const store of Object.values(stores)) {
+      assert((await store.claimOpenRouterSync("only", 60_000)) !== null);
+      assertEquals(await store.endOpenRouterSync("only", null), true);
+      states.push(await store.getOpenRouterSync());
+    }
+    // A row with every time null, not no row: a sync waiting on this one must not take it for
+    // an answer either way.
+    assertEquals(states[0], {
+      syncedAt: null,
+      attemptedAt: null,
+      error: null,
+      errorCode: null,
+      syncing: false,
+    });
+    assertEquals(states[1], states[0]);
+  } finally {
+    await stores.drizzle.close();
+  }
+});
+
 test("the sync claim: one holder at a time, writes only under it, lapsing on its own", async () => {
   const handle = await makeTestDb();
   const stores = { drizzle: drizzleKeyStore(handle), memory: memoryKeyStore() };
@@ -334,8 +359,12 @@ test("the sync claim: one holder at a time, writes only under it, lapsing on its
       const taken = await Promise.all(
         ["a", "b", "c", "d"].map((c) => store.claimOpenRouterSync(c, 60_000)),
       );
-      assertEquals(taken.filter(Boolean).length, 1, name);
-      const holder = ["a", "b", "c", "d"][taken.indexOf(true)];
+      assertEquals(taken.filter((at) => at !== null).length, 1, name);
+      const holder = ["a", "b", "c", "d"][taken.findIndex((at) => at !== null)];
+      // The one taken answers the store's time as it took it: the sync's time.
+      const at = taken.find((at) => at !== null)!;
+      assertEquals(new Date(at).toISOString(), at, name);
+      assert(Math.abs(Date.parse(at) - Date.now()) < 60_000, `${name}: ${at}`);
       const other = holder === "a" ? "b" : "a";
       assertEquals(await store.getOpenRouterSync(), {
         syncedAt: null,
@@ -369,17 +398,17 @@ test("the sync claim: one holder at a time, writes only under it, lapsing on its
       assertEquals(await store.endOpenRouterSync(holder, null), false, `${name}: ended once`);
 
       // An end with no state frees the claim and keeps the state as it was.
-      assert(await store.claimOpenRouterSync("e", 60_000), name);
+      assert((await store.claimOpenRouterSync("e", 60_000)) !== null, name);
       assertEquals(await store.endOpenRouterSync("e", null), true, name);
       assertEquals(await store.getOpenRouterSync(), { ...state, syncing: false }, name);
 
       // A claim whose holder never ends it lapses: the state stops saying a sync runs, the next
       // claim is taken, and the old holder can write nothing after it.
-      assert(await store.claimOpenRouterSync("dead", 30), name);
+      assert((await store.claimOpenRouterSync("dead", 30)) !== null, name);
       await new Promise((resolve) => setTimeout(resolve, 80));
       assertEquals((await store.getOpenRouterSync())?.syncing, false, name);
       assertEquals(await lost(store.upsertOpenRouterCatalogue([], T2, "dead")), "lost", name);
-      assert(await store.claimOpenRouterSync("next", 60_000), name);
+      assert((await store.claimOpenRouterSync("next", 60_000)) !== null, name);
       assertEquals(await lost(store.upsertOpenRouterCatalogue([], T2, "dead")), "lost", name);
       assertEquals(
         await store.endOpenRouterSync("dead", { ...state, attemptedAt: T2 }),

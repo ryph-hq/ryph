@@ -500,8 +500,12 @@ export function drizzleKeyStore(handle: ModelProxyDbHandle): KeyStore {
           // claims at once one winner and one loser.
           setWhere: or(isNull(syncRow.claim), lte(syncRow.claimedUntil, sql`now()`)),
         })
-        .returning({ id: syncRow.id });
-      return taken.length === 1;
+        // The sync's time, on the clock the claim is timed by. Read as milliseconds: the
+        // drivers answer a timestamp in different shapes, a number in one.
+        .returning({
+          at: sql<number>`(extract(epoch from now()) * 1000)::float8`.mapWith(Number),
+        });
+      return taken.length === 1 ? new Date(Math.floor(taken[0].at)).toISOString() : null;
     },
     async endOpenRouterSync(claim, state) {
       const ended = await db.update(syncRow)

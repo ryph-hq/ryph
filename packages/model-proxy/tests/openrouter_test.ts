@@ -8,7 +8,13 @@ import type { Route } from "@ryph/shared/http";
 import { unauthorized } from "@ryph/sealed";
 import { forbidden } from "@ryph/auth";
 import { catalogueOf, OPENROUTER, openRouterModelForRun } from "../src/core/openrouter.ts";
-import { makeOpenRouterCatalogue, SYNC_CLAIM_MS } from "../src/core/openrouter_catalogue.ts";
+import {
+  makeOpenRouterCatalogue,
+  OPENROUTER_SYNC_MAX_AGE_MS,
+  OPENROUTER_SYNC_STILL_RUNNING,
+  SYNC_CLAIM_MS,
+  SYNC_WAIT_MS,
+} from "../src/core/openrouter_catalogue.ts";
 import { openRouterApi } from "../src/adapters/openrouter/api.ts";
 import { OpenRouterApiError } from "../src/ports/openrouter_api.ts";
 import { openRouterRoutes } from "../src/http/openrouter.ts";
@@ -225,9 +231,9 @@ test("the adapter reads at most 16 MB of an answer", async () => {
 // ── the sync ────────────────────────────────────────────────────────────────────────────────
 
 test("a sync writes the catalogue; a failed one keeps it and says why", async () => {
-  const store = memoryKeyStore();
-  const api = fakeOpenRouter();
   let now = NOW;
+  const store = memoryKeyStore({ now: () => now });
+  const api = fakeOpenRouter();
   const catalogue = makeOpenRouterCatalogue({ store, api, now: () => now, diag: quiet });
 
   const first = await catalogue.sync();
@@ -256,9 +262,9 @@ test("a sync writes the catalogue; a failed one keeps it and says why", async ()
 });
 
 test("syncs run one at a time, and a stale check syncs only when it should", async () => {
-  const store = memoryKeyStore();
-  const api = fakeOpenRouter();
   let now = NOW;
+  const store = memoryKeyStore({ now: () => now });
+  const api = fakeOpenRouter();
   const catalogue = makeOpenRouterCatalogue({ store, api, now: () => now, diag: quiet });
 
   await Promise.all([catalogue.sync(), catalogue.sync(), catalogue.syncIfStale()]);
@@ -282,10 +288,10 @@ test("syncs run one at a time, and a stale check syncs only when it should", asy
 });
 
 test("a short list keeps enabled models; one half gone fails unless forced", async () => {
-  const store = memoryKeyStore();
+  let now = NOW;
+  const store = memoryKeyStore({ now: () => now });
   const ten = Array.from({ length: 10 }, (_, i) => listedModel(`m/${i}`));
   const api = fakeOpenRouter({ models: { data: ten } });
-  let now = NOW;
   const catalogue = makeOpenRouterCatalogue({ store, api, now: () => now, diag: quiet });
   await catalogue.sync();
   await store.setOpenRouterEnabled(["m/0", "m/1"], NOW.toISOString());
@@ -323,7 +329,7 @@ test("a short list keeps enabled models; one half gone fails unless forced", asy
 });
 
 test("a list past the cap fails, and so does a write, with a short error", async () => {
-  const store = memoryKeyStore();
+  const store = memoryKeyStore({ now: () => NOW });
   const api = fakeOpenRouter({
     models: { data: Array.from({ length: 5_001 }, (_, i) => listedModel(`m/${i}`)) },
   });
@@ -365,11 +371,23 @@ const ADMIN = "admin-secret";
 const USER = "user-secret";
 
 function makeApi(
-  opts: { store?: KeyStore; api?: ReturnType<typeof fakeOpenRouter>; changed?: () => void } = {},
+  opts: {
+    store?: KeyStore;
+    api?: ReturnType<typeof fakeOpenRouter>;
+    changed?: () => void;
+    now?: () => Date;
+    sleep?: (ms: number) => Promise<void>;
+  } = {},
 ) {
-  const store = opts.store ?? memoryKeyStore();
+  const store = opts.store ?? memoryKeyStore({ now: () => NOW });
   const api = opts.api ?? fakeOpenRouter();
-  const catalogue = makeOpenRouterCatalogue({ store, api, now: () => NOW, diag: quiet });
+  const catalogue = makeOpenRouterCatalogue({
+    store,
+    api,
+    now: opts.now ?? (() => NOW),
+    diag: quiet,
+    ...(opts.sleep === undefined ? {} : { sleep: opts.sleep }),
+  });
   const gate = (req: Request, adminsOnly: boolean): Response | null => {
     const presented = req.headers.get("authorization");
     if (presented === `Bearer ${ADMIN}`) return null;
@@ -660,7 +678,7 @@ function heldOpenRouter(over: Parameters<typeof fakeOpenRouter>[0] = {}) {
 const tick = () => new Promise<void>((resolve) => setTimeout(resolve, 1));
 
 test("a sync another replica runs is reported as running, until it ends", async () => {
-  const store = memoryKeyStore();
+  const store = memoryKeyStore({ now: () => NOW });
   // The other replica: its own catalogue over the same store, its model list held open.
   const { api, release } = heldOpenRouter();
   const there = makeOpenRouterCatalogue({ store, api, now: () => NOW, diag: quiet });
@@ -681,7 +699,9 @@ test("a sync another replica runs is reported as running, until it ends", async 
 });
 
 test("two replicas syncing at once make one sync, and the state never goes back", async () => {
-  const store = memoryKeyStore();
+  // The store's clock, which every replica shares.
+  let storeNow = NOW;
+  const store = memoryKeyStore({ now: () => storeNow });
   const { api, release } = heldOpenRouter();
   // Two replicas, the second's clock a minute behind the first's.
   const here = makeOpenRouterCatalogue({ store, api, now: () => NOW, diag: quiet, sleep: tick });
@@ -715,15 +735,19 @@ test("two replicas syncing at once make one sync, and the state never goes back"
   const seen = states.filter((at) => at !== null);
   assertEquals(seen, [...seen].sort(), "attemptedAt only moves forward");
 
-  // A sync on the replica whose clock is behind is still later than the last.
+  // A sync on the replica whose clock is behind is stamped by the store's clock, so it is later
+  // than the last.
+  storeNow = new Date(NOW.getTime() + 1_000);
   await there.sync({ force: true });
   const later = await store.getOpenRouterSync();
+  assertEquals(later?.attemptedAt, storeNow.toISOString());
   assert(later!.attemptedAt! > synced!.attemptedAt!, "a later sync is later");
   assert(later!.syncedAt! > synced!.syncedAt!);
 });
 
 test("one short list counts one miss, however many replicas sync on it at once", async () => {
-  const store = memoryKeyStore();
+  let storeNow = NOW;
+  const store = memoryKeyStore({ now: () => storeNow });
   const ten = Array.from({ length: 10 }, (_, i) => listedModel(`m/${i}`));
   const first = fakeOpenRouter({ models: { data: ten } });
   await makeOpenRouterCatalogue({ store, api: first, now: () => NOW, diag: quiet }).sync();
@@ -731,6 +755,7 @@ test("one short list counts one miss, however many replicas sync on it at once",
 
   // One short answer, without the enabled model, that three replicas would all act on.
   const later = new Date(NOW.getTime() + 25 * 60 * 60 * 1000);
+  storeNow = later;
   const { api, release } = heldOpenRouter({ models: { data: ten.slice(1) } });
   const replicas = [0, 1, 2].map(() =>
     makeOpenRouterCatalogue({ store, api, now: () => later, diag: quiet, sleep: tick })
@@ -752,7 +777,7 @@ test("one short list counts one miss, however many replicas sync on it at once",
 });
 
 test("a background sync that cannot claim leaves it to the holder", async () => {
-  const store = memoryKeyStore();
+  const store = memoryKeyStore({ now: () => NOW });
   const { api, release } = heldOpenRouter();
   const there = makeOpenRouterCatalogue({ store, api, now: () => NOW, diag: quiet });
   const running = there.sync();
@@ -770,7 +795,7 @@ test("a background sync that cannot claim leaves it to the holder", async () => 
 
 test("a forced sync waits out another replica's and then runs its own", async () => {
   const ten = Array.from({ length: 10 }, (_, i) => listedModel(`m/${i}`));
-  const store = memoryKeyStore();
+  const store = memoryKeyStore({ now: () => NOW });
   await makeOpenRouterCatalogue({
     store,
     api: fakeOpenRouter({ models: { data: ten } }),
@@ -801,7 +826,7 @@ test("a holder that died mid-sync blocks the next sync for one claim, and no lon
   let now = NOW;
   const store = memoryKeyStore({ now: () => now });
   // A replica claimed and died: nothing ever ends its claim.
-  assert(await store.claimOpenRouterSync("dead", SYNC_CLAIM_MS));
+  assert((await store.claimOpenRouterSync("dead", SYNC_CLAIM_MS)) !== null);
 
   const api = fakeOpenRouter();
   // Each look at the claim moves the clock along, as waiting would.
@@ -823,7 +848,7 @@ test("a holder that died mid-sync blocks the next sync for one claim, and no lon
   assertEquals((await store.listOpenRouterModels()).length, 3);
 
   // A read after another lapse starts one at once.
-  assert(await store.claimOpenRouterSync("dead again", SYNC_CLAIM_MS));
+  assert((await store.claimOpenRouterSync("dead again", SYNC_CLAIM_MS)) !== null);
   now = new Date(now.getTime() + SYNC_CLAIM_MS + 25 * 60 * 60 * 1000);
   assertEquals((await store.getOpenRouterSync())?.syncing, false);
   await catalogue.syncIfStale();
@@ -838,7 +863,7 @@ test("a sync that outlives its claim writes nothing", async () => {
   // The model list takes so long the claim lapses, and another sync takes it meanwhile.
   api.listModels = async () => {
     now = new Date(now.getTime() + SYNC_CLAIM_MS + 1);
-    assert(await store.claimOpenRouterSync("the next", SYNC_CLAIM_MS));
+    assert((await store.claimOpenRouterSync("the next", SYNC_CLAIM_MS)) !== null);
     return await listModels();
   };
   const catalogue = makeOpenRouterCatalogue({ store, api, now: () => now, diag: quiet });
@@ -853,18 +878,20 @@ test("a sync that outlives its claim writes nothing", async () => {
 });
 
 test("a store that fails the sync's first read is a recorded failure, never a throw", async () => {
-  const store = memoryKeyStore();
+  const store = memoryKeyStore({ now: () => NOW });
   await seedSyncState(store, {
     syncedAt: "2026-11-26T12:00:00.000Z",
     attemptedAt: "2026-11-26T12:00:00.000Z",
     error: null,
     errorCode: null,
   });
-  let failReads = 1;
+  // The first read is "Sync now" looking at the state before it claims; the second is the sync's
+  // own, under the claim.
+  let reads = 0;
   const blipping: KeyStore = {
     ...store,
     getOpenRouterSync: () => {
-      if (failReads-- > 0) return Promise.reject(new Error("connection reset: select ..."));
+      if (++reads === 2) return Promise.reject(new Error("connection reset: select ..."));
       return store.getOpenRouterSync();
     },
   };
@@ -897,6 +924,182 @@ test("a store that fails the sync's first read is a recorded failure, never a th
   assertEquals((await store.getOpenRouterSync())?.attemptedAt, NOW.toISOString());
 });
 
+test("a replica whose clock runs fast stamps nothing in the future, and a state that some clock did never stops the sync", async () => {
+  let storeNow = NOW;
+  const store = memoryKeyStore({ now: () => storeNow });
+  const api = fakeOpenRouter();
+  const yearAhead = new Date(NOW.getTime() + 365 * 24 * 60 * 60 * 1000);
+  const fast = makeOpenRouterCatalogue({ store, api, now: () => yearAhead, diag: quiet });
+  let rightNow = NOW;
+  const right = makeOpenRouterCatalogue({ store, api, now: () => rightNow, diag: quiet });
+
+  // The fast replica syncs: the state carries the store's time, not its own.
+  const synced = await fast.sync();
+  assertEquals([synced.syncedAt, synced.attemptedAt], [NOW.toISOString(), NOW.toISOString()]);
+  await right.syncIfStale();
+  assertEquals(api.calls.models, 1, "fresh, by a clock that is right");
+
+  // A day on, the lazy sync fires as it should.
+  storeNow = rightNow = new Date(NOW.getTime() + 25 * 60 * 60 * 1000);
+  await right.syncIfStale();
+  assertEquals(api.calls.models, 2);
+  assertEquals((await store.getOpenRouterSync())?.syncedAt, storeNow.toISOString());
+
+  // A state some clock stamped a year ahead is stale, not fresh for a year: the next read syncs,
+  // and the state is the store's time again.
+  for (
+    const ahead of [
+      { syncedAt: yearAhead.toISOString(), attemptedAt: yearAhead.toISOString(), error: null },
+      // A failure stamped ahead does not hold off the retry either.
+      { syncedAt: null, attemptedAt: yearAhead.toISOString(), error: "down" },
+    ]
+  ) {
+    await seedSyncState(store, { ...ahead, errorCode: null });
+    const calls = api.calls.models;
+    assertEquals(await right.startIfStale(), true);
+    await right.syncIfStale();
+    assertEquals(api.calls.models, calls + 1);
+    const state = await store.getOpenRouterSync();
+    assertEquals([state?.syncedAt, state?.attemptedAt, state?.error], [
+      storeNow.toISOString(),
+      storeNow.toISOString(),
+      null,
+    ]);
+    assertEquals(await right.startIfStale(), false, "and fresh after it");
+  }
+});
+
+test("a plain Sync now never takes a sync that ended writing nothing for its answer", async () => {
+  const store = memoryKeyStore({ now: () => NOW });
+  const api = fakeOpenRouter();
+  // Another replica holds the claim, and ends it with nothing written (its store blipped) just
+  // as this one fails to take it: before any sync ever wrote a state, and after one did.
+  for (const before of [null, "2026-11-26T12:00:00.000Z"]) {
+    if (before !== null) {
+      await seedSyncState(store, {
+        syncedAt: before,
+        attemptedAt: before,
+        error: null,
+        errorCode: null,
+      });
+    }
+    assert((await store.claimOpenRouterSync("other", SYNC_CLAIM_MS)) !== null);
+    let ended = false;
+    const racing: KeyStore = {
+      ...store,
+      async claimOpenRouterSync(claim, forMs) {
+        const at = await store.claimOpenRouterSync(claim, forMs);
+        if (!ended) {
+          ended = true;
+          await store.endOpenRouterSync("other", null);
+        }
+        return at;
+      },
+    };
+    const calls = api.calls.models;
+    const here = makeOpenRouterCatalogue({
+      store: racing,
+      api,
+      now: () => NOW,
+      diag: quiet,
+      sleep: tick,
+    });
+    const state = await here.sync();
+    assertEquals(api.calls.models, calls + 1, "it ran a sync of its own");
+    assertEquals([state.error, state.syncedAt], [null, NOW.toISOString()]);
+  }
+});
+
+test("Sync now answers within its time, and a second forced one joins the first", async () => {
+  let now = NOW;
+  const store = memoryKeyStore({ now: () => now });
+  // Waiting moves the clock along, and lets everything else run.
+  const sleep = async (ms: number) => {
+    now = new Date(now.getTime() + ms);
+    await tick();
+  };
+  const api = fakeOpenRouter();
+  const here = makeOpenRouterCatalogue({ store, api, now: () => now, diag: quiet, sleep });
+
+  // Another replica holds the claim for far longer than anyone waits.
+  assert((await store.claimOpenRouterSync("other", 10 * SYNC_CLAIM_MS)) !== null);
+  const answered = (call: Promise<unknown>) => call.then((state) => ({ state, at: now }));
+  const plain = answered(here.sync());
+  await tick();
+  const forced = [answered(here.sync({ force: true })), answered(here.sync({ force: true }))];
+  const started = now.getTime();
+  for (const { state, at } of await Promise.all([plain, ...forced])) {
+    assertEquals(state, {
+      syncedAt: null,
+      attemptedAt: null,
+      error: OPENROUTER_SYNC_STILL_RUNNING,
+      errorCode: null,
+      syncing: true,
+    });
+    // A few looks' slack: every waiter moves the clock.
+    assert(at.getTime() - started <= SYNC_WAIT_MS + 5_000, `${at.getTime() - started} ms`);
+  }
+  assertEquals(api.calls.models, 0);
+  await store.endOpenRouterSync("other", null);
+  while (here.syncing()) await tick();
+
+  // The holder ends while a plain sync waits it out and two forced ones wait behind that: the
+  // plain one runs, and the forced two are one sync after it.
+  now = NOW;
+  assert((await store.claimOpenRouterSync("other", 10 * SYNC_CLAIM_MS)) !== null);
+  const waiting = here.sync();
+  await tick();
+  const twoForced = Promise.all([here.sync({ force: true }), here.sync({ force: true })]);
+  await sleep(60_000);
+  await store.endOpenRouterSync("other", null);
+  assertEquals((await waiting).error, null);
+  const [first, second] = await twoForced;
+  assertEquals(first, second);
+  assertEquals(first.error, null);
+  assertEquals(api.calls.models, 2, "one plain sync, and one forced");
+
+  // A sync this process runs whose model list hangs: Sync now joins it, and still answers in
+  // time.
+  now = new Date(NOW.getTime() + 2 * OPENROUTER_SYNC_MAX_AGE_MS);
+  const held = heldOpenRouter();
+  const hanging = makeOpenRouterCatalogue({
+    store,
+    api: held.api,
+    now: () => now,
+    diag: quiet,
+    sleep,
+  });
+  assertEquals(await hanging.startIfStale(), true);
+  const asked = now.getTime();
+  const late = await hanging.sync();
+  assertEquals(late.error, OPENROUTER_SYNC_STILL_RUNNING);
+  assert(now.getTime() - asked <= SYNC_WAIT_MS + 5_000, `${now.getTime() - asked} ms`);
+  held.release();
+  while (hanging.syncing()) await tick();
+});
+
+test("Sync now past its time answers as still running, in the same shape", async () => {
+  let now = NOW;
+  const store = memoryKeyStore({ now: () => now });
+  const sleep = async (ms: number) => {
+    now = new Date(now.getTime() + ms);
+    await tick();
+  };
+  const { call } = makeApi({ store, now: () => now, sleep });
+  assert((await store.claimOpenRouterSync("other", 10 * SYNC_CLAIM_MS)) !== null);
+  for (const body of [undefined, { force: true }]) {
+    const res = await call("POST", "/v1/openrouter/sync", body);
+    assertEquals(res.status, 502);
+    const answer = await res.json();
+    assertEquals(
+      answer.error,
+      `could not sync OpenRouter's models: ${OPENROUTER_SYNC_STILL_RUNNING}`,
+    );
+    assertEquals(answer.sync.syncing, true);
+    assertEquals(answer.models, []);
+  }
+});
+
 test("saving the enabled set and a sync that writes tell the proxy's cache", async () => {
   let changes = 0;
   const { call, api } = makeApi({ changed: () => changes++ });
@@ -909,7 +1112,7 @@ test("saving the enabled set and a sync that writes tell the proxy's cache", asy
 
   let synced = 0;
   const catalogue = makeOpenRouterCatalogue({
-    store: memoryKeyStore(),
+    store: memoryKeyStore({ now: () => NOW }),
     api,
     now: () => NOW,
     diag: quiet,

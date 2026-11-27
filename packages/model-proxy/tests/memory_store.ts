@@ -42,6 +42,8 @@ export function memoryKeyStore(opts: MemoryKeyStoreOptions = {}): KeyStore {
   let agentHostId: string | null = null;
   const openRouterModels = new Map<string, OpenRouterModel>();
   let openRouterSync: OpenRouterSyncEnd | null = null;
+  /** Whether the sync's row exists: from the first claim on, as the drizzle store's does. */
+  let syncRowWritten = false;
   // The sync claim: the holder's token and when it lapses, by `now`.
   let syncClaim: { claim: string; until: number } | null = null;
   const claimHeld = (claim: string) =>
@@ -301,7 +303,9 @@ export function memoryKeyStore(opts: MemoryKeyStoreOptions = {}): KeyStore {
       return Promise.resolve();
     },
     getOpenRouterSync() {
-      if (openRouterSync === null && syncClaim === null) return Promise.resolve(null);
+      // The drizzle store's row is there from the first claim on, every time null until a sync
+      // ends with a state.
+      if (!syncRowWritten) return Promise.resolve(null);
       return Promise.resolve({
         syncedAt: null,
         attemptedAt: null,
@@ -312,9 +316,10 @@ export function memoryKeyStore(opts: MemoryKeyStoreOptions = {}): KeyStore {
       });
     },
     claimOpenRouterSync(claim, forMs) {
-      if (syncClaim !== null && syncClaim.until > now().getTime()) return Promise.resolve(false);
+      if (syncClaim !== null && syncClaim.until > now().getTime()) return Promise.resolve(null);
       syncClaim = { claim, until: now().getTime() + forMs };
-      return Promise.resolve(true);
+      syncRowWritten = true;
+      return Promise.resolve(now().toISOString());
     },
     endOpenRouterSync(claim, state) {
       if (!claimHeld(claim)) return Promise.resolve(false);
