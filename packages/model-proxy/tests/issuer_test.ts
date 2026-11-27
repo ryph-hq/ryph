@@ -365,7 +365,7 @@ test("an OpenRouter credential is narrowed to the enabled models, in the policy'
   const store = await openRouterStore(["a/one", "b/two", "c/gone"]);
   const { issuer } = makeIssuer(store);
 
-  const all = await issuer.issue({ ...OPENROUTER_SCOPE, allowedModels: "*" });
+  const all = await issuer.issue({ ...OPENROUTER_SCOPE, allowedModels: "*", model: "a/one" });
   // ryph's own two variables, like a custom endpoint, and the proxy's /v1.
   assertEquals(all.RYPH_MODEL_BASE_URL, "http://model-proxy.internal:7420/v1");
   const allRow = await store.getVirtualKeyByTokenHash(await sha256Hex(all.RYPH_MODEL_API_KEY));
@@ -384,6 +384,7 @@ test("an OpenRouter credential is narrowed to the enabled models, in the policy'
     ...OPENROUTER_SCOPE,
     runId: "r-2",
     allowedModels: ["b/two", "x/never-enabled", "c/gone", "a/one"],
+    model: "b/two",
   });
   const row = await store.getVirtualKeyByTokenHash(await sha256Hex(listed.RYPH_MODEL_API_KEY));
   assertEquals(row?.allowedModels, ["b/two", "a/one"]);
@@ -419,10 +420,18 @@ test("an OpenRouter run whose own model is not enabled is refused, not booted to
       `model "${model}" isn't enabled for OpenRouter`,
     );
   }
-  // Its model enabled, or no model of its own: issued.
+  // Its model enabled: issued.
   const env = await issuer.issue({ ...OPENROUTER_SCOPE, allowedModels: "*", model: "a/one" });
   assert(env.RYPH_MODEL_API_KEY.startsWith("ryph-vk-"));
-  await issuer.issue({ ...OPENROUTER_SCOPE, runId: "r-2", allowedModels: "*", model: null });
+  // No model of its own: refused. pi, told none, would pick its own default out of its built-in
+  // OpenRouter catalogue, a model nobody enabled, and every call would be refused.
+  for (const model of [null, undefined]) {
+    await assertRejects(
+      () => issuer.issue({ ...OPENROUTER_SCOPE, runId: "r-2", allowedModels: "*", model }),
+      CredentialRefusedError,
+      "an OpenRouter run needs a model",
+    );
+  }
 
   // A re-issue narrows again: disabled since, the model is refused to the same run.
   await store.setOpenRouterEnabled(["c/gone"], T0);

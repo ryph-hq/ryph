@@ -26,6 +26,7 @@ import { openAiAccounts } from "./adapters/openai/accounts.ts";
 import { usageRoutes } from "./http/usage.ts";
 import { openRouterRoutes } from "./http/openrouter.ts";
 import { makeOpenRouterCatalogue } from "./core/openrouter_catalogue.ts";
+import { makeUsableOpenRouterModels } from "./core/openrouter_usable.ts";
 import type { OpenRouterApi } from "./ports/openrouter_api.ts";
 import { openRouterApi } from "./adapters/openrouter/api.ts";
 import type { KeyStore } from "./ports/key_store.ts";
@@ -148,11 +149,15 @@ export function setup(deps: ModelProxySetupDeps): ModelProxySetup {
     diag: deps.proxyDiag,
   });
   const openRouter = deps.openRouterApi ?? openRouterApi();
+  // The proxy's cache of the models agents may use, dropped by whatever changes them in this
+  // process: a save of the enabled set, a sync.
+  const openRouterModels = makeUsableOpenRouterModels({ store, now });
   const catalogue = makeOpenRouterCatalogue({
     store,
     api: openRouter,
     now,
     diag: deps.proxyDiag,
+    changed: openRouterModels.invalidate,
   });
   const planListener = !planOn ? null : makeCallbackListener({
     ...(deps.chatgptPlan?.callbackPort === undefined
@@ -184,6 +189,7 @@ export function setup(deps: ModelProxySetupDeps): ModelProxySetup {
         authenticateManage: deps.authenticateManage,
         now,
         diag: deps.proxyDiag,
+        changed: openRouterModels.invalidate,
       }),
       ...(planListener === null ? planOffRoutes({ authenticate: deps.authenticate }) : planRoutes({
         plan,
@@ -207,6 +213,7 @@ export function setup(deps: ModelProxySetupDeps): ModelProxySetup {
       now,
       diag: deps.proxyDiag,
       limits: { meter, gauge },
+      openRouterModels,
       ...(planOn ? { plan } : {}),
       ...(deps.resolveHost === undefined ? {} : { resolveHost: deps.resolveHost }),
     }),

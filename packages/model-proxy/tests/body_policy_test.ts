@@ -365,4 +365,22 @@ test("OpenRouter's content parts: only text, image, file and audio, every one in
     openRouter: true,
   });
   assertEquals(top.refused.length, 2);
+  // Including `provider`, whose routing preferences can override the account's data settings.
+  const routing = vetBody(enc.encode("{}"), "openai-chat", new Set(["provider"]), {
+    openRouter: true,
+  });
+  assertEquals(routing.refused.length, 1);
+  assert(routing.refused[0].startsWith("provider ("), routing.refused[0]);
+  assertEquals(vetBody(enc.encode("{}"), "openai-chat", new Set(["provider"])).refused, []);
+  // OpenRouter's fields are refused by name, a `null` value included; the shape's are not.
+  const named = vetBody(enc.encode("{}"), "openai-chat", new Set(), {
+    openRouter: true,
+    named: new Set(["models", "plugins", "preset", "provider", "web_search_options"]),
+  });
+  assertEquals(named.refused.map((r) => r.split(" ")[0]), [
+    "models",
+    "plugins",
+    "preset",
+    "provider",
+  ]);
 });

@@ -9,7 +9,9 @@ import {
   estimatedTokens,
   insertMember,
   MEDIA_MIN_TOKENS,
+  objectOrNull,
   requestedMaxOutput,
+  setMember,
   streams,
 } from "../src/core/usage_fallback.ts";
 import { topLevelMembers } from "../src/core/model_field.ts";
@@ -130,4 +132,40 @@ test("a member is inserted first, with a comma only when one follows", () => {
   assertEquals(inserted('{"model":"m"}'), { plugins: [{ id: "x" }], model: "m" });
   assertEquals(inserted(" { } "), { plugins: [{ id: "x" }] });
   assertEquals(insertMember(enc.encode("[1]"), "plugins", "[]"), null);
+});
+
+test("a member is set where the body has it, never added beside it", () => {
+  const wanted = new Set(["plugins"]);
+  const set = (body: string) => {
+    const bytes = enc.encode(body);
+    const out = setMember(bytes, topLevelMembers(bytes, wanted)!, "plugins", '[{"id":"x"}]');
+    return out === null ? null : dec.decode(out);
+  };
+  // Present, `null` included: replaced in place, so there is one `plugins` and it is the proxy's.
+  assertEquals(set('{"plugins":null,"model":"m"}'), '{"plugins":[{"id":"x"}],"model":"m"}');
+  assertEquals(
+    set('{"plugins":[{"id":"web"}],"model":"m"}'),
+    '{"plugins":[{"id":"x"}],"model":"m"}',
+  );
+  // Twice over: the last is the one a parse keeps, and the one replaced.
+  assertEquals(
+    JSON.parse(set('{"plugins":[{"id":"a"}],"plugins":[{"id":"b"}]}')!).plugins,
+    [{ id: "x" }],
+  );
+  // Absent: added.
+  assertEquals(JSON.parse(set('{"model":"m"}')!), { plugins: [{ id: "x" }], model: "m" });
+});
+
+test("only an object or null is a usage the proxy can make ask", () => {
+  const ok = (body: string) => {
+    const bytes = enc.encode(body);
+    return objectOrNull(bytes, topLevelMembers(bytes, new Set(["usage"]))!.get("usage"));
+  };
+  assertEquals(ok("{}"), true);
+  assertEquals(ok('{"usage":null}'), true);
+  assertEquals(ok('{"usage":{"include":false}}'), true);
+  for (const usage of ['"no"', "false", "[]", "1", "true"]) {
+    assertEquals(ok(`{"usage":${usage}}`), false, usage);
+  }
+  assertEquals(ok(`{"usage":{"pad":"${"x".repeat(64 * 1024)}"}}`), false, "past the cap");
 });

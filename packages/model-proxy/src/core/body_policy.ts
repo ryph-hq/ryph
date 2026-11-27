@@ -79,12 +79,18 @@ const REFUSED_TOP_LEVEL: Record<BodyShape, readonly string[]> = {
  *   `OPENROUTER_FILE_PARSER`)
  * - `preset`: a configuration stored in the OpenRouter account, which can name its own models
  *   and plugins
+ * - `provider`: routing preferences, which can override what the account decided about which
+ *   upstreams may keep or train on its data (`data_collection`, `zdr`, `only`, `ignore`). pi
+ *   does not send it
+ * Each is refused by NAME, whatever its value, `null` included: the proxy adds members of its own
+ * to an OpenRouter body (`plugins`), and a `null` it let through is one OpenRouter reads.
  * A model id's own suffixes (`:online`, `@preset/…`) need no rule: the allowlist is exact ids.
  */
 const OPENROUTER_REFUSED: Readonly<Record<string, string>> = {
   models: "fallback models the run's allowlist does not cover",
   plugins: "OpenRouter-side plugins, billed per request",
   preset: "a preset stored in the OpenRouter account",
+  provider: "routing preferences that can override the account's data and retention settings",
 };
 
 const OPENROUTER_REFUSED_FIELDS: readonly string[] = Object.keys(OPENROUTER_REFUSED);
@@ -147,12 +153,21 @@ export interface BodyVetting {
   carriesFile: boolean;
 }
 
+/** How a body is vetted beyond its shape. */
+export interface VetOptions {
+  /** Holds it to OpenRouter's rules as well. */
+  openRouter?: boolean;
+  /** Every top-level member name the body carries, `null`-valued ones included: what
+   * OpenRouter's own refusals key on. `topLevel` when not given. */
+  named?: ReadonlySet<string>;
+}
+
 /** `vetBody`'s refusals alone. */
 export function refusedInBody(
   bytes: Uint8Array,
   shape: BodyShape,
   topLevel: ReadonlySet<string>,
-  opts: { openRouter?: boolean } = {},
+  opts: VetOptions = {},
 ): string[] {
   return vetBody(bytes, shape, topLevel, opts).refused;
 }
@@ -161,13 +176,14 @@ export function refusedInBody(
  * What a model call's body asks for that the proxy does not forward, each named with where it
  * is (empty when nothing), and whether it carries a file. `topLevel` is the set of top-level
  * member names the body carries with a non-null value. `openRouter` holds it to OpenRouter's
- * rules as well: its own top-level fields, and only the content parts it reads, inline.
+ * rules as well: its own top-level fields (by name, see `opts.named`), and only the content parts
+ * it reads, inline.
  */
 export function vetBody(
   bytes: Uint8Array,
   shape: BodyShape,
   topLevel: ReadonlySet<string>,
-  opts: { openRouter?: boolean } = {},
+  opts: VetOptions = {},
 ): BodyVetting {
   const refused: string[] = [];
   let carriesFile = false;
@@ -175,8 +191,9 @@ export function vetBody(
     if (topLevel.has(field)) refused.push(`${field} (stored or provider-side state)`);
   }
   if (opts.openRouter === true) {
+    const named = opts.named ?? topLevel;
     for (const field of OPENROUTER_REFUSED_FIELDS) {
-      if (topLevel.has(field)) refused.push(`${field} (${OPENROUTER_REFUSED[field]})`);
+      if (named.has(field)) refused.push(`${field} (${OPENROUTER_REFUSED[field]})`);
     }
   }
   const clientTools = CLIENT_TOOL_TYPES[shape];

@@ -312,7 +312,8 @@ export interface VirtualKey {
   /** SHA-256 hex of the raw token; the raw token exists only inside the container. */
   tokenHash: string;
   /** Frozen from the agent's (or the platform's) model policy at issue time — editing the
-   * policy afterwards changes nothing for a credential already out. */
+   * policy afterwards changes nothing for a credential already out. An OpenRouter call is also
+   * held to the models enabled as they stand (http/proxy.ts), so turning one off does. */
   allowedModels: AllowedModels;
   /** The run's spend cap in USD at list price, frozen at issue time like the allowlist. Null
    * means the run is uncapped; a platform credential always is. */

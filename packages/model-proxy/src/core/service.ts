@@ -14,15 +14,21 @@
 //   runner reports upstream than a run that starts and can never call a model
 // - an OPENROUTER credential is narrowed to the models an admin enabled, at issue time: its
 //   allowlist is the policy's ∩ the enabled set ("*" is the enabled set), frozen onto the virtual
-//   key and narrowed again for every credential a run is issued after. None left is a refusal,
-//   and so is a run whose own model was narrowed away: it would boot only to have every call
-//   refused
+//   key. None left is a refusal, and so is a run with no model of its own or whose own model was
+//   narrowed away: it would boot only to have every call refused. The frozen list is not all that
+//   holds a run: the proxy also holds every call to the set as it stands (core/openrouter_usable.ts),
+//   so a model turned off mid-run stops working within a minute
 
 import type { AllowedModels, PlatformModelPolicy } from "./types.ts";
 import { platformPrincipal, secretCleared } from "./types.ts";
 import type { DeclaredModel, Dialect, ProviderSpec } from "./registry.ts";
 import { CHATGPT_PLAN, PLAN_LOCAL_ONLY, type PlanModel } from "./chatgpt_plan.ts";
-import { narrowedModels, OPENROUTER, openRouterModelForRun } from "./openrouter.ts";
+import {
+  narrowedModels,
+  OPENROUTER,
+  type OpenRouterModel,
+  openRouterModelForRun,
+} from "./openrouter.ts";
 import {
   BUILTIN_PROVIDERS,
   customProviderSpec,
@@ -54,12 +60,18 @@ export class CredentialRefusedError extends Error {
  * an archived endpoint as config drift — a 502 — which is a different and wrong story.
  *
  * OPENROUTER resolves with the models agents may use (enabled, and still listed) as its declared
- * ones, read from the store each time: what a custom endpoint declares, so the issuer, the
- * provider list and the proxy read them the same way.
+ * ones: what a custom endpoint declares, so the issuer, the provider list and the proxy read them
+ * the same way. They are read from the store, unless the caller passes `openRouterModels`: the
+ * proxy does, with its cached set (core/openrouter_usable.ts), as it resolves a provider on every
+ * call. The issuer never does: a credential is issued from the set as it is now.
  */
-export async function resolveProvider(store: KeyStore, id: string): Promise<ProviderSpec | null> {
+export async function resolveProvider(
+  store: KeyStore,
+  id: string,
+  opts: { openRouterModels?: () => Promise<OpenRouterModel[]> } = {},
+): Promise<ProviderSpec | null> {
   if (id === OPENROUTER) {
-    const usable = await store.listUsableOpenRouterModels();
+    const usable = await (opts.openRouterModels?.() ?? store.listUsableOpenRouterModels());
     return { ...BUILTIN_PROVIDERS[OPENROUTER], models: usable.map(openRouterModelForRun) };
   }
   // hasOwn, not `in`: a provider id is user input, and `constructor` is not a provider.
@@ -142,7 +154,8 @@ export interface CredentialScope {
   provider: string;
   allowedModels: AllowedModels;
   /** The model the run will call (the task's pick or the policy's default); absent or null when
-   * the harness picks. Held to what the credential carries, where a provider narrows it. */
+   * the harness picks. Held to what the credential carries, where a provider narrows it, and
+   * required by OpenRouter (see `NO_OPENROUTER_RUN_MODEL`). */
   model?: string | null;
   /** The run's spend cap in USD; absent or null means uncapped. */
   spendUsd?: number | null;
@@ -173,6 +186,11 @@ export interface CredentialIssuerDeps {
 }
 
 const DEFAULT_TTL_MS = 12 * 60 * 60 * 1000;
+
+/** The refusal for an OpenRouter scope that names no model for the run. pi, told none, picks its
+ * own default out of its built-in OpenRouter catalogue: a model nobody enabled. */
+const NO_OPENROUTER_RUN_MODEL =
+  "an OpenRouter run needs a model: pick a default model in the agent's policy";
 
 /** The refusal for an OpenRouter scope that leaves no model a run may use. */
 const NO_OPENROUTER_MODEL =
@@ -240,9 +258,10 @@ export function makeCredentialIssuer(deps: CredentialIssuerDeps): CredentialIssu
         declared = narrowedModels(provider.models, scope.allowedModels);
         if (declared.length === 0) throw new CredentialRefusedError(NO_OPENROUTER_MODEL);
         allowedModels = declared.map((model) => model.id);
-        if (
-          scope.model !== undefined && scope.model !== null && !allowedModels.includes(scope.model)
-        ) {
+        if (scope.model === undefined || scope.model === null) {
+          throw new CredentialRefusedError(NO_OPENROUTER_RUN_MODEL);
+        }
+        if (!allowedModels.includes(scope.model)) {
           throw new CredentialRefusedError(notEnabledForOpenRouter(scope.model));
         }
       }

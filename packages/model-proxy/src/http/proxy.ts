@@ -19,7 +19,10 @@
 // - usage recording is fire-and-forget: metering must never fail or slow a model call
 // - the provider is resolved PER REQUEST through the store (built-ins ∪ custom rows), so
 //   registering or archiving an endpoint takes effect on the next request with no restart and
-//   no cache to go stale — the same stance the live provider-key liveness check takes
+//   no cache to go stale — the same stance the live provider-key liveness check takes. The one
+//   cache is OpenRouter's usable models (core/openrouter_usable.ts), at most a minute old
+// - an OPENROUTER call is held to the models agents may use as they stand, beside its credential's
+//   frozen allowlist: a model turned off or unlisted mid-run stops answering within that minute
 // - the caps are the ONE stateful thing in this process (see spend_meter.ts): what a run has
 //   spent is seeded from the store the first time the process sees the run and then counted here
 //   as each row is priced, so the cap is judged from a map lookup rather than an aggregate per
@@ -63,10 +66,11 @@ import {
   estimatedInputTokens,
   estimatedTokens,
   FALLBACK_OUTPUT_TOKENS,
-  insertMember,
   MAX_DRAIN_BYTES,
   MAX_OUTPUT_FIELDS,
+  objectOrNull,
   requestedMaxOutput,
+  setMember,
   streams,
 } from "../core/usage_fallback.ts";
 import {
@@ -76,6 +80,10 @@ import {
   vetBody,
 } from "../core/body_policy.ts";
 import { OPENROUTER } from "../core/openrouter.ts";
+import {
+  makeUsableOpenRouterModels,
+  type UsableOpenRouterModels,
+} from "../core/openrouter_usable.ts";
 import { modelOf, rawValue, topLevelMembers, type ValueSpan } from "../core/model_field.ts";
 import type { PlanKeys } from "../core/plan_keys.ts";
 import { included, priceFor, type PriceOverlay, priceOverlayFrom } from "../core/pricing.ts";
@@ -127,6 +135,9 @@ export interface ProxyHandlerDeps {
   /** A ChatGPT plan key's tokens and state. Absent — a deployment that is not local — plan keys
    * are refused with a 403. */
   plan?: Pick<PlanKeys, "accessToken" | "markLimited" | "clearLimited">;
+  /** OpenRouter's usable models, cached; shared with the routes that change them so a change
+   * made in this process reaches the next call. One of the proxy's own when not given. */
+  openRouterModels?: UsableOpenRouterModels;
 }
 
 /** How much of a plan's error body is read to find its code and relayed. Error bodies are
@@ -493,6 +504,8 @@ export function makeProxyHandler(deps: ProxyHandlerDeps): (req: Request) => Prom
   const upstreamFetch = deps.upstreamFetch ?? fetch;
   const baseUrlFor = deps.baseUrlFor ?? ((p: ProviderSpec) => p.baseUrl);
   const { meter, gauge } = deps.limits;
+  const openRouterModels = deps.openRouterModels ??
+    makeUsableOpenRouterModels({ store: deps.store, now: deps.now });
 
   // Hostname → until when it is known to resolve outside the network. Only a pass is kept: a
   // refusal is asked again, so a fixed record serves on the next request.
@@ -773,7 +786,9 @@ export function makeProxyHandler(deps: ProxyHandlerDeps): (req: Request) => Prom
     // provider that does not resolve, or that is archived, still come after `decide`.
     const provider = providerKey === null
       ? null
-      : await resolveProvider(deps.store, providerKey.provider);
+      : await resolveProvider(deps.store, providerKey.provider, {
+        openRouterModels: openRouterModels.get,
+      });
     const route = provider === null ? null : providerRoute(provider, req.method, url.pathname);
     // A route the provider does not serve to a run is refused here, unread: batches, files,
     // fine-tuning, stored responses, an organization's admin API and a gateway's key-info route
@@ -861,6 +876,25 @@ export function makeProxyHandler(deps: ProxyHandlerDeps): (req: Request) => Prom
       deps.diag.debug("proxy.denied", { runId: decision.virtualKey.runId, status: 403 });
       return final(403, { error: "the model endpoint backing this run was archived" });
     }
+    // OpenRouter's usable set as it stands, beside the allowlist frozen when the credential was
+    // issued: a model an admin turned off, or that a sync unlisted, is refused from the next call
+    // on (give or take the cache's minute), platform credentials included. The same answer as
+    // the allowlist's.
+    if (
+      provider.id === OPENROUTER && route?.spends === true &&
+      (named === null || !provider.models.some((model) => model.id === named))
+    ) {
+      deps.diag.debug("proxy.denied", {
+        runId: decision.virtualKey.runId,
+        status: 403,
+        model: named,
+      });
+      return json(403, {
+        error: named === null
+          ? "this run may only use certain models, and this request names none"
+          : `model "${named}" is not allowed for this run: it isn't enabled for OpenRouter`,
+      });
+    }
 
     // A model call carries a JSON object, and only a body this proxy has read can be
     // held to anything: one it cannot walk (not JSON, not an object, not UTF-8) would be judged
@@ -893,6 +927,7 @@ export function makeProxyHandler(deps: ProxyHandlerDeps): (req: Request) => Prom
     if (route?.shape && body !== null && members !== null && provider.id !== CHATGPT_PLAN) {
       const vetted = vetBody(body, route.shape, presentMembers(body, members), {
         openRouter: provider.id === OPENROUTER,
+        named: new Set(members.keys()),
       });
       const refused = vetted.refused;
       carriesFile = vetted.carriesFile;
@@ -909,14 +944,28 @@ export function makeProxyHandler(deps: ProxyHandlerDeps): (req: Request) => Prom
     // row carries the bill rather than a list price. A file it parses with the free engine, never
     // the per-page one (`OPENROUTER_FILE_PARSER`). Each splice walks the body again: the spans of
     // the walk before it no longer fit.
+    // Both splices replace a member the body already carries rather than add a second one: JSON's
+    // last one wins, and a second `plugins` would leave the body's own in force.
     if (provider.id === OPENROUTER && body !== null && members !== null) {
+      // Only an object (or null) can be made to ask: anything else would leave the cost unasked.
+      if (!objectOrNull(body, members.get("usage"))) {
+        deps.diag.debug("proxy.body_refused", {
+          runId: decision.virtualKey.runId,
+          refused: "usage",
+        });
+        return bodyRefusal(["usage (it must be a small JSON object, or null)"]);
+      }
       const asked = ensureObjectField(body, members, "usage", "include");
-      const parsed = carriesFile
-        ? insertMember(asked ?? body, "plugins", OPENROUTER_FILE_PARSER)
-        : null;
-      if (asked !== null || parsed !== null) {
-        body = parsed ?? asked ?? body;
+      if (asked !== null) {
+        body = asked;
         members = topLevelMembers(body, READ_MEMBERS);
+      }
+      if (carriesFile && members !== null) {
+        const parsed = setMember(body, members, "plugins", OPENROUTER_FILE_PARSER);
+        if (parsed !== null) {
+          body = parsed;
+          members = topLevelMembers(body, READ_MEMBERS);
+        }
       }
     }
     // A streamed Chat Completions call reports its usage only when it asks to: made to ask, so a

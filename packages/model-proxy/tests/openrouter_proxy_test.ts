@@ -7,6 +7,11 @@ import { assert, assertAlmostEquals, assertEquals } from "@std/assert";
 import { makeProxyHandler } from "../src/http/proxy.ts";
 import { makeCredentialIssuer } from "../src/core/service.ts";
 import { catalogueOf, OPENROUTER } from "../src/core/openrouter.ts";
+import { makeOpenRouterCatalogue } from "../src/core/openrouter_catalogue.ts";
+import {
+  makeUsableOpenRouterModels,
+  type UsableOpenRouterModels,
+} from "../src/core/openrouter_usable.ts";
 import { makeSpendMeter } from "../src/core/spend_meter.ts";
 import { spendOfRun } from "../src/core/spend.ts";
 import { memoryKeyStore } from "./memory_store.ts";
@@ -19,9 +24,12 @@ const T0 = "2026-11-27T12:00:00.000Z";
 async function makeSlice(opts: {
   enabled?: string[];
   allowedModels?: string[] | "*";
+  /** The run's own model; the first enabled one it may use unless given. */
+  model?: string;
   spendUsd?: number;
   upstream?: (req: Request) => Response | Promise<Response>;
   now?: () => Date;
+  openRouterModels?: (store: ReturnType<typeof memoryKeyStore>) => UsableOpenRouterModels;
 } = {}) {
   const store = memoryKeyStore();
   await store.upsertOpenRouterCatalogue(
@@ -33,10 +41,10 @@ async function makeSlice(opts: {
     }),
     T0,
   );
-  await store.setOpenRouterEnabled(
-    opts.enabled ?? ["anthropic/claude-sonnet-5", "openai/gpt-6", "mystery/unpriced"],
-    T0,
-  );
+  const enabled = opts.enabled ??
+    ["anthropic/claude-sonnet-5", "openai/gpt-6", "mystery/unpriced"];
+  await store.setOpenRouterEnabled(enabled, T0);
+  const allowedModels = opts.allowedModels ?? "*";
   await store.createProviderKey({
     id: "pk-or",
     provider: OPENROUTER,
@@ -57,7 +65,9 @@ async function makeSlice(opts: {
     taskId: "t-1",
     providerKeyId: "pk-or",
     provider: OPENROUTER,
-    allowedModels: opts.allowedModels ?? "*",
+    allowedModels,
+    model: opts.model ??
+      (allowedModels === "*" ? enabled : allowedModels).find((m) => enabled.includes(m)),
     spendUsd: opts.spendUsd ?? null,
   });
   const seen: Array<{ url: string; headers: Headers; body: string }> = [];
@@ -74,6 +84,9 @@ async function makeSlice(opts: {
     now: opts.now ?? (() => new Date(T0)),
     diag: { debug() {}, warn() {} },
     limits: { meter: makeSpendMeter({ backstopMs: 30_000 }), gauge: null },
+    ...(opts.openRouterModels === undefined
+      ? {}
+      : { openRouterModels: opts.openRouterModels(store) }),
     upstreamFetch: (async (input: URL | Request | string, init?: RequestInit) => {
       const req = input instanceof Request
         ? new Request(input, init)
@@ -161,6 +174,13 @@ test("an OpenRouter body may not route around the allowlist or the meter", async
       { models: ["openai/gpt-6", "x-ai/grok-9"] },
       { plugins: [{ id: "web" }] },
       { preset: "my-preset" },
+      { provider: { data_collection: "allow", only: ["some-host"] } },
+      // Refused by name: a `null` here is one OpenRouter reads, and the proxy's own `plugins`
+      // must never sit beside the body's.
+      { models: null },
+      { plugins: null },
+      { preset: null },
+      { provider: null },
     ]
   ) {
     const res = await call({ model: "openai/gpt-6", messages: [], ...extra });
@@ -169,8 +189,24 @@ test("an OpenRouter body may not route around the allowlist or the meter", async
     assertEquals(body.code, "body_not_allowed");
     assert(body.refused[0].startsWith(Object.keys(extra)[0]), body.refused[0]);
   }
-  // `null` is not asking for anything.
-  assertEquals((await call({ model: "openai/gpt-6", messages: [], models: null })).status, 200);
+  // A `usage` the proxy cannot make ask for the cost is refused; an object or null is not.
+  for (const usage of ["no", false, [], 1, { pad: "x".repeat(70 * 1024) }]) {
+    const res = await call({ model: "openai/gpt-6", messages: [], usage });
+    assertEquals(res.status, 400, JSON.stringify(usage).slice(0, 40));
+    assertEquals((await res.json()).refused[0].startsWith("usage"), true);
+  }
+  for (const usage of [null, {}, { include: false }]) {
+    const res = await call({ model: "openai/gpt-6", messages: [], usage });
+    assertEquals(res.status, 200, JSON.stringify(usage));
+    await res.body?.cancel();
+    assertEquals(JSON.parse(seen.at(-1)!.body).usage.include, true);
+  }
+  // The fields every chat body is held to still read `null` as asking for nothing.
+  const plain = await call({ model: "openai/gpt-6", messages: [], web_search_options: null });
+  assertEquals(plain.status, 200);
+  await plain.body?.cancel();
+  seen.length = 0;
+  assertEquals((await call({ model: "openai/gpt-6", messages: [] })).status, 200);
   // A model id's own suffixes are not the enabled model: the allowlist is exact ids.
   for (const model of ["openai/gpt-6:online", "@preset/mine", "openrouter/auto"]) {
     const res = await call({ model, messages: [] });
@@ -414,4 +450,82 @@ test("an OpenRouter message carries only inline parts OpenRouter reads", async (
   assertEquals(plain.status, 200);
   await plain.text();
   assertEquals(JSON.parse(seen[1].body).plugins, undefined);
+});
+
+test("a model turned off mid-run is refused from the next call, the credential notwithstanding", async () => {
+  let cache: UsableOpenRouterModels | null = null;
+  const { call, store } = await makeSlice({
+    openRouterModels: (
+      store,
+    ) => (cache = makeUsableOpenRouterModels({ store, now: () => new Date(T0) })),
+  });
+  const ok = await call({ model: "openai/gpt-6", messages: [] });
+  assertEquals(ok.status, 200);
+  await ok.body?.cancel();
+
+  // The admin saves the enabled set without it; the save drops this process's cache.
+  await store.setOpenRouterEnabled(["anthropic/claude-sonnet-5"], T0);
+  cache!.invalidate();
+  const refused = await call({ model: "openai/gpt-6", messages: [] });
+  assertEquals(refused.status, 403);
+  assertEquals(
+    (await refused.json()).error,
+    'model "openai/gpt-6" is not allowed for this run: it isn\'t enabled for OpenRouter',
+  );
+  // A model still enabled answers as before.
+  const other = await call({ model: "anthropic/claude-sonnet-5", messages: [] });
+  assertEquals(other.status, 200);
+  await other.body?.cancel();
+});
+
+test("a change made in another process reaches the proxy once its cache runs out", async () => {
+  let now = new Date(T0);
+  const { call, store } = await makeSlice({ now: () => now });
+  const ok = await call({ model: "openai/gpt-6", messages: [] });
+  assertEquals(ok.status, 200);
+  await ok.body?.cancel();
+
+  // Nothing tells this process: the cached set answers for up to a minute...
+  await store.setOpenRouterEnabled(["anthropic/claude-sonnet-5"], T0);
+  const cached = await call({ model: "openai/gpt-6", messages: [] });
+  assertEquals(cached.status, 200);
+  await cached.body?.cancel();
+  // ...and no longer.
+  now = new Date(Date.parse(T0) + 61_000);
+  const refused = await call({ model: "openai/gpt-6", messages: [] });
+  assertEquals(refused.status, 403);
+  await refused.body?.cancel();
+});
+
+test("a model a sync unlists is refused from the next call", async () => {
+  let cache: UsableOpenRouterModels | null = null;
+  const { call, store } = await makeSlice({
+    openRouterModels: (
+      store,
+    ) => (cache = makeUsableOpenRouterModels({ store, now: () => new Date(T0) })),
+  });
+  const ok = await call({ model: "openai/gpt-6", messages: [] });
+  assertEquals(ok.status, 200);
+  await ok.body?.cancel();
+
+  // Two lists in a row leave it out (forced: they are short), and the sync drops the cache.
+  const rest = MODELS_BODY.data.filter((m) => m.id !== "openai/gpt-6");
+  const catalogue = makeOpenRouterCatalogue({
+    store,
+    api: {
+      listModels: () => Promise.resolve({ data: rest }),
+      keyInfo: () => Promise.reject(new Error("unused")),
+    },
+    now: () => new Date(T0),
+    diag: { debug() {}, warn() {} },
+    changed: () => cache!.invalidate(),
+  });
+  await catalogue.sync({ force: true });
+  const once = await call({ model: "openai/gpt-6", messages: [] });
+  assertEquals(once.status, 200, "one miss keeps an enabled model");
+  await once.body?.cancel();
+  await catalogue.sync({ force: true });
+  const refused = await call({ model: "openai/gpt-6", messages: [] });
+  assertEquals(refused.status, 403);
+  await refused.body?.cancel();
 });

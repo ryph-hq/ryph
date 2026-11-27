@@ -93,6 +93,46 @@ export function insertMember(
 }
 
 /**
+ * A body with its top-level member `name` set to `raw` (JSON, as written): the member's value
+ * replaced where the body carries one (the last, which is the one a parse keeps), else the member
+ * added. Never a second member of the same name: JSON's last one wins, so an added one could be
+ * overruled by the body's own, or overrule it, depending on the parser. Null for a body that is no
+ * object. `members` is the walk's spans, `name` among the names it asked for.
+ */
+export function setMember(
+  bytes: Uint8Array,
+  members: Map<string, ValueSpan>,
+  name: string,
+  raw: string,
+): Uint8Array<ArrayBuffer> | null {
+  const span = members.get(name);
+  return span === undefined
+    ? insertMember(bytes, name, raw)
+    : spliced(bytes, span.start, span.end, raw);
+}
+
+/** The most of a member `ensureObjectField` parses to add to it. */
+export const MAX_SPLICED_MEMBER_BYTES = 64 * 1024;
+
+/**
+ * Whether a member's value (absent counts) is a JSON object of at most
+ * `MAX_SPLICED_MEMBER_BYTES`, or null: what `ensureObjectField` can make ask for something. A
+ * string, a number, `false`, an array or an object past the cap would leave it unable to.
+ */
+export function objectOrNull(bytes: Uint8Array, span: ValueSpan | undefined): boolean {
+  if (span === undefined) return true;
+  const raw = dec.decode(bytes.subarray(span.start, span.end));
+  if (raw === "null") return true;
+  if (span.end - span.start > MAX_SPLICED_MEMBER_BYTES) return false;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed);
+  } catch {
+    return false;
+  }
+}
+
+/**
  * A body whose top-level member `name` is an object with `field: true` in it — a streamed Chat
  * Completions call's `stream_options.include_usage`, an OpenRouter call's `usage.include` — or
  * null when it needs no change: it says so already, or `name` is not an object the proxy can add
@@ -111,7 +151,7 @@ export function ensureObjectField(
   if (span === undefined) return insertMember(bytes, name, asked);
   const raw = dec.decode(bytes.subarray(span.start, span.end));
   if (raw === "null") return spliced(bytes, span.start, span.end, asked);
-  if (span.end - span.start > 64 * 1024) return null;
+  if (span.end - span.start > MAX_SPLICED_MEMBER_BYTES) return null;
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
