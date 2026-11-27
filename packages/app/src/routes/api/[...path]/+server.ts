@@ -21,11 +21,13 @@ import {
 
 /** Provider-key management, the provider registry and the usage reports, which a standalone
  * model-proxy serves on its control listener: the key collection, one key, its archive action,
- * a ChatGPT plan key's model refresh, the plan sign-ins, the provider collection, one provider and
- * its archive action, the platform policy, and usage for a window or one run. The proxy's INTERNAL surface is never routed here — that one is
- * service-authed and belongs to the control plane, not to a browser. */
+ * a ChatGPT plan key's model refresh, an OpenRouter key's credit read, the plan sign-ins,
+ * OpenRouter's catalogue (its models, the enabled set, a sync), the provider collection, one
+ * provider and its archive action, the platform policy, and usage for a window or one run. The
+ * proxy's INTERNAL surface is never routed here — that one is service-authed and belongs to the
+ * control plane, not to a browser. */
 const PROVIDER_KEY_PATH =
-  /^v1\/(provider-keys(\/[^/]+(\/archive|\/chatgpt-plan\/models)?)?|chatgpt-plan\/sign-ins(\/[^/]+)?|providers(\/[^/]+(\/archive)?)?|platform-model-policy|model-usage(\/runs\/[^/]+)?)$/;
+  /^v1\/(provider-keys(\/[^/]+(\/archive|\/chatgpt-plan\/models|\/openrouter)?)?|chatgpt-plan\/sign-ins(\/[^/]+)?|openrouter\/(models(\/enabled)?|sync)|providers(\/[^/]+(\/archive)?)?|platform-model-policy|model-usage(\/runs\/[^/]+)?)$/;
 
 /** MCP-server management — the collection, one server, its probe, restart and logs actions —
  * the hosting catalogue, and a run's tool-call trail, all of which a standalone mcp-gateway

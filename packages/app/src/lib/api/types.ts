@@ -252,6 +252,10 @@ export type Agent = z.infer<typeof agentSchema>;
 /** The provider id of a ChatGPT plan key: a sign-in rather than a pasted secret. */
 export const CHATGPT_PLAN_PROVIDER = "chatgpt-plan";
 
+/** The provider id of an OpenRouter key: a built-in whose models are the ones an admin enabled
+ * out of OpenRouter's synced catalogue. */
+export const OPENROUTER_PROVIDER = "openrouter";
+
 /**
  * Whether a ChatGPT plan key can be used right now. `needs_reauth` is a failed refresh: someone
  * has to sign in again. `limited` is the plan's own usage limit, hit at `limitedAt`.
