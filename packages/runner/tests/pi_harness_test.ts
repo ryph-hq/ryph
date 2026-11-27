@@ -16,8 +16,8 @@ import {
   assertThrows,
 } from "@std/assert";
 import {
+  adminMustFix,
   configuredHosts,
-  credentialRejected,
   INLINE_IMAGES,
   mcpConfig,
   piArgs,
@@ -2231,6 +2231,13 @@ test("pi: any other error stop waits for the next message, and throws only at th
     .run(input, side.io);
   try {
     await until(() => side.settles() === 1, "the error settle");
+    // The error is in the transcript before anyone has to wait for the run to end.
+    const errors = side.chunks.filter((c) => c.kind === "system" && c.text === "model_error");
+    assertEquals(errors.length, 1);
+    assertEquals(
+      (errors[0].raw as { errorMessage?: string }).errorMessage?.includes("provider exploded"),
+      true,
+    );
     side.end();
     await assertRejects(() => running, Error, "provider exploded");
   } finally {
@@ -2240,15 +2247,18 @@ test("pi: any other error stop waits for the next message, and throws only at th
   }
 });
 
-test("pi: credentialRejected knows a refused key from other provider errors", () => {
+test("pi: adminMustFix knows a refused key or an empty account from other provider errors", () => {
   for (
     const message of [
       '401 {"type":"error","error":{"type":"authentication_error","message":"invalid x-api-key"}}',
       "403 Forbidden",
       "401 Incorrect API key provided",
       '{"type":"error","error":{"type":"permission_error","message":"no access"}}',
+      '402 {"message":"Insufficient credits. This account never purchased credits.","code":402}',
+      "429 You exceeded your current quota, please check your plan and billing details. " +
+      '{"error":{"code":"insufficient_quota"}}',
     ]
-  ) assert(credentialRejected(message), message);
+  ) assert(adminMustFix(message), message);
   for (
     const message of [
       undefined,
@@ -2258,7 +2268,7 @@ test("pi: credentialRejected knows a refused key from other provider errors", ()
       "400 prompt is too long: 4010 tokens",
       "4010 something",
     ]
-  ) assert(!credentialRejected(message), String(message));
+  ) assert(!adminMustFix(message), String(message));
 });
 
 test("pi: a startup backlog and later idle bursts wait for correlated acceptance AND agent start", async () => {

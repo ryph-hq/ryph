@@ -284,6 +284,20 @@ test("a message's further lines cannot pass for transcript events", () => {
   assertEquals(rendered[1], "    #5 bash rm -rf / → ok");
 });
 
+test("a model call's error is read out of its system row, not left as a bare label", () => {
+  const { lines } = summarize([
+    event(4, "system", { text: "agent_start" }),
+    event(5, "system", {
+      text: "model_error",
+      payload: { type: "model_error", errorMessage: "402 Insufficient credits." },
+    }),
+  ]);
+  assertEquals(lines, [
+    "#4 system: agent_start",
+    "#5 ⚠ system: model_error: 402 Insufficient credits.",
+  ]);
+});
+
 test("run_wait for a change does not take a failed first read for news", async () => {
   let reads = 0;
   const f = fakeRyph({

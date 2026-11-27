@@ -433,6 +433,52 @@ function relayedHeaders(upstream: Headers): Headers {
  */
 const STREAM_CUT_STATUS = 499;
 
+/** How much of an upstream's error body `proxy.upstream_error` reads, and how much it logs. */
+const UPSTREAM_ERROR_READ_BYTES = 4096;
+const UPSTREAM_ERROR_LOG_CHARS = 500;
+
+/** `text` with the credential the proxy sent taken out: the header's whole value and, for a
+ * scheme-prefixed one (`Bearer …`), the bare secret too. */
+export function withoutCredential(text: string, sent: string | null): string {
+  const value = sent ?? "";
+  const secrets = [value, value.slice(value.indexOf(" ") + 1)].filter((v) => v !== "");
+  return secrets.reduce((out, secret) => out.split(secret).join("***"), text);
+}
+
+/**
+ * Logs an upstream's error answer: its status and the start of its body, read off a clone so the
+ * caller's copy is untouched. The read stops at UPSTREAM_ERROR_READ_BYTES whatever the upstream
+ * sends, and the credential is taken out of what is logged. Never throws.
+ */
+export async function logUpstreamError(
+  diag: ProxyDiag,
+  // Only its body is read, and typed by that alone: a package typechecking this file against
+  // undici's `Response` (the orchestrator's) hands over one Bun's global type does not accept.
+  response: { body: ReadableStream<Uint8Array> | null },
+  sentCredential: string | null,
+  fields: { runId: string; provider: string; model: string | null; status: number },
+): Promise<void> {
+  let body = "";
+  try {
+    const reader = response.body?.getReader();
+    if (reader !== undefined) {
+      const decoder = new TextDecoder();
+      let seen = 0;
+      while (seen < UPSTREAM_ERROR_READ_BYTES) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        seen += value.byteLength;
+        body += decoder.decode(value, { stream: true });
+      }
+      await reader.cancel().catch(() => {});
+    }
+  } catch {
+    // What arrived is what is logged.
+  }
+  const clipped = withoutCredential(body, sentCredential).trim().slice(0, UPSTREAM_ERROR_LOG_CHARS);
+  diag.warn("proxy.upstream_error", { ...fields, body: clipped });
+}
+
 export function makeProxyHandler(deps: ProxyHandlerDeps): (req: Request) => Promise<Response> {
   const upstreamFetch = deps.upstreamFetch ?? fetch;
   const baseUrlFor = deps.baseUrlFor ?? ((p: ProviderSpec) => p.baseUrl);
@@ -1223,11 +1269,9 @@ export function makeProxyHandler(deps: ProxyHandlerDeps): (req: Request) => Prom
       else release();
       // The credential is on this request: a fetch error that quotes a header (Bun quotes one it
       // refuses whole) must not carry it into a log line.
-      const sent = headers.get(provider.auth.header) ?? "";
-      const secrets = [sent, sent.slice(sent.indexOf(" ") + 1)].filter((v) => v !== "");
       deps.diag.warn("proxy.upstream_unreachable", {
         provider: provider.id,
-        err: secrets.reduce((text, secret) => text.split(secret).join("***"), String(err)),
+        err: withoutCredential(String(err), headers.get(provider.auth.header)),
       });
       return json(502, { error: "upstream unreachable" });
     }
@@ -1261,6 +1305,18 @@ export function makeProxyHandler(deps: ProxyHandlerDeps): (req: Request) => Prom
           type: "upstream_credential_refused",
         },
         code: "upstream_credential_refused",
+      });
+    }
+
+    // Any other refusal (out of credits, rate limited, a request the provider rejects) goes back
+    // to the run as it came, and the run's harness is otherwise its only reader. One line here
+    // lets an operator see why a run's calls fail without opening the run.
+    if (upstream.status >= 400) {
+      void logUpstreamError(deps.diag, upstream.clone(), headers.get(provider.auth.header), {
+        runId: decision.virtualKey.runId,
+        provider: provider.id,
+        model: named,
+        status: upstream.status,
       });
     }
 
