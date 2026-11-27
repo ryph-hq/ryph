@@ -11,6 +11,7 @@ import {
   isNull,
   like,
   lt,
+  lte,
   ne,
   notInArray,
   or,
@@ -20,7 +21,7 @@ import {
 import { SEALED_FORMAT } from "@ryph/sealed";
 import { NO_SECRET, PLATFORM_PRINCIPAL_PREFIX } from "../../core/types.ts";
 import { customProviderSpec, endpointShape } from "../../core/registry.ts";
-import { MISSES_BEFORE_UNLISTED } from "../../core/openrouter.ts";
+import { MISSES_BEFORE_UNLISTED, OpenRouterSyncClaimLost } from "../../core/openrouter.ts";
 import type { UsageDimension } from "../../core/usage_report.ts";
 import type { KeyStore } from "../../ports/key_store.ts";
 import type { ModelProxyDb, ModelProxyDbHandle } from "./db/db.ts";
@@ -52,6 +53,16 @@ function lockKeyOf(id: string): number {
   }
   return hash;
 }
+
+const syncRow = schema.openrouterSync;
+
+/** The sync row, while `claim` holds it: its token, and its time not up by the database's clock. */
+const claimHeld = (claim: string) =>
+  and(
+    eq(syncRow.id, OPENROUTER_SYNC_ID),
+    eq(syncRow.claim, claim),
+    gt(syncRow.claimedUntil, sql`now()`),
+  );
 
 /** Whatever a grouped read runs on: the database itself, or a transaction inside it. */
 type Queryable = Pick<ModelProxyDb, "select">;
@@ -372,9 +383,15 @@ export function drizzleKeyStore(handle: ModelProxyDbHandle): KeyStore {
         .where(eq(schema.platformModelPolicy.id, PLATFORM_POLICY_ID));
     },
 
-    async upsertOpenRouterCatalogue(models, at) {
+    async upsertOpenRouterCatalogue(models, at, claim) {
       const rows = schema.openrouterModels;
       await db.transaction(async (tx) => {
+        // The claim first, its row locked to the end of the transaction: a sync whose claim
+        // lapsed writes nothing, and nobody can take the claim over while this one writes.
+        const held = await tx.select({ id: syncRow.id }).from(syncRow)
+          .where(claimHeld(claim))
+          .for("update");
+        if (held.length === 0) throw new OpenRouterSyncClaimLost();
         for (let i = 0; i < models.length; i += CATALOGUE_CHUNK) {
           await tx.insert(rows)
             .values(
@@ -459,21 +476,39 @@ export function drizzleKeyStore(handle: ModelProxyDbHandle): KeyStore {
     },
     async getOpenRouterSync() {
       const row = await db.query.openrouterSync.findFirst({
+        columns: { syncedAt: true, attemptedAt: true, error: true, errorCode: true },
         where: (s, { eq }) => eq(s.id, OPENROUTER_SYNC_ID),
+        // Asked of the database's clock, the one the claim was stamped by.
+        extras: (s) => ({
+          syncing: sql<boolean>`(${s.claim} is not null and ${s.claimedUntil} > now())`
+            .as("syncing"),
+        }),
       });
       if (row === undefined) return null;
-      const { id: _id, ...state } = row;
-      return state;
+      return { ...row, syncing: row.syncing === true };
     },
-    async putOpenRouterSync(state) {
-      const { syncedAt, attemptedAt, error, errorCode } = state;
-      const set = { syncedAt, attemptedAt, error, errorCode };
-      await db.insert(schema.openrouterSync).values({ id: OPENROUTER_SYNC_ID, ...set })
-        .onConflictDoUpdate({ target: schema.openrouterSync.id, set });
+    async claimOpenRouterSync(claim, forMs) {
+      const until = sql`now() + ${
+        Math.max(0, Math.round(forMs))
+      }::integer * interval '1 millisecond'`;
+      const taken = await db.insert(syncRow)
+        .values({ id: OPENROUTER_SYNC_ID, claim, claimedUntil: until })
+        .onConflictDoUpdate({
+          target: syncRow.id,
+          set: { claim, claimedUntil: until },
+          // Free, or its holder's time is up. The row lock the conflict takes is what makes two
+          // claims at once one winner and one loser.
+          setWhere: or(isNull(syncRow.claim), lte(syncRow.claimedUntil, sql`now()`)),
+        })
+        .returning({ id: syncRow.id });
+      return taken.length === 1;
     },
-    async markOpenRouterSyncStarted(at) {
-      await db.insert(schema.openrouterSync).values({ id: OPENROUTER_SYNC_ID, startedAt: at })
-        .onConflictDoUpdate({ target: schema.openrouterSync.id, set: { startedAt: at } });
+    async endOpenRouterSync(claim, state) {
+      const ended = await db.update(syncRow)
+        .set({ ...(state ?? {}), claim: null, claimedUntil: null })
+        .where(claimHeld(claim))
+        .returning({ id: syncRow.id });
+      return ended.length === 1;
     },
 
     async recordUsage(record) {

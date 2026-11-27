@@ -7,14 +7,8 @@ import { assert, assertEquals } from "@std/assert";
 import type { Route } from "@ryph/shared/http";
 import { unauthorized } from "@ryph/sealed";
 import { forbidden } from "@ryph/auth";
-import {
-  catalogueOf,
-  OPENROUTER,
-  openRouterModelForRun,
-  SYNC_RUNNING_FOR_MS,
-  syncRunningIn,
-} from "../src/core/openrouter.ts";
-import { makeOpenRouterCatalogue } from "../src/core/openrouter_catalogue.ts";
+import { catalogueOf, OPENROUTER, openRouterModelForRun } from "../src/core/openrouter.ts";
+import { makeOpenRouterCatalogue, SYNC_CLAIM_MS } from "../src/core/openrouter_catalogue.ts";
 import { openRouterApi } from "../src/adapters/openrouter/api.ts";
 import { OpenRouterApiError } from "../src/ports/openrouter_api.ts";
 import { openRouterRoutes } from "../src/http/openrouter.ts";
@@ -28,7 +22,13 @@ import { sha256Hex } from "@ryph/sealed";
 import { toPublicProviderSpec } from "../src/core/registry.ts";
 import type { KeyStore } from "../src/ports/key_store.ts";
 import { memoryKeyStore } from "./memory_store.ts";
-import { fakeOpenRouter, KEY_INFO, listedModel, MODELS_BODY } from "./fake_openrouter.ts";
+import {
+  fakeOpenRouter,
+  KEY_INFO,
+  listedModel,
+  MODELS_BODY,
+  seedSyncState,
+} from "./fake_openrouter.ts";
 
 const NOW = new Date("2026-11-27T12:00:00.000Z");
 const quiet = { debug() {}, warn() {} };
@@ -215,7 +215,7 @@ test("a sync writes the catalogue; a failed one keeps it and says why", async ()
     attemptedAt: NOW.toISOString(),
     error: null,
     errorCode: null,
-    startedAt: NOW.toISOString(),
+    syncing: false,
   });
   assertEquals((await store.listOpenRouterModels()).length, 3);
 
@@ -622,20 +622,29 @@ test("a catalogue read that starts a sync answers that one is running", async ()
   assertEquals(asked, 1, "fresh now: no second sync");
 });
 
-test("a sync another replica began is reported as running, until it ends or goes quiet", async () => {
-  const store = memoryKeyStore();
-  // The other replica: its own catalogue over the same store, its model list held open.
-  const api = fakeOpenRouter();
+/** A model list held open until `release`: a sync that is running, for as long as a test likes. */
+function heldOpenRouter(over: Parameters<typeof fakeOpenRouter>[0] = {}) {
+  const api = fakeOpenRouter(over);
   let release = () => {};
   const held = new Promise<void>((resolve) => (release = resolve));
   const listModels = api.listModels;
   api.listModels = async () => {
+    const answer = listModels();
     await held;
-    return await listModels();
+    return await answer;
   };
+  return { api, release: () => release() };
+}
+
+const tick = () => new Promise<void>((resolve) => setTimeout(resolve, 1));
+
+test("a sync another replica runs is reported as running, until it ends", async () => {
+  const store = memoryKeyStore();
+  // The other replica: its own catalogue over the same store, its model list held open.
+  const { api, release } = heldOpenRouter();
   const there = makeOpenRouterCatalogue({ store, api, now: () => NOW, diag: quiet });
   const running = there.sync();
-  await new Promise((resolve) => setTimeout(resolve, 1));
+  await tick();
 
   // This replica runs no sync of its own, and still answers that one runs.
   const { call, catalogue } = makeApi({ store });
@@ -648,19 +657,183 @@ test("a sync another replica began is reported as running, until it ends or goes
   const after = await (await call("GET", "/v1/openrouter/models")).json();
   assertEquals(after.sync.syncing, false);
   assertEquals(after.models.length, 3);
+});
 
-  // One that never said it ended stops counting after a few minutes: its process may be gone.
-  const state = (await store.getOpenRouterSync())!;
-  await store.markOpenRouterSyncStarted(new Date(NOW.getTime() + 1_000).toISOString());
-  const begun = await store.getOpenRouterSync();
-  assertEquals(syncRunningIn(begun, new Date(NOW.getTime() + 2_000)), true);
-  assertEquals(syncRunningIn(begun, new Date(NOW.getTime() + 1_000 + SYNC_RUNNING_FOR_MS)), false);
-  assertEquals(syncRunningIn({ ...state, startedAt: null }, NOW), false);
+test("two replicas syncing at once make one sync, and the state never goes back", async () => {
+  const store = memoryKeyStore();
+  const { api, release } = heldOpenRouter();
+  // Two replicas, the second's clock a minute behind the first's.
+  const here = makeOpenRouterCatalogue({ store, api, now: () => NOW, diag: quiet, sleep: tick });
+  const there = makeOpenRouterCatalogue({
+    store,
+    api,
+    now: () => new Date(NOW.getTime() - 60_000),
+    diag: quiet,
+    sleep: tick,
+  });
+  // Every way a sync starts, on both at once: a key's save or an admin's "Sync now", and a read
+  // of the provider list or the catalogue.
+  const states: Array<string | null> = [];
+  const watch = setInterval(async () => {
+    states.push((await store.getOpenRouterSync())?.attemptedAt ?? null);
+  }, 1);
+  const syncs = Promise.all([here.sync(), there.sync(), here.syncIfStale(), there.syncIfStale()]);
+  await tick();
+  assertEquals(await here.startIfStale(), true, "one runs");
+  assertEquals(await there.startIfStale(), true, "one runs");
+  release();
+  const [a, b] = await syncs;
+  clearInterval(watch);
+
+  assertEquals(api.calls.models, 1, "one read of OpenRouter between them");
+  assertEquals(a, b, "the waiting one answers what the other found");
+  assertEquals(a.error, null);
+  const synced = await store.getOpenRouterSync();
+  assertEquals(synced?.syncing, false);
+  assertEquals(synced?.syncedAt, a.syncedAt);
+  const seen = states.filter((at) => at !== null);
+  assertEquals(seen, [...seen].sort(), "attemptedAt only moves forward");
+
+  // A sync on the replica whose clock is behind is still later than the last.
+  await there.sync({ force: true });
+  const later = await store.getOpenRouterSync();
+  assert(later!.attemptedAt! > synced!.attemptedAt!, "a later sync is later");
+  assert(later!.syncedAt! > synced!.syncedAt!);
+});
+
+test("one short list counts one miss, however many replicas sync on it at once", async () => {
+  const store = memoryKeyStore();
+  const ten = Array.from({ length: 10 }, (_, i) => listedModel(`m/${i}`));
+  const first = fakeOpenRouter({ models: { data: ten } });
+  await makeOpenRouterCatalogue({ store, api: first, now: () => NOW, diag: quiet }).sync();
+  await store.setOpenRouterEnabled(["m/0"], NOW.toISOString());
+
+  // One short answer, without the enabled model, that three replicas would all act on.
+  const later = new Date(NOW.getTime() + 25 * 60 * 60 * 1000);
+  const { api, release } = heldOpenRouter({ models: { data: ten.slice(1) } });
+  const replicas = [0, 1, 2].map(() =>
+    makeOpenRouterCatalogue({ store, api, now: () => later, diag: quiet, sleep: tick })
+  );
+  const syncs = Promise.all([
+    replicas[0].sync(),
+    replicas[1].syncIfStale(),
+    replicas[2].sync(),
+    replicas[0].syncIfStale(),
+  ]);
+  await tick();
+  release();
+  await syncs;
+
+  assertEquals(api.calls.models, 1);
+  const enabled = (await store.listOpenRouterModels()).find((m) => m.id === "m/0")!;
+  assertEquals([enabled.listed, enabled.missedSyncs], [true, 1], "one miss, still listed");
+  assertEquals((await store.listUsableOpenRouterModels()).map((m) => m.id), ["m/0"]);
+});
+
+test("a background sync that cannot claim leaves it to the holder", async () => {
+  const store = memoryKeyStore();
+  const { api, release } = heldOpenRouter();
+  const there = makeOpenRouterCatalogue({ store, api, now: () => NOW, diag: quiet });
+  const running = there.sync();
+  await tick();
+
+  const otherApi = fakeOpenRouter();
+  const here = makeOpenRouterCatalogue({ store, api: otherApi, now: () => NOW, diag: quiet });
+  assertEquals(await here.startIfStale(), true, "a sync runs");
+  assertEquals(here.syncing(), false, "but not here");
+  await here.syncIfStale();
+  assertEquals(otherApi.calls.models, 0, "OpenRouter is not read twice");
+  release();
+  await running;
+});
+
+test("a forced sync waits out another replica's and then runs its own", async () => {
+  const ten = Array.from({ length: 10 }, (_, i) => listedModel(`m/${i}`));
+  const store = memoryKeyStore();
+  await makeOpenRouterCatalogue({
+    store,
+    api: fakeOpenRouter({ models: { data: ten } }),
+    now: () => NOW,
+    diag: quiet,
+  }).sync();
+
+  // The other replica's sync, held open, is about to refuse a list of two as shrunk.
+  const later = new Date(NOW.getTime() + 1_000);
+  const { api, release } = heldOpenRouter({ models: { data: ten.slice(0, 2) } });
+  const there = makeOpenRouterCatalogue({ store, api, now: () => later, diag: quiet });
+  const running = there.sync();
+  await tick();
+
+  const here = makeOpenRouterCatalogue({ store, api, now: () => later, diag: quiet, sleep: tick });
+  const forced = here.sync({ force: true });
+  await tick();
+  assertEquals(api.calls.models, 1, "the force waits");
+  release();
+  assertEquals((await running).errorCode, "openrouter_sync_shrunk");
+  const taken = await forced;
+  assertEquals(taken.error, null, "and then takes the list");
+  assertEquals(api.calls.models, 2);
+  assertEquals(await store.countListedOpenRouterModels(), 2);
+});
+
+test("a holder that died mid-sync blocks the next sync for one claim, and no longer", async () => {
+  let now = NOW;
+  const store = memoryKeyStore({ now: () => now });
+  // A replica claimed and died: nothing ever ends its claim.
+  assert(await store.claimOpenRouterSync("dead", SYNC_CLAIM_MS));
+
+  const api = fakeOpenRouter();
+  // Each look at the claim moves the clock along, as waiting would.
+  const sleep = (ms: number) => {
+    now = new Date(now.getTime() + ms);
+    return Promise.resolve();
+  };
+  const catalogue = makeOpenRouterCatalogue({ store, api, now: () => now, diag: quiet, sleep });
+  assertEquals(await catalogue.startIfStale(), true, "a sync is said to run");
+  assertEquals(api.calls.models, 0, "but none starts beside it");
+  assertEquals((await store.getOpenRouterSync())?.syncing, true);
+
+  // An admin's "Sync now" waits it out, then syncs.
+  const state = await catalogue.sync();
+  assertEquals(state.error, null);
+  assertEquals(api.calls.models, 1);
+  assert(now.getTime() - NOW.getTime() >= SYNC_CLAIM_MS, "after the claim lapsed");
+  assertEquals((await store.getOpenRouterSync())?.syncing, false);
+  assertEquals((await store.listOpenRouterModels()).length, 3);
+
+  // A read after another lapse starts one at once.
+  assert(await store.claimOpenRouterSync("dead again", SYNC_CLAIM_MS));
+  now = new Date(now.getTime() + SYNC_CLAIM_MS + 25 * 60 * 60 * 1000);
+  assertEquals((await store.getOpenRouterSync())?.syncing, false);
+  await catalogue.syncIfStale();
+  assertEquals(api.calls.models, 2);
+});
+
+test("a sync that outlives its claim writes nothing", async () => {
+  let now = NOW;
+  const store = memoryKeyStore({ now: () => now });
+  const api = fakeOpenRouter();
+  const listModels = api.listModels;
+  // The model list takes so long the claim lapses, and another sync takes it meanwhile.
+  api.listModels = async () => {
+    now = new Date(now.getTime() + SYNC_CLAIM_MS + 1);
+    assert(await store.claimOpenRouterSync("the next", SYNC_CLAIM_MS));
+    return await listModels();
+  };
+  const catalogue = makeOpenRouterCatalogue({ store, api, now: () => now, diag: quiet });
+  const state = await catalogue.sync();
+  assertEquals(
+    state.error,
+    "the sync ran out of time before it could save OpenRouter's model list",
+  );
+  assertEquals(await store.listOpenRouterModels(), []);
+  const stored = await store.getOpenRouterSync();
+  assertEquals([stored?.attemptedAt, stored?.syncing], [null, true], "the next one's claim stands");
 });
 
 test("a store that fails the sync's first read is a recorded failure, never a throw", async () => {
   const store = memoryKeyStore();
-  await store.putOpenRouterSync({
+  await seedSyncState(store, {
     syncedAt: "2026-11-26T12:00:00.000Z",
     attemptedAt: "2026-11-26T12:00:00.000Z",
     error: null,

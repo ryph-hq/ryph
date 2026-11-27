@@ -15,7 +15,7 @@ import {
 import { makeSpendMeter } from "../src/core/spend_meter.ts";
 import { spendOfRun } from "../src/core/spend.ts";
 import { memoryKeyStore } from "./memory_store.ts";
-import { listedModel, MODELS_BODY } from "./fake_openrouter.ts";
+import { listedModel, MODELS_BODY, seedCatalogue } from "./fake_openrouter.ts";
 import { publicDns } from "./dns.ts";
 
 const T0 = "2026-11-27T12:00:00.000Z";
@@ -33,7 +33,8 @@ async function makeSlice(opts: {
   warn?: (event: string, data?: Record<string, unknown>) => void;
 } = {}) {
   const store = memoryKeyStore();
-  await store.upsertOpenRouterCatalogue(
+  await seedCatalogue(
+    store,
     catalogueOf({
       data: [
         ...MODELS_BODY.data,

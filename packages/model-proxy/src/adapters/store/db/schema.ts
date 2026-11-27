@@ -16,6 +16,7 @@ import {
   pgTable,
   serial,
   text,
+  timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import type { DeclaredModel } from "../../../core/registry.ts";
@@ -131,9 +132,12 @@ export const openrouterSync = pgTable("openrouter_sync", {
   error: text("error"),
   // A code beside the error, for the one failure the admin can act on: OPENROUTER_SYNC_SHRUNK.
   errorCode: text("error_code"),
-  // When the latest sync began, in whichever replica: later than `attempted_at` while it runs,
-  // which is how a replica that is not running it can say one is.
-  startedAt: text("started_at"),
+  // The one sync claim (KeyStore.claimOpenRouterSync): the holding sync's token, and when its
+  // claim lapses. A timestamp, unlike the text times beside it, because it is set and compared
+  // only by the database's own clock (now()), which every replica shares: two replicas whose
+  // clocks disagree cannot both believe they hold it.
+  claim: text("claim"),
+  claimedUntil: timestamp("claimed_until", { withTimezone: true, mode: "string" }),
 });
 
 export const virtualKeys = pgTable("virtual_keys", {

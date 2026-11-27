@@ -5,7 +5,7 @@
 import { MAX_JSON_BODY_BYTES } from "@ryph/shared/http";
 import { test } from "bun:test";
 import { catalogueOf } from "../src/core/openrouter.ts";
-import { listedModel } from "./fake_openrouter.ts";
+import { listedModel, seedCatalogue } from "./fake_openrouter.ts";
 import { assert, assertEquals } from "@std/assert";
 import { internalCredentialRoutes } from "../src/http/internal.ts";
 import { makeServiceGate } from "@ryph/sealed";
@@ -168,7 +168,8 @@ test("a key's dialect comes off the provider it names, custom or built-in", asyn
   });
 
   // An OpenRouter key answers the models a policy may name: enabled, and still listed.
-  await store.upsertOpenRouterCatalogue(
+  await seedCatalogue(
+    store,
     catalogueOf({ data: [listedModel("a/one"), listedModel("b/two"), listedModel("c/three")] }),
     NOW.toISOString(),
   );

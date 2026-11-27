@@ -3,6 +3,8 @@
 
 import type { OpenRouterApi, OpenRouterKeyInfo } from "../src/ports/openrouter_api.ts";
 import { OpenRouterApiError } from "../src/ports/openrouter_api.ts";
+import type { KeyStore } from "../src/ports/key_store.ts";
+import type { OpenRouterCatalogueEntry, OpenRouterSyncEnd } from "../src/core/openrouter.ts";
 
 /** One model as OpenRouter's `GET /api/v1/models` lists it. */
 export function listedModel(id: string, over: Record<string, unknown> = {}) {
@@ -72,4 +74,23 @@ export function fakeOpenRouter(over: Partial<Pick<FakeOpenRouter, "models">> = {
     },
   };
   return fake;
+}
+
+/** Writes a catalogue straight into `store`, under a claim of its own, as one sync would. */
+export async function seedCatalogue(
+  store: KeyStore,
+  models: OpenRouterCatalogueEntry[],
+  at: string,
+): Promise<void> {
+  const claim = crypto.randomUUID();
+  if (!(await store.claimOpenRouterSync(claim, 60_000))) throw new Error("sync claim held");
+  await store.upsertOpenRouterCatalogue(models, at, claim);
+  await store.endOpenRouterSync(claim, null);
+}
+
+/** Writes a sync state straight into `store`, under a claim of its own. */
+export async function seedSyncState(store: KeyStore, state: OpenRouterSyncEnd): Promise<void> {
+  const claim = crypto.randomUUID();
+  if (!(await store.claimOpenRouterSync(claim, 60_000))) throw new Error("sync claim held");
+  await store.endOpenRouterSync(claim, state);
 }

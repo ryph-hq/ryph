@@ -21,10 +21,18 @@ import type { UsageAggregateRow, UsageDimension } from "../src/core/usage_report
 import {
   MISSES_BEFORE_UNLISTED,
   type OpenRouterModel,
-  type OpenRouterSync,
+  OpenRouterSyncClaimLost,
+  type OpenRouterSyncEnd,
 } from "../src/core/openrouter.ts";
 
-export function memoryKeyStore(): KeyStore {
+export interface MemoryKeyStoreOptions {
+  /** The store's own clock, which the sync claim lapses by (the database's `now()` on the
+   * drizzle store). */
+  now?: () => Date;
+}
+
+export function memoryKeyStore(opts: MemoryKeyStoreOptions = {}): KeyStore {
+  const now = opts.now ?? (() => new Date());
   const providerKeys = new Map<string, ProviderKey>();
   const customProviders = new Map<string, CustomProvider>();
   const virtualKeys = new Map<string, VirtualKey>();
@@ -33,7 +41,11 @@ export function memoryKeyStore(): KeyStore {
   const signIns = new Map<string, PlanSignIn>();
   let agentHostId: string | null = null;
   const openRouterModels = new Map<string, OpenRouterModel>();
-  let openRouterSync: OpenRouterSync | null = null;
+  let openRouterSync: OpenRouterSyncEnd | null = null;
+  // The sync claim: the holder's token and when it lapses, by `now`.
+  let syncClaim: { claim: string; until: number } | null = null;
+  const claimHeld = (claim: string) =>
+    syncClaim !== null && syncClaim.claim === claim && syncClaim.until > now().getTime();
   const openRouterRows = () =>
     structuredClone(
       [...openRouterModels.values()].sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
@@ -239,7 +251,8 @@ export function memoryKeyStore(): KeyStore {
       return Promise.resolve();
     },
 
-    upsertOpenRouterCatalogue(models, at) {
+    upsertOpenRouterCatalogue(models, at, claim) {
+      if (!claimHeld(claim)) return Promise.reject(new OpenRouterSyncClaimLost());
       // Mirrors the drizzle store's one transaction: upserted, listed and its misses cleared,
       // `enabled` kept; every listed row the sync left out one miss more, and unlisted unless it
       // is enabled and short of MISSES_BEFORE_UNLISTED.
@@ -288,28 +301,26 @@ export function memoryKeyStore(): KeyStore {
       return Promise.resolve();
     },
     getOpenRouterSync() {
-      return Promise.resolve(openRouterSync === null ? null : { ...openRouterSync });
-    },
-    putOpenRouterSync({ syncedAt, attemptedAt, error, errorCode }) {
-      openRouterSync = {
-        syncedAt,
-        attemptedAt,
-        error,
-        errorCode,
-        startedAt: openRouterSync?.startedAt ?? null,
-      };
-      return Promise.resolve();
-    },
-    markOpenRouterSyncStarted(at) {
-      openRouterSync = {
+      if (openRouterSync === null && syncClaim === null) return Promise.resolve(null);
+      return Promise.resolve({
         syncedAt: null,
         attemptedAt: null,
         error: null,
         errorCode: null,
         ...openRouterSync,
-        startedAt: at,
-      };
-      return Promise.resolve();
+        syncing: syncClaim !== null && syncClaim.until > now().getTime(),
+      });
+    },
+    claimOpenRouterSync(claim, forMs) {
+      if (syncClaim !== null && syncClaim.until > now().getTime()) return Promise.resolve(false);
+      syncClaim = { claim, until: now().getTime() + forMs };
+      return Promise.resolve(true);
+    },
+    endOpenRouterSync(claim, state) {
+      if (!claimHeld(claim)) return Promise.resolve(false);
+      if (state !== null) openRouterSync = { ...state };
+      syncClaim = null;
+      return Promise.resolve(true);
     },
 
     recordUsage(record) {

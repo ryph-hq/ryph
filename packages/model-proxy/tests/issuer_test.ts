@@ -7,7 +7,7 @@ import { memoryKeyStore } from "./memory_store.ts";
 import { sha256Hex } from "@ryph/sealed";
 import type { CustomProvider, ProviderKey } from "../src/core/types.ts";
 import { catalogueOf, OPENROUTER } from "../src/core/openrouter.ts";
-import { listedModel } from "./fake_openrouter.ts";
+import { listedModel, seedCatalogue } from "./fake_openrouter.ts";
 
 const T0 = "2026-01-01T00:00:00.000Z";
 
@@ -346,15 +346,12 @@ async function openRouterStore(enabled: string[]) {
   const store = memoryKeyStore();
   const one = listedModel("a/one");
   const two = listedModel("b/two", { supported_parameters: ["tools", "reasoning"] });
-  await store.upsertOpenRouterCatalogue(
-    catalogueOf({ data: [one, two, listedModel("c/gone")] }),
-    T0,
-  );
+  await seedCatalogue(store, catalogueOf({ data: [one, two, listedModel("c/gone")] }), T0);
   await store.setOpenRouterEnabled(enabled, T0);
   // `c/gone` drops out of OpenRouter's list for two syncs in a row: still enabled, but no longer
   // usable.
-  await store.upsertOpenRouterCatalogue(catalogueOf({ data: [one, two] }), T0);
-  await store.upsertOpenRouterCatalogue(catalogueOf({ data: [one, two] }), T0);
+  await seedCatalogue(store, catalogueOf({ data: [one, two] }), T0);
+  await seedCatalogue(store, catalogueOf({ data: [one, two] }), T0);
   await store.createProviderKey(anthropicKey({ id: "pk-or", provider: OPENROUTER }));
   return store;
 }

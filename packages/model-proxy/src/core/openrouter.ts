@@ -99,26 +99,28 @@ export const OPENROUTER_SYNC_SHRUNK = "openrouter_sync_shrunk";
  * try failed, in words and (for a failure the admin can act on) as a code. */
 export interface OpenRouterSync {
   syncedAt: string | null;
-  /** When the last sync that ended began; a sync's own `startedAt` once it ends. */
+  /** When the last sync that ended began. */
   attemptedAt: string | null;
   error: string | null;
   errorCode: string | null;
-  /** When the latest sync began, in whichever process ran it. Later than `attemptedAt` while
-   * that sync has not ended. Written as a sync begins, never with the rest of the state. */
-  startedAt: string | null;
+  /** Whether a sync holds the claim right now, in whichever process: read from the claim
+   * itself, so it is the same answer on every replica, and false once the holder ends or its
+   * claim lapses. */
+  syncing: boolean;
 }
 
-/** How long a sync another process began counts as running when it never said it ended: well
- * past the model list's own timeout, so a process that died mid-sync stops being reported. */
-export const SYNC_RUNNING_FOR_MS = 5 * 60 * 1000;
+/** How a sync ended, as it is written: everything but `syncing`, which is the claim's. */
+export type OpenRouterSyncEnd = Omit<OpenRouterSync, "syncing">;
 
-/** Whether the state shows a sync begun and not ended within `SYNC_RUNNING_FOR_MS`: one this
- * process cannot see, another replica's. */
-export function syncRunningIn(state: OpenRouterSync | null, now: Date): boolean {
-  if (state?.startedAt === null || state?.startedAt === undefined) return false;
-  const started = Date.parse(state.startedAt);
-  const ended = state.attemptedAt === null ? -Infinity : Date.parse(state.attemptedAt);
-  return ended < started && now.getTime() - started < SYNC_RUNNING_FOR_MS;
+/**
+ * Thrown by a store asked to write for a sync whose claim it no longer holds: the claim lapsed
+ * and another sync may have taken it. Nothing was written.
+ */
+export class OpenRouterSyncClaimLost extends Error {
+  constructor() {
+    super("the sync's claim lapsed before it wrote");
+    this.name = "OpenRouterSyncClaimLost";
+  }
 }
 
 type Json = Record<string, unknown>;

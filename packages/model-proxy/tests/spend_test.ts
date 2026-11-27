@@ -8,6 +8,7 @@ import { priceOverlayFrom, priceOverlayOf } from "../src/core/pricing.ts";
 import { makeDeploymentGauge } from "../src/core/spend_meter.ts";
 import { memoryKeyStore } from "./memory_store.ts";
 import { TRAIL, usageRow } from "./usage_fixtures.ts";
+import { seedCatalogue } from "./fake_openrouter.ts";
 import type { KeyStore } from "../src/ports/key_store.ts";
 
 async function seeded() {
@@ -109,7 +110,7 @@ test("priceRecord takes OpenRouter's stated cost over any catalogue price", () =
 
 test("spendOfRun counts OpenRouter's bills and prices its unbilled rows from the catalogue", async () => {
   const store = memoryKeyStore();
-  await store.upsertOpenRouterCatalogue([{
+  await seedCatalogue(store, [{
     id: "openai/gpt-6",
     label: "GPT-6",
     contextLength: 100_000,

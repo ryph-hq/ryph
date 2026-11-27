@@ -23,12 +23,7 @@
 import { json, parseBody, type Route, route } from "@ryph/shared/http";
 import type { SealBinding } from "@ryph/sealed";
 import { BUILTIN_PROVIDERS } from "../core/registry.ts";
-import {
-  narrowedModels,
-  OPENROUTER,
-  type OpenRouterModel,
-  syncRunningIn,
-} from "../core/openrouter.ts";
+import { narrowedModels, OPENROUTER, type OpenRouterModel } from "../core/openrouter.ts";
 import type { OpenRouterCatalogue } from "../core/openrouter_catalogue.ts";
 import { providerKeyBinding } from "../core/sealing.ts";
 import { NO_SECRET } from "../core/types.ts";
@@ -65,8 +60,8 @@ export async function liveOpenRouterKey(store: KeyStore): Promise<boolean> {
 
 /**
  * Starts a sync when the catalogue is stale and a live OpenRouter key exists. Resolves once that
- * is decided, never waiting out the sync itself, and never rejects: from then on
- * `catalogue.syncing()` says whether one runs.
+ * is decided, never waiting out the sync itself, and never rejects: from then on the store's
+ * sync state says whether one runs.
  */
 export async function startStaleSync(
   store: KeyStore,
@@ -150,8 +145,8 @@ export function openRouterRoutes(deps: OpenRouterRoutesDeps): Route[] {
         attemptedAt: sync?.attemptedAt ?? null,
         error: sync?.error ?? null,
         errorCode: sync?.errorCode ?? null,
-        // This process's own sync, or one another replica began and has not ended.
-        syncing: catalogue.syncing() || syncRunningIn(sync, deps.now()),
+        // The claim's word, the same on every replica: a sync holds it, in whichever process.
+        syncing: sync?.syncing ?? false,
       },
     };
   };
