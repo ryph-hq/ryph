@@ -36,6 +36,10 @@ const MAX_WINDOW_DAYS = 366;
 /** How many of a window's most expensive tasks a report names: the page shows 5 and opens the rest. */
 export const TOP_TASKS = 50;
 
+/** `source` names the built-in price list, which is what ESTIMATES are priced from: never what a
+ * provider billed. A call priced at OpenRouter's bill is counted in `totals.reportedRequests`
+ * instead, so a reader that says where the costs came from says that from the two counts: all of
+ * `requests` reported is a bill, none an estimate, some a mix. */
 const PRICING = { currency: "USD", source: PRICING_SOURCE } as const;
 
 /** The breakdowns a window's report carries, in the order it reads them. */
