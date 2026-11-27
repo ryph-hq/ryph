@@ -1,8 +1,8 @@
-// The OpenRouter models agents may use right now (enabled, and still listed), as the proxy reads
-// them on every OpenRouter call.
+// The OpenRouter models agents may use right now (enabled, still listed, and taking tools), as the
+// proxy reads them on every OpenRouter call.
 //
 // The proxy holds each call to this set as well as to its credential's allowlist, so a model an
-// admin turns off, or one a sync unlists, stops working at once, in runs already going too: the
+// admin turns off, or one a sync unlists or finds no longer takes tools, stops working at once, in runs already going too: the
 // allowlist was narrowed when the credential was issued, and a run can hold one for hours. Reading
 // every enabled row per call would put a query on the hot path, so the set is cached the way the
 // price overlay is.

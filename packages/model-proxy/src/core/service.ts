@@ -59,7 +59,7 @@ export class CredentialRefusedError extends Error {
  * owns (the proxy's 403, the issuer's definitive 400). Answering null here instead would report
  * an archived endpoint as config drift — a 502 — which is a different and wrong story.
  *
- * OPENROUTER resolves with the models agents may use (enabled, and still listed) as its declared
+ * OPENROUTER resolves with the models agents may use (enabled, listed, taking tools) as its declared
  * ones: what a custom endpoint declares, so the issuer, the provider list and the proxy read them
  * the same way. They are read from the store, unless the caller passes `openRouterModels`: the
  * proxy does, with its cached set (core/openrouter_usable.ts), as it resolves a provider on every
@@ -116,7 +116,7 @@ export async function listProviderSpecs(
 
 /**
  * The models a provider limits every policy to, for the control plane's policy check: OpenRouter's
- * enabled and listed ids, and null for every other provider, whose models nothing narrows.
+ * usable ids (enabled, listed, taking tools), and null for every other provider, whose models nothing narrows.
  */
 export function enabledModelsOf(provider: ProviderSpec): string[] | null {
   return provider.id === OPENROUTER ? provider.models.map((model) => model.id) : null;

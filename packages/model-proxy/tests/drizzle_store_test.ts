@@ -302,6 +302,14 @@ test("the OpenRouter catalogue round-trips through both stores identically", asy
       ], name);
       assertEquals((await store.listUsableOpenRouterModels()).map((r) => r.id), ["a/one"], name);
 
+      // A sync that says `a/one` no longer takes tools leaves it enabled but unusable.
+      await store.upsertOpenRouterCatalogue(
+        [catalogueEntry("a/one", { tools: false }), catalogueEntry("c/three")],
+        T2,
+      );
+      assertEquals((await store.listOpenRouterModels())[0].enabled, true, name);
+      assertEquals(await store.listUsableOpenRouterModels(), [], name);
+
       // The enabled set is replaced whole; an empty set disables everything.
       await store.setOpenRouterEnabled(["c/three"], T1);
       assertEquals(

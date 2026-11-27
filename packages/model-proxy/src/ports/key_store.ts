@@ -168,8 +168,9 @@ export interface KeyStore {
   countListedOpenRouterModels(): Promise<number>;
   /** Every catalogue row, unlisted ones included, by id. The admin's picker reads it. */
   listOpenRouterModels(): Promise<OpenRouterModel[]>;
-  /** The rows agents may use — enabled and listed — by id: what a credential is issued, and the
-   * provider list offers. */
+  /** The rows agents may use — enabled, listed and taking tools — by id: what a credential is
+   * issued, and the provider list offers. An enabled model that stopped taking tools stays
+   * enabled (the admin's set still saves with it) but is left out here. */
   listUsableOpenRouterModels(): Promise<OpenRouterModel[]>;
   /** Every row's price, listed or not, enabled or not; rows with none left out. What a call is
    * priced at. */

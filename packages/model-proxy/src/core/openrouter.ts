@@ -209,7 +209,7 @@ export function openRouterModelForRun(row: OpenRouterCatalogueEntry): DeclaredMo
 
 /**
  * The models a credential may use: a policy's allowlist narrowed to the ones the provider serves
- * (OpenRouter's: enabled and listed), in the policy's order — or every one for `"*"`. Narrowed
+ * (OpenRouter's: enabled, listed and taking tools), in the policy's order — or every one for `"*"`. Narrowed
  * each time a credential is issued. The proxy holds every OpenRouter call to the set as it stands
  * as well, so a model disabled after a credential was issued stops working mid-run.
  */

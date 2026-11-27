@@ -11,8 +11,10 @@
 // - only a model OpenRouter lists, that takes tools, can be NEWLY enabled: pi drives an agent
 //   through tool calls, and a model without them would fail every run on its first turn. One
 //   already enabled may stay in the set it is saved with even after it stops qualifying, so a
-//   change elsewhere in the list still saves; the proxy keeps it away from runs regardless (it
-//   serves only enabled models that are still listed), and the picker shows it to be turned off
+//   change elsewhere in the list still saves; but from the sync that found it no longer
+//   qualifies, it is kept away from runs (the usable set is enabled models that are still listed
+//   AND take tools: no credential is issued it, no provider list offers it, the proxy refuses
+//   it), and the picker shows it to be turned off
 // - a sync that refused a list for shrinking says so by code (`errorCode`), on its 502 and in
 //   the catalogue's sync state, so the admin can be offered to take the list anyway
 // - a key's credit is read live from OpenRouter with the key itself, and never stored
@@ -169,7 +171,7 @@ export function openRouterRoutes(deps: OpenRouterRoutesDeps): Route[] {
     for (const id of body.data.ids) {
       const model = byId.get(id);
       // Already enabled: kept whatever became of it, or one model OpenRouter changed would block
-      // every later save. Only enabled AND listed models reach runs either way.
+      // every later save. Only enabled models that are listed and take tools reach runs either way.
       if (model?.enabled === true) continue;
       if (model === undefined) unknown.push(id);
       else if (!model.listed) unlisted.push(id);

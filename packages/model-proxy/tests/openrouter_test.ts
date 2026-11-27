@@ -13,7 +13,11 @@ import { openRouterApi } from "../src/adapters/openrouter/api.ts";
 import { OpenRouterApiError } from "../src/ports/openrouter_api.ts";
 import { openRouterRoutes } from "../src/http/openrouter.ts";
 import { disabledProviderKeyRoutes, providerKeyRoutes } from "../src/http/routes.ts";
-import { listProviderSpecs, makePlatformCredentialIssuer } from "../src/core/service.ts";
+import {
+  listProviderSpecs,
+  makeCredentialIssuer,
+  makePlatformCredentialIssuer,
+} from "../src/core/service.ts";
 import { sha256Hex } from "@ryph/sealed";
 import { toPublicProviderSpec } from "../src/core/registry.ts";
 import type { KeyStore } from "../src/ports/key_store.ts";
@@ -501,6 +505,62 @@ test("an enabled model that stops taking tools does not block a save, and stays 
   ]);
 });
 
+test("an enabled model that stops taking tools leaves the usable set at that sync", async () => {
+  const { call, catalogue, api, store } = makeApi();
+  await catalogue.sync();
+  await call("PUT", "/v1/openrouter/models/enabled", {
+    ids: ["openai/gpt-6", "anthropic/claude-sonnet-5"],
+  });
+  await store.createProviderKey({
+    id: "pk-or",
+    provider: OPENROUTER,
+    label: "team",
+    last4: "abcd",
+    encryptedSecret: "sealed:sk-or-team",
+    archivedAt: null,
+    createdAt: NOW.toISOString(),
+    updatedAt: NOW.toISOString(),
+  });
+  api.models = {
+    data: [
+      ...MODELS_BODY.data.filter((m) => m.id !== "openai/gpt-6"),
+      listedModel("openai/gpt-6", { supported_parameters: ["reasoning"] }),
+    ],
+  };
+  assertEquals((await catalogue.sync()).error, null);
+
+  // Still enabled, so the admin's set saves with it...
+  const enabled = (await store.listOpenRouterModels()).filter((m) => m.enabled).map((m) => m.id);
+  assertEquals(enabled, ["anthropic/claude-sonnet-5", "openai/gpt-6"]);
+  // ...but straight after the sync, nothing hands it to a run.
+  const usable = (await store.listUsableOpenRouterModels()).map((m) => m.id);
+  assertEquals(usable, ["anthropic/claude-sonnet-5"]);
+  const providers = (await (await call("GET", "/v1/providers", undefined, USER)).json()).providers;
+  assertEquals(
+    providers.find((p: { id: string }) => p.id === OPENROUTER).models.map((m: { id: string }) =>
+      m.id
+    ),
+    ["anthropic/claude-sonnet-5"],
+  );
+  const issuer = makeCredentialIssuer({
+    store,
+    now: () => NOW,
+    proxyUrl: "http://model-proxy.internal:7420",
+    ttlMs: 60_000,
+  });
+  const env = await issuer.issue({
+    runId: "r-1",
+    agentId: "a-1",
+    taskId: "t-1",
+    providerKeyId: "pk-or",
+    provider: OPENROUTER,
+    allowedModels: "*",
+    model: "anthropic/claude-sonnet-5",
+  });
+  const blob = JSON.parse(env.RYPH_MODEL_PROVIDER_CONFIG);
+  assertEquals(blob.models.map((m: { id: string }) => m.id), ["anthropic/claude-sonnet-5"]);
+});
+
 test("Sync now answers the catalogue, or a 502 that says why and keeps it", async () => {
   const { call, api } = makeApi();
   const synced = await call("POST", "/v1/openrouter/sync");
@@ -605,22 +665,25 @@ test("a sync refused for a shrunk list says so by code, until a forced one takes
 test("the provider list offers OpenRouter's enabled, listed models with their prices", async () => {
   const { call, store, catalogue } = makeApi();
   await catalogue.sync();
-  await store.setOpenRouterEnabled(["openai/gpt-6", "acme/no-tools"], NOW.toISOString());
+  await store.setOpenRouterEnabled(
+    ["openai/gpt-6", "anthropic/claude-sonnet-5", "acme/no-tools"],
+    NOW.toISOString(),
+  );
 
   const providers = (await (await call("GET", "/v1/providers", undefined, USER)).json()).providers;
   const openrouter = providers.find((p: { id: string }) => p.id === OPENROUTER);
   assertEquals(openrouter.builtin, true);
   assertEquals(openrouter.dialect, "openai-completions");
   assertEquals(openrouter.baseUrl, "https://openrouter.ai/api/v1");
+  // Enabled without tools (only the store lets that happen): never offered.
   assertEquals(openrouter.models.map((m: { id: string }) => m.id), [
-    "acme/no-tools",
+    "anthropic/claude-sonnet-5",
     "openai/gpt-6",
   ]);
   assertEquals(openrouter.models[1].compat, { thinkingFormat: "openrouter" });
   assertEquals(openrouter.models[1].price.input, 2.5);
   assert(!("extraHeaders" in openrouter), "the list never carries static headers");
 
-  // A model OpenRouter stopped listing drops out of what agents are offered.
   const specs = await listProviderSpecs(store, { planOn: false });
   assertEquals(
     toPublicProviderSpec(specs.find((s) => s.id === OPENROUTER)!).models.length,

@@ -271,7 +271,7 @@ export function memoryKeyStore(): KeyStore {
       return Promise.resolve(openRouterRows());
     },
     listUsableOpenRouterModels() {
-      return Promise.resolve(openRouterRows().filter((m) => m.enabled && m.listed));
+      return Promise.resolve(openRouterRows().filter((m) => m.enabled && m.listed && m.tools));
     },
     listOpenRouterPrices() {
       return Promise.resolve(

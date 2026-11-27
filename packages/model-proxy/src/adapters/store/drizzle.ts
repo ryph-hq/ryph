@@ -430,7 +430,7 @@ export function drizzleKeyStore(handle: ModelProxyDbHandle): KeyStore {
     async listUsableOpenRouterModels() {
       return await db.query.openrouterModels.findMany({
         columns: { seenAt: false },
-        where: (m, { and, eq }) => and(eq(m.enabled, true), eq(m.listed, true)),
+        where: (m, { and, eq }) => and(eq(m.enabled, true), eq(m.listed, true), eq(m.tools, true)),
         orderBy: (m, { asc }) => [asc(m.id)],
       });
     },
