@@ -57,6 +57,7 @@ import * as Select from "#lib/components/ui/select/index.ts";
 import { Spinner } from "#lib/components/ui/spinner/index.ts";
 import * as Table from "#lib/components/ui/table/index.ts";
 import { formatDateTime } from "#lib/utils/format.ts";
+import { refreshWhileLive } from "#lib/utils/live-refresh.svelte.ts";
 import ArchiveIcon from "@lucide/svelte/icons/archive";
 import CircleAlertIcon from "@lucide/svelte/icons/circle-alert";
 import ExternalLinkIcon from "@lucide/svelte/icons/external-link";
@@ -362,6 +363,16 @@ let addPicker = $state<ReturnType<typeof OpenrouterModels> | null>(null);
 let modelsPicker = $state<ReturnType<typeof OpenrouterModels> | null>(null);
 /** How to close the dialog whose unsaved ticks are being asked about, while that is asked. */
 let discardThen = $state<(() => void) | null>(null);
+
+/** Whether a picker is on screen: it reads the catalogue again itself while a sync runs. */
+const pickerShown = $derived(modelsOpen || (addOpen && addStep === "models"));
+
+// A sync can outlast the picker: closed, or skipped while the first sync runs. Read again until it
+// is done, so the cards' models line catches up.
+refreshWhileLive(
+  "app:model-keys",
+  () => !pickerShown && data.openrouter?.catalogue?.sync.syncing === true,
+);
 
 /** Closes a picker's dialog, asking first when it holds unsaved ticks. */
 function closeOverChanges(picker: ReturnType<typeof OpenrouterModels> | null, close: () => void) {
