@@ -26,6 +26,7 @@ const totals = {
   meteredRequests: 2,
   unpricedRequests: 0,
   includedRequests: 0,
+  reportedRequests: 0,
   tokens: { input: 300, output: 150, cacheRead: 1000, cacheWrite: 0, reasoning: 0 },
   cost: { input: 0.0006, output: 0.0015, cacheRead: 0.0002, cacheWrite: 0, total: 0.0023 },
 };
