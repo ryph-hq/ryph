@@ -3,7 +3,12 @@
 
 import { test } from "bun:test";
 import { assert, assertEquals, assertRejects } from "@std/assert";
-import { forwardTarget, makeProxyHandler } from "../src/http/proxy.ts";
+import {
+  forwardTarget,
+  logUpstreamError,
+  makeProxyHandler,
+  withoutCredential,
+} from "../src/http/proxy.ts";
 import { makeCredentialIssuer } from "../src/core/service.ts";
 import { memoryKeyStore } from "./memory_store.ts";
 import { BUILTIN_PROVIDERS } from "../src/core/registry.ts";
@@ -55,6 +60,11 @@ async function makeSlice(opts: {
   resolveHost?: ResolveHost;
   /** A real upstream to forward to with the real fetch, in place of the recording fake. */
   realUpstream?: string;
+  /** Where the proxy's log lines go; silent by default. */
+  diag?: {
+    debug(event: string, data?: Record<string, unknown>): void;
+    warn(event: string, data?: Record<string, unknown>): void;
+  };
 } = {}) {
   const store = memoryKeyStore();
   const key = opts.key ?? providerKey();
@@ -95,7 +105,7 @@ async function makeSlice(opts: {
     // The "sealed" fixture format keeps the crypto out of the proxy's own test.
     decrypt: opts.decrypt ?? ((sealed) => Promise.resolve(sealed.replace(/^sealed:/, ""))),
     now: () => new Date(clock.nowMs),
-    diag: silentDiag,
+    diag: opts.diag ?? silentDiag,
     limits: {
       meter: makeSpendMeter({ backstopMs: opts.backstopMs ?? 30_000 }),
       gauge: opts.ceiling === undefined ? null : makeDeploymentGauge({
@@ -1190,6 +1200,41 @@ test("a CUSTOM endpoint refusing the proxy's credential is answered with a fixed
   assertEquals([row.status, row.estimated], [401, false]);
 });
 
+test("any other upstream error is relayed as it came, and logged with its status and body", async () => {
+  const warned: Array<{ event: string; data?: Record<string, unknown> }> = [];
+  const body = '{"error":{"message":"Insufficient credits.","code":402}}';
+  const { handler, env } = await makeSlice({
+    custom: customProvider(),
+    key: providerKey({ provider: "cloudflare", encryptedSecret: "sealed:cf-realkey" }),
+    upstream: () =>
+      new Response(body, { status: 402, headers: { "content-type": "application/json" } }),
+    diag: { debug() {}, warn: (event, data) => void warned.push({ event, data }) },
+  });
+  const res = await handler(
+    new Request("http://proxy.test/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${env.RYPH_MODEL_API_KEY}`,
+      },
+      body: JSON.stringify({ model: "llama-4" }),
+    }),
+  );
+  assertEquals([res.status, await res.text()], [402, body]);
+  // The log line is written off a clone, after the response went back.
+  for (let i = 0; i < 50 && !warned.some((w) => w.event === "proxy.upstream_error"); i++) {
+    await new Promise((r) => setTimeout(r, 5));
+  }
+  const logged = warned.find((w) => w.event === "proxy.upstream_error");
+  assertEquals(logged?.data, {
+    runId: "r-1",
+    provider: "cloudflare",
+    model: "llama-4",
+    status: 402,
+    body,
+  });
+});
+
 test("a CUSTOM endpoint whose name now resolves inside the network is never dialled", async () => {
   let answer = ["93.184.216.34"];
   const lookups: string[] = [];
@@ -1865,4 +1910,58 @@ test("a usage row is counted toward the caps before it is written, so a failed w
   assertEquals((await buy()).status, 403);
   store.recordUsage = failing;
   assertEquals(await store.listUsageForRun("r-1"), []);
+});
+
+test("an upstream's error is logged with its status and body, credential taken out", async () => {
+  const warned: Array<{ event: string; data?: Record<string, unknown> }> = [];
+  const diag = {
+    debug() {},
+    warn: (event: string, data?: Record<string, unknown>) => void warned.push({ event, data }),
+  };
+  const body = '{"error":{"message":"Insufficient credits for key sk-or-secret","code":402}}';
+  await logUpstreamError(diag, new Response(body, { status: 402 }), "Bearer sk-or-secret", {
+    runId: "r-1",
+    provider: "openrouter",
+    model: "z-ai/glm-5.3",
+    status: 402,
+  });
+  assertEquals(warned, [{
+    event: "proxy.upstream_error",
+    data: {
+      runId: "r-1",
+      provider: "openrouter",
+      model: "z-ai/glm-5.3",
+      status: 402,
+      body: '{"error":{"message":"Insufficient credits for key ***","code":402}}',
+    },
+  }]);
+});
+
+test("an upstream's error body is read only so far, however much it sends", async () => {
+  let pulled = 0;
+  const endless = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      pulled++;
+      controller.enqueue(new Uint8Array(1024).fill(0x61));
+    },
+  });
+  const warned: Array<Record<string, unknown> | undefined> = [];
+  const diag = {
+    debug() {},
+    warn: (_: string, data?: Record<string, unknown>) => void warned.push(data),
+  };
+  await logUpstreamError(diag, new Response(endless, { status: 500 }), null, {
+    runId: "r-1",
+    provider: "openai",
+    model: null,
+    status: 500,
+  });
+  assert(pulled < 16, `read ${pulled} chunks`);
+  assertEquals((warned[0]?.body as string).length, 500);
+});
+
+test("withoutCredential takes out the header value and its bare secret", () => {
+  assertEquals(withoutCredential("a Bearer k1 b k1", "Bearer k1"), "a *** b ***");
+  assertEquals(withoutCredential("x-api-key k2 seen", "k2"), "x-api-key *** seen");
+  assertEquals(withoutCredential("nothing", null), "nothing");
 });

@@ -1,7 +1,7 @@
 // The price list: USD per million tokens, per provider, per model id.
 //
 // Sourced from the model data bundled with @earendil-works/pi-ai, the pi release the agent image
-// installs (`providers/data/{anthropic,openai}.json`; last refreshed from 1.5.0 on 2026-11-04),
+// installs (`providers/data/{anthropic,openai}.json`; last refreshed from 1.6.1 on 2026-11-27),
 // and hand-kept between refreshes: a new model or a price change is a one-line edit, and because
 // pricing is applied at read time, an edit re-prices the whole trail, history included.
 //
@@ -14,12 +14,13 @@
 import type { ModelPrice } from "./pricing.ts";
 
 /** Where the numbers below came from, as the usage surface reports it. */
-export const PRICING_SOURCE = "pi-ai 1.5.0 model catalogue, 2026-11-04";
+export const PRICING_SOURCE = "pi-ai 1.6.1 model catalogue, 2026-11-27";
 
 export const PRICE_CATALOGUE: Readonly<Record<string, Readonly<Record<string, ModelPrice>>>> = {
   anthropic: {
     "claude-fable-5": { input: 10, output: 50, cacheRead: 1, cacheWrite: 12.5 },
     "claude-fable-5-1": { input: 10, output: 50, cacheRead: 0.25, cacheWrite: 12.5 },
+    "claude-fable-5-2": { input: 8, output: 40, cacheRead: 0.2, cacheWrite: 10 },
     "claude-haiku-4-5": { input: 1, output: 5, cacheRead: 0.1, cacheWrite: 1.25 },
     "claude-haiku-4-5-20251001": { input: 1, output: 5, cacheRead: 0.1, cacheWrite: 1.25 },
     "claude-haiku-5-5": {
@@ -135,6 +136,13 @@ export const PRICE_CATALOGUE: Readonly<Record<string, Readonly<Record<string, Mo
       cacheWrite: 12.5,
       tiers: [{ inputTokensAbove: 272000, input: 20, output: 75, cacheRead: 2, cacheWrite: 25 }],
     },
+    "gpt-6-cyber": {
+      input: 20,
+      output: 100,
+      cacheRead: 2,
+      cacheWrite: 25,
+      tiers: [{ inputTokensAbove: 272000, input: 40, output: 150, cacheRead: 4, cacheWrite: 25 }],
+    },
     "gpt-6-luna": {
       input: 0.1,
       output: 0.5,
@@ -168,6 +176,20 @@ export const PRICE_CATALOGUE: Readonly<Record<string, Readonly<Record<string, Mo
       cacheRead: 0.05,
       cacheWrite: 1.25,
       tiers: [{ inputTokensAbove: 272000, input: 2, output: 7.5, cacheRead: 0.1, cacheWrite: 2.5 }],
+    },
+    "gpt-6.2-astra": {
+      input: 8,
+      output: 40,
+      cacheRead: 0.4,
+      cacheWrite: 10,
+      tiers: [{ inputTokensAbove: 272000, input: 16, output: 60, cacheRead: 0.8, cacheWrite: 20 }],
+    },
+    "gpt-6.2-sol": {
+      input: 2,
+      output: 10,
+      cacheRead: 0.1,
+      cacheWrite: 2.5,
+      tiers: [{ inputTokensAbove: 272000, input: 4, output: 15, cacheRead: 0.2, cacheWrite: 5 }],
     },
     "gpt-daybreak-blue-latest": {
       input: 4,
