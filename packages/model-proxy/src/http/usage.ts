@@ -8,13 +8,15 @@
 // - every number in a response is computed from the same rows at the same moment, so a report's
 //   breakdowns always add up to its totals
 // - a window is bounded (MAX_WINDOW_DAYS): nobody asks for all of history by accident
-// - the price overlay is built ONCE per request, from the custom endpoints' declared models, and
-//   handed to every roll-up in it — so a report's breakdowns are priced from one reading of the
-//   rows AND one reading of the prices. A declared model with no price contributes nothing to
-//   the overlay and is therefore reported as unpriced, never as free.
+// - the price overlay is built ONCE per request, from the custom endpoints' declared models and
+//   OpenRouter's synced catalogue, and handed to every roll-up in it — so a report's breakdowns
+//   are priced from one reading of the rows AND one reading of the prices. A model with no price
+//   contributes nothing to the overlay and is therefore reported as unpriced, never as free.
+// - a row that carries the provider's own bill (OpenRouter's `costUsd`) is reported at it
+//   (`pricing: "reported"`), never re-priced from the overlay
 
 import { PRICING_SOURCE } from "../core/pricing_catalogue.ts";
-import { priceOverlayOf, TIER_THRESHOLDS } from "../core/pricing.ts";
+import { priceOverlay, TIER_THRESHOLDS } from "../core/pricing.ts";
 import { PLATFORM_PRINCIPAL_PREFIX } from "../core/types.ts";
 import { emptyTotals, rollUp, type UsageDimension } from "../core/usage_report.ts";
 import { refreshGauge, spendInWindow } from "../core/spend.ts";
@@ -34,6 +36,10 @@ const MAX_WINDOW_DAYS = 366;
 /** How many of a window's most expensive tasks a report names: the page shows 5 and opens the rest. */
 export const TOP_TASKS = 50;
 
+/** `source` names the built-in price list, which is what ESTIMATES are priced from: never what a
+ * provider billed. A call priced at OpenRouter's bill is counted in `totals.reportedRequests`
+ * instead, so a reader that says where the costs came from says that from the two counts: all of
+ * `requests` reported is a bill, none an estimate, some a mix. */
 const PRICING = { currency: "USD", source: PRICING_SOURCE } as const;
 
 /** The breakdowns a window's report carries, in the order it reads them. */
@@ -86,7 +92,7 @@ export function usageRoutes(deps: UsageRoutesDeps): Route[] {
   const forRun = async (req: Request, params: Record<string, string>): Promise<Response> => {
     const denied = await deps.authenticateRunRead(req, params.runId);
     if (denied) return denied;
-    const overlay = priceOverlayOf(await store.listCustomProviders());
+    const overlay = await priceOverlay(store);
     const [rows] = await store.aggregateUsage({
       runId: params.runId,
       by: ["model"],
@@ -111,7 +117,7 @@ export function usageRoutes(deps: UsageRoutesDeps): Route[] {
     // the same moment. Five separate reads let a row land between two of them — a stream that
     // began inside the window and ended while the report ran — and then `byAgent` totals more
     // requests and more dollars than `totals`, which the page renders as a share above 100%.
-    const overlay = priceOverlayOf(await store.listCustomProviders());
+    const overlay = await priceOverlay(store);
     const [models, agents, keys, days, tasks] = (await store.aggregateUsage({
       ...window,
       by: DIMENSIONS,

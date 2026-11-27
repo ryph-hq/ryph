@@ -2,6 +2,7 @@ import {
   CHATGPT_PLAN_PROVIDER,
   type DeclaredModel,
   INCLUDED_PRICING,
+  OPENROUTER_PROVIDER,
   type Provider,
   type ProviderKey,
   type ThinkingLevel,
@@ -17,7 +18,7 @@ export function modelsOf(providers: Provider[], providerId: string | undefined):
 
 /**
  * Whether a run's harness is handed the provider's models rather than knowing them: the runner
- * writes a custom endpoint's or a ChatGPT plan's into pi's models.json, where pi's own defaults
+ * writes a custom endpoint's, a ChatGPT plan's or OpenRouter's into pi's models.json, where pi's own defaults
  * decide the levels a model with none named takes; a built-in's come from pi's catalogue. A
  * provider missing from the list is taken for the latter, which keeps every level open — nothing
  * is known of it. What `thinkingLevelsFor` reads as `declaredToPi`.
@@ -27,7 +28,9 @@ export function declaredToPi(
   providerId: string | undefined,
 ): boolean {
   const provider = providers.find((p) => p.id === providerId);
-  return provider !== undefined && (!provider.builtin || provider.id === CHATGPT_PLAN_PROVIDER);
+  return provider !== undefined &&
+    (!provider.builtin || provider.id === CHATGPT_PLAN_PROVIDER ||
+      provider.id === OPENROUTER_PROVIDER);
 }
 
 /**
@@ -72,11 +75,20 @@ export function thinkingLevelsForKey(
 /**
  * What a single pick may choose from under an allowlist: every known model for "*", else the
  * listed ids in order, once each, with an id the provider does not list kept as a bare entry so
- * a stored value still shows.
+ * a stored value still shows. `knownOnly` drops those bare entries instead, for a provider that
+ * serves its list and nothing else.
  */
-export function choicesFor(models: DeclaredModel[], allowed: "*" | string[]): DeclaredModel[] {
+export function choicesFor(
+  models: DeclaredModel[],
+  allowed: "*" | string[],
+  knownOnly = false,
+): DeclaredModel[] {
   if (allowed === "*") return models;
-  return [...new Set(allowed)].map((id) => models.find((m) => m.id === id) ?? { id });
+  return [...new Set(allowed)].flatMap((id) => {
+    const model = models.find((m) => m.id === id);
+    if (model) return [model];
+    return knownOnly ? [] : [{ id }];
+  });
 }
 
 const usd = new Intl.NumberFormat("en-US", {

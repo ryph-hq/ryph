@@ -4,8 +4,12 @@ import {
   composeModelPolicy,
   defaultModelThinkingLevels,
   editedDefaultThinking,
+  editedModelPolicyCheck,
   modelPolicyProblem,
+  openRouterChoices,
   policyToFields,
+  sameModelPolicy,
+  storedModelsWarning,
   usableProviderKeys,
 } from "./model-policy";
 
@@ -205,5 +209,172 @@ describe("editedDefaultThinking", () => {
     expect(editedDefaultThinking(seeded, "key-1", "other", "high", ["off"])).toBeNull();
     expect(editedDefaultThinking(seeded, "key-2", "plain", "high", ["off"])).toBeNull();
     expect(editedDefaultThinking(seeded, "key-1", "other", "high", ["off", "high"])).toBe("high");
+  });
+});
+
+describe("OpenRouter model fields", () => {
+  const OR_KEY: ProviderKey = { ...KEY, id: "or-1", provider: "openrouter" };
+  const openrouter = (ids: string[]): Provider => ({
+    id: "openrouter",
+    label: "OpenRouter",
+    dialect: "openai-completions",
+    builtin: true,
+    baseUrl: "https://openrouter.ai/api/v1",
+    authHeader: "authorization",
+    authScheme: "Bearer",
+    models: ids.map((id) => ({ id })),
+    archivedAt: null,
+  });
+
+  it("reads the enabled models for an OpenRouter key only", () => {
+    const providers = [openrouter(["a/x", "b/y"])];
+    expect(openRouterChoices(providers, [KEY, OR_KEY], "key-1")).toBeNull();
+    expect(openRouterChoices(providers, [KEY, OR_KEY], "")).toBeNull();
+    expect(openRouterChoices(providers, [KEY, OR_KEY], "or-1")).toEqual({
+      enabled: ["a/x", "b/y"],
+    });
+    // The list came back without OpenRouter: the models are not known.
+    expect(openRouterChoices([], [OR_KEY], "or-1")).toEqual({ enabled: null });
+  });
+
+  it("goes by the stored policy for a key the list cannot resolve", () => {
+    const stored = {
+      providerKeyId: "or-1",
+      provider: "openrouter",
+      allowedModels: "*" as const,
+      defaultModel: "a/x",
+      defaultThinking: null,
+    };
+    expect(openRouterChoices([openrouter(["a/x"])], [], "or-1", stored)).toEqual({
+      enabled: ["a/x"],
+    });
+  });
+
+  it("needs an enabled model, and a default picked from them", () => {
+    const choices = { enabled: ["a/x", "b/y"] };
+    expect(modelPolicyProblem("or-1", "*", "", { enabled: [] })).toMatch(/Enable an OpenRouter/);
+    expect(modelPolicyProblem("or-1", "*", "", choices)).toBe("Pick a default model.");
+    expect(modelPolicyProblem("or-1", "*", " ", choices)).toBe("Pick a default model.");
+    expect(modelPolicyProblem("or-1", "*", "c/z", choices)).toMatch(/enabled OpenRouter/);
+    expect(modelPolicyProblem("or-1", "*", "a/x", choices)).toBeNull();
+    expect(modelPolicyProblem("or-1", ["a/x"], "a/x", choices)).toBeNull();
+    expect(modelPolicyProblem("or-1", ["a/x"], "b/y", choices)).toMatch(/allowed models/);
+    expect(modelPolicyProblem("or-1", [], "", choices)).toMatch(/at least one/);
+  });
+
+  it("still needs a default when the enabled models are not known", () => {
+    expect(modelPolicyProblem("or-1", "*", "", { enabled: null })).toBe("Pick a default model.");
+    expect(modelPolicyProblem("or-1", "*", "c/z", { enabled: null })).toBeNull();
+  });
+
+  describe("on an agent being edited", () => {
+    const stored = {
+      providerKeyId: "or-1",
+      provider: "openrouter",
+      allowedModels: ["a/x", "b/y"],
+      defaultModel: "a/x",
+      defaultThinking: null,
+    };
+    const fields = policyToFields(stored);
+    const compose = (over: Partial<typeof fields> = {}) => {
+      const f = { ...fields, ...over };
+      return composeModelPolicy(f.providerKeyId, f.allowedModels, f.defaultModel, [OR_KEY]);
+    };
+    // An admin has since disabled the default.
+    const now = { enabled: ["b/y"] };
+
+    it("compares policies as the server does", () => {
+      expect(sameModelPolicy(compose(), stored)).toBe(true);
+      expect(sameModelPolicy({ ...stored, allowedModels: ["b/y", "a/x"] }, stored)).toBe(true);
+      expect(
+        sameModelPolicy({ ...stored, defaultThinking: undefined } as never, stored),
+      ).toBe(true);
+      expect(sameModelPolicy({ ...stored, defaultThinking: "high" }, stored)).toBe(false);
+      expect(sameModelPolicy({ ...stored, allowedModels: "*" }, stored)).toBe(false);
+      expect(sameModelPolicy(null, stored)).toBe(false);
+      expect(sameModelPolicy(null, null)).toBe(true);
+    });
+
+    it("saves an unchanged policy whose default was disabled, with a warning", () => {
+      expect(editedModelPolicyCheck(stored, compose(), fields, now)).toEqual({
+        problem: null,
+        warning: "This agent's model a/x isn't enabled any more.",
+      });
+    });
+
+    it("warns about a disabled allowlisted model too", () => {
+      expect(editedModelPolicyCheck(stored, compose(), fields, { enabled: ["a/x"] })).toEqual({
+        problem: null,
+        warning: "This agent's model b/y isn't enabled any more.",
+      });
+    });
+
+    it("warns about nothing while every model is still enabled or the models aren't known", () => {
+      const fine = { problem: null, warning: null };
+      expect(editedModelPolicyCheck(stored, compose(), fields, { enabled: ["a/x", "b/y"] }))
+        .toEqual(fine);
+      expect(editedModelPolicyCheck(stored, compose(), fields, { enabled: null })).toEqual(fine);
+    });
+
+    it("holds a moved policy to the OpenRouter rules", () => {
+      const moved = { ...fields, allowedModels: ["a/x"] };
+      expect(editedModelPolicyCheck(stored, compose(moved), moved, now)).toEqual({
+        problem: "Pick one of the enabled OpenRouter models as the default.",
+        warning: null,
+      });
+      const fixed = { ...fields, defaultModel: "b/y" };
+      expect(editedModelPolicyCheck(stored, compose(fixed), fixed, now)).toEqual({
+        problem: null,
+        warning: null,
+      });
+    });
+
+    it("holds a new policy to the rules", () => {
+      const fresh = { providerKeyId: "or-1", allowedModels: "*" as const, defaultModel: "" };
+      const composed = composeModelPolicy("or-1", "*", "", [OR_KEY]);
+      expect(editedModelPolicyCheck(null, composed, fresh, now).problem)
+        .toBe("Pick a default model.");
+    });
+  });
+});
+
+describe("storedModelsWarning", () => {
+  const stored = {
+    providerKeyId: "or-1",
+    provider: "openrouter",
+    allowedModels: ["a/x", "b/y", "c/z"],
+    defaultModel: "a/x",
+    defaultThinking: null,
+  };
+
+  it("names every model the policy names that isn't enabled, the default first and each once", () => {
+    expect(storedModelsWarning(stored, ["b/y"])).toBe(
+      "Some of this agent's models aren't enabled any more: a/x, c/z.",
+    );
+    expect(storedModelsWarning(stored, [])).toBe(
+      "Some of this agent's models aren't enabled any more: a/x, b/y, c/z.",
+    );
+  });
+
+  it("names a single model on its own", () => {
+    expect(storedModelsWarning(stored, ["a/x", "b/y"])).toBe(
+      "This agent's model c/z isn't enabled any more.",
+    );
+  });
+
+  it("checks only the default when every model is allowed", () => {
+    const open = { ...stored, allowedModels: "*" as const };
+    expect(storedModelsWarning(open, ["a/x"])).toBeNull();
+    expect(storedModelsWarning(open, ["b/y"])).toBe(
+      "This agent's model a/x isn't enabled any more.",
+    );
+  });
+
+  it("flags a missing default, and says nothing while the enabled list is unknown", () => {
+    expect(storedModelsWarning({ ...stored, defaultModel: null }, ["a/x", "b/y", "c/z"])).toBe(
+      "This agent has no default model.",
+    );
+    expect(storedModelsWarning(stored, null)).toBeNull();
+    expect(storedModelsWarning(stored, ["a/x", "b/y", "c/z"])).toBeNull();
   });
 });

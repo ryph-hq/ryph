@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  costBasis,
+  costHeadline,
   costLabel,
+  costSourceNote,
   getRunUsageState,
   getUsageReportOrOff,
   isIncluded,
@@ -26,6 +29,7 @@ const totals = {
   meteredRequests: 2,
   unpricedRequests: 0,
   includedRequests: 0,
+  reportedRequests: 0,
   tokens: { input: 300, output: 150, cacheRead: 1000, cacheWrite: 0, reasoning: 0 },
   cost: { input: 0.0006, output: 0.0015, cacheRead: 0.0002, cacheWrite: 0, total: 0.0023 },
 };
@@ -109,5 +113,95 @@ describe("included usage", () => {
     expect(costLabel(mixed)).toBe(formatUsd(totals.cost.total));
     const unpriced = usageTotalsSchema.parse({ ...totals, unpricedRequests: 2, cost: zero });
     expect(costLabel(unpriced)).toBe("Unpriced");
+  });
+});
+
+describe("reported usage", () => {
+  const zero = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 };
+
+  it("defaults reportedRequests to 0 for a proxy that does not send it", () => {
+    const { reportedRequests: _, ...before } = totals;
+    expect(usageTotalsSchema.parse(before).reportedRequests).toBe(0);
+  });
+
+  it("shows what the provider billed as a cost, never as unpriced", () => {
+    const row = modelUsageSchema.parse({
+      provider: "openrouter",
+      model: "anthropic/claude-sonnet-4.5",
+      pricing: "reported",
+      ...totals,
+      reportedRequests: 2,
+    });
+    expect(row.pricing).toBe("reported");
+    expect(costLabel(row)).toBe(formatUsd(totals.cost.total));
+    const free = usageTotalsSchema.parse({
+      ...totals,
+      reportedRequests: 1,
+      unpricedRequests: 1,
+      cost: zero,
+    });
+    expect(costLabel(free)).toBe(formatUsd(0));
+  });
+});
+
+describe("where the costs come from", () => {
+  const source = "pi-ai 1.6.1 model catalogue";
+
+  it("says list-price estimates when nothing was billed", () => {
+    const t = usageTotalsSchema.parse(totals);
+    expect(costBasis(t)).toBe("list");
+    expect(costHeadline(t)).toBe("Estimated cost");
+    expect(costSourceNote(t, source)).toBe(
+      `Costs are list-price estimates from Ryph's built-in price list (${source}), not an invoice.`,
+    );
+  });
+
+  it("says Cost when OpenRouter billed every priced call", () => {
+    const t = usageTotalsSchema.parse({ ...totals, reportedRequests: 2 });
+    expect(costBasis(t)).toBe("billed");
+    expect(costHeadline(t)).toBe("Cost");
+    expect(costSourceNote(t, source)).toBe("Costs are what OpenRouter billed.");
+  });
+
+  it("does not count included or unpriced calls as estimates", () => {
+    const t = usageTotalsSchema.parse({
+      ...totals,
+      meteredRequests: 4,
+      reportedRequests: 2,
+      includedRequests: 1,
+      unpricedRequests: 1,
+    });
+    expect(costBasis(t)).toBe("billed");
+    expect(costSourceNote(t, source)).toBe("Costs are what OpenRouter billed for 2 calls.");
+  });
+
+  it("says every call was billed only when none were included or unpriced", () => {
+    const included = usageTotalsSchema.parse({
+      ...totals,
+      meteredRequests: 2,
+      reportedRequests: 1,
+      includedRequests: 1,
+    });
+    expect(costSourceNote(included, source)).toBe("Costs are what OpenRouter billed for 1 call.");
+    const unpriced = usageTotalsSchema.parse({
+      ...totals,
+      meteredRequests: 3,
+      reportedRequests: 2,
+      unpricedRequests: 1,
+    });
+    expect(costSourceNote(unpriced, source)).toBe(
+      "Costs are what OpenRouter billed for 2 calls.",
+    );
+  });
+
+  it("keeps the estimate wording for the rest of a mix", () => {
+    const one = usageTotalsSchema.parse({ ...totals, reportedRequests: 1 });
+    expect(costBasis(one)).toBe("mixed");
+    expect(costHeadline(one)).toBe("Estimated cost");
+    expect(costSourceNote(one, source)).toBe(
+      `Costs are list-price estimates from Ryph's built-in price list (${source}), except 1 call priced at OpenRouter's bill.`,
+    );
+    const two = usageTotalsSchema.parse({ ...totals, meteredRequests: 5, reportedRequests: 2 });
+    expect(costSourceNote(two, source)).toMatch(/except 2 calls priced at OpenRouter's bill\.$/);
   });
 });

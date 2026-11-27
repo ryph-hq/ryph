@@ -12,6 +12,8 @@
 //   endpoint's keys' secrets, and they are entered again
 // - keys are archived, never deleted: historical runs keep resolving whose key they spent, and
 //   archiving is the immediate kill-switch for every credential minted from the key
+// - an OPENROUTER secret is shown to OpenRouter before it is sealed, new or rotated: one it
+//   refuses is never saved, and the save answers with the key's credit as OpenRouter read it
 // - the paths are mounted in every deployment: without a master key they carry the disabled
 //   stand-ins, so "model access is off" is always an answer and never a 404
 // - a CUSTOM ENDPOINT is configuration, not a credential — but registering one decides where a
@@ -37,7 +39,12 @@ import {
   toAdminProviderSpec,
   toPublicProviderSpec,
 } from "../core/registry.ts";
-import { listProviderSpecs, resolveProvider } from "../core/service.ts";
+import {
+  enabledModelsOf,
+  listProviderSpecs,
+  notEnabledForOpenRouter,
+  resolveProvider,
+} from "../core/service.ts";
 import type { GuardedKeyWrite, KeyStore } from "../ports/key_store.ts";
 import { mintId } from "@ryph/sealed";
 import {
@@ -65,6 +72,24 @@ const PATHS = {
 
 import { USAGE_PATHS } from "./usage.ts";
 import { PLAN_PATHS } from "./chatgpt_plan.ts";
+import { OPENROUTER_PATHS, openRouterKeyRefusal, syncStaleInBackground } from "./openrouter.ts";
+import type { OpenRouterCatalogue } from "../core/openrouter_catalogue.ts";
+import { OPENROUTER } from "../core/openrouter.ts";
+import {
+  type OpenRouterApi,
+  OpenRouterApiError,
+  type OpenRouterKeyInfo,
+} from "../ports/openrouter_api.ts";
+
+/** How long saving the first OpenRouter key waits for the catalogue's first sync. Past it the
+ * key is saved anyway, and the sync carries on in the background. */
+const FIRST_SYNC_WAIT_MS = 10_000;
+
+/** What an OpenRouter key's save adds to its answer: the key's credit as OpenRouter read it just
+ * now, or why it was saved without being read. */
+type OpenRouterCheck =
+  | { refused: Response }
+  | { refused: null; extra: { openrouter: OpenRouterKeyInfo } | { warning: string } | null };
 
 /**
  * The machine-readable marker on a "model access is off" refusal. The VALUE is the contract,
@@ -114,6 +139,14 @@ export interface ProviderKeyRoutesDeps {
   /** Resolves a custom endpoint's host, to refuse one whose name points inside the network
    * (`endpointAddressProblem`); the platform's DNS unless a test fakes it. */
   resolveHost?: ResolveHost;
+  /** OpenRouter's API and its catalogue: a key is checked with OpenRouter before it is saved,
+   * the first one saved syncs the catalogue, and the provider list keeps it fresh. Absent, an
+   * OpenRouter key is saved unchecked and nothing syncs. */
+  openRouter?: {
+    api: OpenRouterApi;
+    catalogue: OpenRouterCatalogue;
+    diag: { warn(event: string, data?: Record<string, unknown>): void };
+  };
 }
 
 export function providerKeyRoutes(deps: ProviderKeyRoutesDeps): Route[] {
@@ -130,6 +163,48 @@ export function providerKeyRoutes(deps: ProviderKeyRoutesDeps): Route[] {
   };
   const { store } = deps;
   const nowIso = () => deps.now().toISOString();
+
+  /**
+   * An OpenRouter secret checked with OpenRouter before it is sealed (`GET /api/v1/key`). A key
+   * OpenRouter refuses is never saved; one it could not be asked about is saved, and says so.
+   * Nothing the answer holds is stored. Any other provider's secret is not checked here.
+   */
+  const checkOpenRouterSecret = async (
+    provider: string,
+    secret: string,
+  ): Promise<OpenRouterCheck> => {
+    if (provider !== OPENROUTER || deps.openRouter === undefined) {
+      return { refused: null, extra: null };
+    }
+    try {
+      return { refused: null, extra: { openrouter: await deps.openRouter.api.keyInfo(secret) } };
+    } catch (err) {
+      const refused = openRouterKeyRefusal(err, 400);
+      if (refused !== null) return { refused };
+      deps.openRouter.diag.warn("openrouter.key_check_failed", {
+        status: err instanceof OpenRouterApiError ? err.status : null,
+      });
+      return {
+        refused: null,
+        extra: {
+          warning: "Key saved. OpenRouter couldn't check it.",
+        },
+      };
+    }
+  };
+
+  /** The catalogue's first sync, waited for briefly when an OpenRouter key is saved before the
+   * deployment ever synced: the admin's next step is picking models from it. */
+  const firstSync = async (): Promise<void> => {
+    const openRouter = deps.openRouter;
+    if (openRouter === undefined) return;
+    if ((await store.getOpenRouterSync())?.syncedAt) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    await Promise.race([
+      openRouter.catalogue.sync(),
+      new Promise((resolve) => timer = setTimeout(resolve, FIRST_SYNC_WAIT_MS)),
+    ]).finally(() => clearTimeout(timer));
+  };
 
   /**
    * The refusal for a secret sealed for an endpoint shape that is no longer the endpoint's: the
@@ -184,6 +259,9 @@ export function providerKeyRoutes(deps: ProviderKeyRoutesDeps): Route[] {
       return json(400, { error: "that model endpoint is archived" });
     }
 
+    const checked = await checkOpenRouterSecret(provider.id, body.data.secret);
+    if (checked.refused !== null) return checked.refused;
+
     const at = nowIso();
     const id = mintId("pk");
     const key = {
@@ -202,7 +280,11 @@ export function providerKeyRoutes(deps: ProviderKeyRoutesDeps): Route[] {
     };
     const written = await writeSealedFor(provider, { create: key });
     if (written.moved) return movedWhileSealing();
-    return json(201, toPublicProviderKey(key, { account: true }));
+    if (provider.id === OPENROUTER) {
+      // A sync that fails or runs long never fails the save: the key is written already.
+      await firstSync().catch(() => {});
+    }
+    return json(201, { ...toPublicProviderKey(key, { account: true }), ...checked.extra });
   };
 
   const list = async (req: Request): Promise<Response> => {
@@ -238,6 +320,7 @@ export function providerKeyRoutes(deps: ProviderKeyRoutesDeps): Route[] {
     // shape. A provider that no longer resolves has nowhere to bind it to, and never will: the
     // key can only be archived.
     let sealedFor: ProviderSpec | null = null;
+    let checked: OpenRouterCheck = { refused: null, extra: null };
     if (body.data.secret !== undefined) {
       sealedFor = await resolveProvider(store, key.provider);
       if (sealedFor === null) {
@@ -246,6 +329,9 @@ export function providerKeyRoutes(deps: ProviderKeyRoutesDeps): Route[] {
           code: PROVIDER_MISSING,
         });
       }
+      // A rotated OpenRouter secret is checked like a new one.
+      checked = await checkOpenRouterSecret(key.provider, body.data.secret);
+      if (checked.refused !== null) return checked.refused;
     }
 
     // A patch of exactly what changed, never the whole row read above: a plan key's tokens
@@ -269,7 +355,7 @@ export function providerKeyRoutes(deps: ProviderKeyRoutesDeps): Route[] {
       updated = written.key;
     }
     if (updated === null) return json(404, { error: "no such provider key" });
-    return json(200, toPublicProviderKey(updated, { account: true }));
+    return json(200, { ...toPublicProviderKey(updated, { account: true }), ...checked.extra });
   };
 
   const archive = async (req: Request, params: Record<string, string>): Promise<Response> => {
@@ -309,6 +395,9 @@ export function providerKeyRoutes(deps: ProviderKeyRoutesDeps): Route[] {
   const listProviders = async (req: Request): Promise<Response> => {
     const denied = await deps.authenticate(req);
     if (denied) return denied;
+    if (deps.openRouter) {
+      syncStaleInBackground(store, deps.openRouter.catalogue, deps.openRouter.diag);
+    }
     const specs = await listProviderSpecs(store, { planOn: deps.planOn ?? false });
     return json(200, { providers: specs.map(toPublicProviderSpec) });
   };
@@ -475,6 +564,17 @@ export function providerKeyRoutes(deps: ProviderKeyRoutesDeps): Route[] {
     if (provider.archivedAt !== null) {
       return json(400, { error: "that model endpoint is archived" });
     }
+    // And the models, where the provider narrows them (OpenRouter's enabled ones): a policy
+    // naming one it does not serve would have every consumer's mint refused.
+    const served = enabledModelsOf(provider);
+    if (served !== null) {
+      const named = [
+        body.data.model,
+        ...(body.data.allowedModels === "*" ? [] : body.data.allowedModels),
+      ];
+      const missing = named.find((model) => !served.includes(model));
+      if (missing !== undefined) return json(400, { error: notEnabledForOpenRouter(missing) });
+    }
     const policy = {
       providerKeyId: key.id,
       provider: key.provider,
@@ -551,5 +651,9 @@ export function disabledProviderKeyRoutes(
     route("POST", PLAN_PATHS.signIns, off),
     route("GET", PLAN_PATHS.signIn, off),
     route("POST", PLAN_PATHS.models, off),
+    route("GET", OPENROUTER_PATHS.models, off),
+    route("PUT", OPENROUTER_PATHS.enabled, off),
+    route("POST", OPENROUTER_PATHS.sync, off),
+    route("GET", OPENROUTER_PATHS.keyStatus, off),
   ];
 }

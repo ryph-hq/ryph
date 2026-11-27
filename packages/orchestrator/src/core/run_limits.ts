@@ -34,9 +34,11 @@ export interface RunSpendReader {
   spendOf(runId: string): Promise<number>;
 }
 
-/** What the door asks of the proxy: whether the deployment's spend ceiling is reached. */
+/** What the door asks of the proxy: whether the deployment's spend ceiling is reached, and which
+ * models a key's provider narrows every run to (OpenRouter's enabled ones; null for none). */
 export interface SpendGate {
   ceilingReached(): Promise<boolean>;
+  getKey(id: string): Promise<{ models: string[] | null } | null>;
 }
 
 /**
@@ -47,6 +49,14 @@ export interface SpendGate {
  * together).
  */
 const INCLUDED_PROVIDERS: ReadonlySet<string> = new Set(["chatgpt-plan"]);
+
+/**
+ * The provider whose runs must be told their model: OpenRouter. pi, given none, picks its own
+ * default out of its built-in OpenRouter catalogue, a model no admin enabled. Also the one
+ * provider whose served models the door asks the proxy for. @ryph/model-proxy's `OPENROUTER`,
+ * spelled here for the same reason as `INCLUDED_PROVIDERS` (pinned in tests/http_api_test.ts).
+ */
+export const OPENROUTER_PROVIDER = "openrouter";
 
 /** Whether a provider's usage is outside every spend cap. */
 export function spendIncluded(provider: string): boolean {

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { apiCall, ApiError } from "./call";
+import { openRouterKeyInfoSchema } from "./openrouter";
 import {
   type PlatformModelPolicy,
   platformModelPolicySchema,
@@ -87,11 +88,22 @@ export function isSecretRequired(e: unknown): e is ApiError {
     e.body !== null && (e.body as { code?: unknown }).code === SECRET_REQUIRED;
 }
 
+/**
+ * A key as a write answers it. An OpenRouter key is checked with OpenRouter first: the answer
+ * carries its credit, or a `warning` when OpenRouter could not be asked and the key was saved
+ * unchecked. A key OpenRouter refuses is not saved (see `isOpenRouterKeyRefused`).
+ */
+const savedKeySchema = providerKeySchema.extend({
+  openrouter: openRouterKeyInfoSchema.optional(),
+  warning: z.string().optional(),
+});
+export type SavedProviderKey = z.infer<typeof savedKeySchema>;
+
 export async function createProviderKey(
   f = fetch,
   input: CreateProviderKeyInput,
-): Promise<ProviderKey> {
-  return providerKeySchema.parse(
+): Promise<SavedProviderKey> {
+  return savedKeySchema.parse(
     await apiCall(f, "/v1/provider-keys", { method: "POST", body: JSON.stringify(input) }),
   );
 }
@@ -100,8 +112,8 @@ export async function updateProviderKey(
   f = fetch,
   id: string,
   input: UpdateProviderKeyInput,
-): Promise<ProviderKey> {
-  return providerKeySchema.parse(
+): Promise<SavedProviderKey> {
+  return savedKeySchema.parse(
     await apiCall(f, `/v1/provider-keys/${encodeURIComponent(id)}`, {
       method: "PATCH",
       body: JSON.stringify(input),

@@ -13,6 +13,13 @@ import type {
   VirtualKey,
 } from "../core/types.ts";
 import type { UsageAggregateQuery, UsageAggregateRow } from "../core/usage_report.ts";
+import type { PriceRates } from "../core/pricing.ts";
+import type {
+  OpenRouterCatalogueEntry,
+  OpenRouterModel,
+  OpenRouterSync,
+  OpenRouterSyncEnd,
+} from "../core/openrouter.ts";
 
 /** The custom endpoint a secret was sealed for, and that endpoint's shape (`endpointShape`) as
  * it was sealed for. */
@@ -149,6 +156,52 @@ export interface KeyStore {
   getPlatformPolicy(): Promise<PlatformModelPolicy | null>;
   savePlatformPolicy(policy: PlatformModelPolicy): Promise<void>;
   clearPlatformPolicy(): Promise<void>;
+
+  /**
+   * Writes one sync of OpenRouter's catalogue, in one transaction, and only while `claim` holds
+   * the sync claim (`claimOpenRouterSync`): a claim that lapsed or was taken over throws
+   * `OpenRouterSyncClaimLost` and writes nothing. Every model in it inserted or updated, marked
+   * listed and its misses cleared (its `enabled` left as it was); every listed row the sync did
+   * NOT carry counted one more miss, and unlisted — at once when it is not enabled, after
+   * `MISSES_BEFORE_UNLISTED` misses in a row when it is. Nothing is deleted: an old usage row
+   * keeps its model's price.
+   */
+  upsertOpenRouterCatalogue(
+    models: OpenRouterCatalogueEntry[],
+    at: string,
+    claim: string,
+  ): Promise<void>;
+  /** How many catalogue rows are listed: what the next sync is held against. */
+  countListedOpenRouterModels(): Promise<number>;
+  /** Every catalogue row, unlisted ones included, by id. The admin's picker reads it. */
+  listOpenRouterModels(): Promise<OpenRouterModel[]>;
+  /** The rows agents may use — enabled, listed and taking tools — by id: what a credential is
+   * issued, and the provider list offers. An enabled model that stopped taking tools stays
+   * enabled (the admin's set still saves with it) but is left out here. */
+  listUsableOpenRouterModels(): Promise<OpenRouterModel[]>;
+  /** Every row's price, listed or not, enabled or not; rows with none left out. What a call is
+   * priced at. */
+  listOpenRouterPrices(): Promise<Array<{ id: string; price: PriceRates }>>;
+  /** Replaces the enabled set with exactly `ids`. The caller checks they are usable. */
+  setOpenRouterEnabled(ids: readonly string[], at: string): Promise<void>;
+  /** Where the catalogue sync stands, `syncing` read from the claim; null before the first
+   * claim. A claim that ended with no state written leaves every time null. */
+  getOpenRouterSync(): Promise<OpenRouterSync | null>;
+  /**
+   * Takes the deployment's one sync claim as `claim` (a token unique to this sync) for `forMs`,
+   * when nobody holds it or the last holder's claim has lapsed, and answers the store's time as
+   * it took it (an ISO string): the sync's time. Null when it was not taken. Atomic: of two
+   * callers at once, one gets a time. The lapse is timed on the store's own clock, the one clock
+   * every replica shares, so no two processes whose clocks disagree can both hold it; and the
+   * sync is stamped by it for the same reason.
+   */
+  claimOpenRouterSync(claim: string, forMs: number): Promise<string | null>;
+  /**
+   * Ends the sync holding `claim`: writes how it went (unless `state` is null) and gives the claim
+   * up, in one step, and only while the claim is still held. False when it was not, and nothing
+   * was written: the sync ran past its claim, and what it found is no longer its to say.
+   */
+  endOpenRouterSync(claim: string, state: OpenRouterSyncEnd | null): Promise<boolean>;
 
   /** Append-only metering trail, one row per forwarded request. */
   recordUsage(record: UsageRecord): Promise<void>;

@@ -18,7 +18,9 @@
 //   implies a wire shape — it may be a slug an admin typed — and "can this harness drive this
 //   key" is a question about the shape. `providerArchivedAt` is there because archiving an
 //   ENDPOINT is as final as archiving a key: both are kill switches the issuer enforces at a
-//   run's boot, and a policy set against either should die at the form instead.
+//   run's boot, and a policy set against either should die at the form instead. `models` is the
+//   set a provider holds every policy to — OpenRouter's enabled models, null for any other
+//   provider — for the same reason: a model the issuer would narrow away is refused at the form.
 // - issue's DEFINITIVE refusals (unknown provider, unknown/archived/mismatched key) answer 400;
 //   every could-not-ask failure answers 503. The caller must be able to tell "this run can never
 //   have a credential" from "ask again" — see CredentialRefusedError.
@@ -32,6 +34,7 @@ import { json, parseBody, type Route, route } from "@ryph/shared/http";
 import {
   type CredentialIssuer,
   CredentialRefusedError,
+  enabledModelsOf,
   type PlatformCredentialIssuer,
   resolveProvider,
 } from "../core/service.ts";
@@ -75,6 +78,7 @@ export function internalCredentialRoutes(deps: InternalRoutesDeps): Route[] {
       dialect: provider.dialect,
       providerArchivedAt: provider.archivedAt,
       archivedAt: key.archivedAt,
+      models: enabledModelsOf(provider),
     });
   };
 
@@ -96,6 +100,7 @@ export function internalCredentialRoutes(deps: InternalRoutesDeps): Route[] {
         providerKeyId: body.data.providerKeyId,
         provider: body.data.provider,
         allowedModels: body.data.allowedModels,
+        model: body.data.model ?? null,
         spendUsd: body.data.spendUsd ?? null,
         callsInFlight: body.data.callsInFlight ?? null,
       });

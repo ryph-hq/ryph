@@ -24,6 +24,11 @@ import { makePlanKeys } from "./core/plan_keys.ts";
 import type { OpenAiAccounts } from "./ports/openai_accounts.ts";
 import { openAiAccounts } from "./adapters/openai/accounts.ts";
 import { usageRoutes } from "./http/usage.ts";
+import { openRouterRoutes } from "./http/openrouter.ts";
+import { makeOpenRouterCatalogue } from "./core/openrouter_catalogue.ts";
+import { makeUsableOpenRouterModels } from "./core/openrouter_usable.ts";
+import type { OpenRouterApi } from "./ports/openrouter_api.ts";
+import { openRouterApi } from "./adapters/openrouter/api.ts";
 import type { KeyStore } from "./ports/key_store.ts";
 import type { ResolveHost } from "./schema.ts";
 import { refreshGauge, type RunSpend, spendOfRun } from "./core/spend.ts";
@@ -82,6 +87,8 @@ export interface ModelProxySetupDeps {
   /** Resolves a custom endpoint's host, at registration and before a forward; the platform's
    * DNS unless a test fakes it. */
   resolveHost?: ResolveHost;
+  /** OpenRouter's API, or a fake of it: the catalogue sync and a key's credit read reach it. */
+  openRouterApi?: OpenRouterApi;
 }
 
 export interface ChatgptPlanOptions {
@@ -141,6 +148,17 @@ export function setup(deps: ModelProxySetupDeps): ModelProxySetup {
     now,
     diag: deps.proxyDiag,
   });
+  const openRouter = deps.openRouterApi ?? openRouterApi();
+  // The proxy's cache of the models agents may use, dropped by whatever changes them in this
+  // process: a save of the enabled set, a sync.
+  const openRouterModels = makeUsableOpenRouterModels({ store, now });
+  const catalogue = makeOpenRouterCatalogue({
+    store,
+    api: openRouter,
+    now,
+    diag: deps.proxyDiag,
+    changed: openRouterModels.invalidate,
+  });
   const planListener = !planOn ? null : makeCallbackListener({
     ...(deps.chatgptPlan?.callbackPort === undefined
       ? {}
@@ -161,6 +179,17 @@ export function setup(deps: ModelProxySetupDeps): ModelProxySetup {
         archivePlanKey: plan.archive,
         planOn,
         ...(deps.resolveHost === undefined ? {} : { resolveHost: deps.resolveHost }),
+        openRouter: { api: openRouter, catalogue, diag: deps.proxyDiag },
+      }),
+      ...openRouterRoutes({
+        store,
+        catalogue,
+        api: openRouter,
+        decrypt: sealer.openKey,
+        authenticateManage: deps.authenticateManage,
+        now,
+        diag: deps.proxyDiag,
+        changed: openRouterModels.invalidate,
       }),
       ...(planListener === null ? planOffRoutes({ authenticate: deps.authenticate }) : planRoutes({
         plan,
@@ -184,6 +213,7 @@ export function setup(deps: ModelProxySetupDeps): ModelProxySetup {
       now,
       diag: deps.proxyDiag,
       limits: { meter, gauge },
+      openRouterModels,
       ...(planOn ? { plan } : {}),
       ...(deps.resolveHost === undefined ? {} : { resolveHost: deps.resolveHost }),
     }),

@@ -31,6 +31,7 @@ import {
 import {
   disabledProviderKeyRoutes,
   drizzleKeyStore,
+  enabledModelsOf,
   isLocalAppUrl,
   type PlatformCredentialIssuer,
   resolveProvider,
@@ -829,6 +830,8 @@ export async function buildApp(cfg: HostConfig): Promise<HostApp> {
           // would be accepted in one deployment and refused in the other.
           providerArchivedAt: provider.archivedAt,
           archivedAt: key.archivedAt,
+          // The same set the internal key read answers with (`enabledModelsOf`).
+          models: enabledModelsOf(provider),
         };
       },
       issueRunCredentials(scope) {

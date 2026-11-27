@@ -1181,6 +1181,7 @@ export function runnerRoutes(deps: WiredDeps): Route[] {
           providerKeyId: run.modelScope.providerKeyId,
           provider: run.modelScope.provider,
           allowedModels: run.modelScope.allowedModels,
+          model: run.modelScope.model,
           spendUsd: run.limits.spendUsd,
           callsInFlight: run.limits.callsInFlight,
         });

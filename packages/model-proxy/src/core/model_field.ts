@@ -338,9 +338,17 @@ export interface ObjectSeen {
   strings: Map<string, string>;
   /** The watched members whose value is an object: that object's own `strings`. */
   children: Map<string, Map<string, string>>;
+  /** Every member it has, watched or not, and what kind of value each holds. */
+  members: Map<string, JsonKind>;
+  /** For each member whose value is an array, the kinds of value its elements hold (empty for an
+   * empty array). */
+  elements: Map<string, ReadonlySet<JsonKind>>;
   /** The path to it (`messages[2].content[0]`), worked out only when asked. */
   path(): string;
 }
+
+/** What kind of JSON value a member holds. */
+export type JsonKind = "object" | "array" | "string" | "null" | "number" | "boolean";
 
 /** The marker in `ObjectSeen.strings` for a watched member whose value is not a string. */
 export const NOT_A_STRING = "\u0000";
@@ -360,11 +368,16 @@ interface Frame {
   index: number;
   strings: Map<string, string>;
   children: Map<string, Map<string, string>>;
+  members: Map<string, JsonKind>;
+  elements: Map<string, ReadonlySet<JsonKind>>;
+  /** Arrays: the kinds of value its elements hold so far. */
+  kinds: Set<JsonKind> | null;
 }
 
 /**
  * Walks every object in a body and hands each, as it closes, to `visit` with the members asked
- * about — strings by prefix, objects by their own string members — without building the body as
+ * about — strings by prefix, objects by their own string members — and the name and kind of every
+ * member, without building the body as
  * values: one pass, like `topLevelMembers`, and only short prefixes decoded. False when the body
  * is not one JSON value, or nests past `maxDepth` (the frames are objects here, not bits, so the
  * depth is bounded instead).
@@ -391,13 +404,21 @@ export function visitObjects(
   };
   const close = (): void => {
     const frame = frames.pop()!;
-    if (!frame.object) return;
+    if (!frame.object) {
+      const parent = frames[frames.length - 1];
+      if (parent?.object && parent.member !== null) {
+        parent.elements.set(parent.member, frame.kinds ?? new Set());
+      }
+      return;
+    }
     const depth = frames.length;
     visit({
       key: frame.key,
       inArray: frame.inArray,
       strings: frame.strings,
       children: frame.children,
+      members: frame.members,
+      elements: frame.elements,
       path: () => {
         frames.push(frame);
         const text = pathOf(depth);
@@ -410,6 +431,10 @@ export function visitObjects(
       parent.children.set(parent.member, frame.strings);
     }
   };
+  /** Tells an array what kind of value one of its elements is. */
+  const element = (parent: Frame | undefined, kind: JsonKind): void => {
+    if (parent !== undefined && !parent.object) (parent.kinds ??= new Set()).add(kind);
+  };
 
   let i = bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf ? 3 : 0;
   for (;;) {
@@ -420,6 +445,7 @@ export function visitObjects(
       // Whatever this member held before (a duplicate name) is replaced, as a parse replaces it.
       parent.strings.delete(name);
       parent.children.delete(name);
+      parent.elements.delete(name);
     }
     if (c === OPEN_OBJECT || c === OPEN_ARRAY) {
       if (frames.length >= maxDepth) return false;
@@ -427,6 +453,8 @@ export function visitObjects(
         parent.strings.set(name, NOT_A_STRING);
       }
       const object = c === OPEN_OBJECT;
+      if (parent?.object && name !== null) parent.members.set(name, object ? "object" : "array");
+      element(parent, object ? "object" : "array");
       frames.push({
         object,
         segment: parent === undefined ? null : parent.object ? parent.member : parent.index,
@@ -436,6 +464,9 @@ export function visitObjects(
         index: 0,
         strings: new Map(),
         children: new Map(),
+        members: new Map(),
+        elements: new Map(),
+        kinds: null,
       });
       i = skipSpace(bytes, i + 1);
       const closer = object ? CLOSE_OBJECT : CLOSE_ARRAY;
@@ -453,6 +484,8 @@ export function visitObjects(
     } else if (c === QUOTE) {
       const end = skipString(bytes, i);
       if (end < 0) return false;
+      if (parent?.object && name !== null) parent.members.set(name, "string");
+      element(parent, "string");
       if (parent?.object && name !== null && watch.strings.has(name)) {
         parent.strings.set(name, decodePrefix(bytes, i, end));
       }
@@ -461,6 +494,9 @@ export function visitObjects(
       const end = skipScalar(bytes, i);
       if (end < 0) return false;
       const isNull = end - i === 4 && bytes[i] === 0x6e;
+      const kind = isNull ? "null" : bytes[i] === 0x74 || bytes[i] === 0x66 ? "boolean" : "number";
+      if (parent?.object && name !== null) parent.members.set(name, kind);
+      element(parent, kind);
       if (parent?.object && name !== null && watch.strings.has(name) && !isNull) {
         parent.strings.set(name, NOT_A_STRING);
       }

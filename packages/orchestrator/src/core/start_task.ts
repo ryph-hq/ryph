@@ -90,6 +90,7 @@ import { resolveRunSize, type RunSize, type RunSizes } from "./run_sizes.ts";
 import {
   deadlineSecondsFor,
   type DeploymentLimits,
+  OPENROUTER_PROVIDER,
   resolveRunLimits,
   type SpendGate,
   spendIncluded,
@@ -167,8 +168,8 @@ export interface StartTaskDeps {
   /** Environment builds (core/environments.ts). Null, or off: every run launches on
    * `config.agentImage`, exactly as before environments existed. */
   environments: EnvironmentService | null;
-  /** Answers whether the deployment's spend ceiling is reached. Null: no model access,
-   * so no ceiling to ask about. */
+  /** Answers whether the deployment's spend ceiling is reached, and which models a key serves.
+   * Null: no model access, so neither to ask about. */
   modelAccess: SpendGate | null;
   /** Where the images a task starts with are kept (core/attachments.ts). Null: a start that
    * carries images is refused with a 503. */
@@ -414,6 +415,54 @@ export async function startTask(
   }
   const thinking = args.thinking ?? policy?.defaultThinking ?? null;
 
+  // An OpenRouter run must be told its model: pi, told none, picks its own default out of its
+  // built-in OpenRouter catalogue, which no admin enabled, and every call would be refused.
+  const openRouter = policy?.provider === OPENROUTER_PROVIDER;
+  if (openRouter && model === null) {
+    return {
+      kind: "refused",
+      status: 400,
+      error: "an OpenRouter run needs a model: pick a default model in the agent's policy",
+    };
+  }
+
+  // What the door asks the proxy, asked together: which models OpenRouter serves (only for an
+  // OpenRouter policy; no other provider narrows them), and whether the deployment's spend
+  // ceiling is reached (for a run that will hold a model credential: one without cannot spend
+  // through the proxy, and neither can one on a plan whose usage is included, which adds
+  // nothing to the spend the ceiling counts). A proxy that cannot answer refuses nothing: the
+  // issuer still refuses the credential and the proxy the calls, and a door closed by a blink
+  // helps nobody.
+  const access = deps.modelAccess;
+  const [served, reached] = await Promise.all([
+    access && policy !== null && openRouter
+      ? Promise.resolve().then(() => access.getKey(policy.providerKeyId)).then(
+        (key) => key?.models ?? null,
+        (err) => {
+          diag.warn("task.models_unreadable", { err: String(err) });
+          return null;
+        },
+      )
+      : null,
+    access && policy !== null && !spendIncluded(policy.provider)
+      ? Promise.resolve().then(() => access.ceilingReached()).catch((err) => {
+        diag.warn("task.ceiling_unreadable", { err: String(err) });
+        return false;
+      })
+      : false,
+  ]);
+
+  // OpenRouter issues a run only the models an admin enabled, and refuses a credential without
+  // the run's own model in it: a run started on a model disabled since the policy was saved
+  // would boot only to fail. Refused here instead, naming the model.
+  if (model !== null && served !== null && !served.includes(model)) {
+    return {
+      kind: "refused",
+      status: 400,
+      error: `model "${model}" isn't enabled for OpenRouter — enable it under Model keys`,
+    };
+  }
+
   // A task without instructions awaits its prompt, and has neither a title nor images until it
   // arrives: the title is made from the prompt, and the images ride it.
   const awaiting = args.spec.instructions === null;
@@ -430,29 +479,16 @@ export async function startTask(
   const imagesChecked = checkRunStartImages(deps, images);
   if (imagesChecked.kind === "refused") return imagesChecked;
 
-  // The deployment's spend ceiling is the last line, asked at the door so a run is not started
-  // only to have its first model call refused. Asked for a run that will hold a model
-  // credential: one without cannot spend through the proxy, and the ceiling has nothing to
-  // say to it, and neither to one on a plan whose usage is included: it adds nothing to the
-  // spend the ceiling counts, and the proxy lets its calls through past it. A proxy that cannot
-  // answer does not refuse the task: the proxy still refuses the calls, and a door closed by a
-  // blink helps nobody.
-  if (deps.modelAccess && policy !== null && !spendIncluded(policy.provider)) {
-    let reached = false;
-    try {
-      reached = await deps.modelAccess.ceilingReached();
-    } catch (err) {
-      diag.warn("task.ceiling_unreadable", { err: String(err) });
-    }
-    if (reached) {
-      return {
-        kind: "refused",
-        status: 403,
-        error: "this deployment has reached its model spend ceiling " +
-          "(RYPH_MODEL_SPEND_CEILING_USD); no task can start until the window moves on",
-        extra: { code: "limit_reached", limit: "deployment-spend" },
-      };
-    }
+  // The deployment's spend ceiling is the last line (asked above, with the models), so a run is
+  // not started only to have its first model call refused.
+  if (reached) {
+    return {
+      kind: "refused",
+      status: 403,
+      error: "this deployment has reached its model spend ceiling " +
+        "(RYPH_MODEL_SPEND_CEILING_USD); no task can start until the window moves on",
+      extra: { code: "limit_reached", limit: "deployment-spend" },
+    };
   }
 
   // The list, checked once more at the one place every door meets: not empty, and every path

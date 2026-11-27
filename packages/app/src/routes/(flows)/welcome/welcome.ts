@@ -4,11 +4,15 @@
 import type { CreateAgentInput } from "#lib/api/agents.ts";
 import type { ImageName, ImageStatus } from "#lib/api/images.ts";
 import {
+  type DeclaredModel,
   DEFAULT_MEMORY_BUDGET_TOKENS,
   type Harness,
+  OPENROUTER_PROVIDER,
   type Provider,
   type ProviderKey,
 } from "#lib/api/types.ts";
+import type { CatalogueRead } from "#lib/components/model-keys/openrouter-models.ts";
+import { modelsForKey } from "#lib/components/model-picker/models.ts";
 import { can } from "#lib/utils/auth/capabilities.ts";
 import { effectiveEmail } from "../agents/shared/agent-steps";
 import { createBrowserEnabled } from "../agents/shared/browser-policy";
@@ -155,6 +159,47 @@ export function composeQuickAgent(input: {
       canGrant,
     }),
   };
+}
+
+/**
+ * The models the quick agent's key offers. An OpenRouter key's come from the provider list; when
+ * that list came back without OpenRouter in it, the catalogue's enabled models stand in. Null
+ * when neither was read, so the step can say so rather than ask for models already enabled.
+ */
+export function quickAgentModels(
+  providers: Provider[],
+  key: ProviderKey | undefined,
+  openrouter: CatalogueRead | null,
+): DeclaredModel[] | null {
+  if (
+    key?.provider !== OPENROUTER_PROVIDER || providers.some((p) => p.id === OPENROUTER_PROVIDER)
+  ) {
+    return modelsForKey(providers, key);
+  }
+  const catalogue = openrouter?.catalogue;
+  if (!catalogue) return null;
+  return catalogue.models
+    .filter((m) => m.enabled && m.listed && m.tools)
+    .map((m) => ({ id: m.id, label: m.label }));
+}
+
+/**
+ * Why the quick agent can't be created with this model yet, or null. An OpenRouter agent needs a
+ * default model, and it must be one of the models enabled for agents (`models`, the key's list,
+ * or null when it could not be read).
+ */
+export function quickAgentModelProblem(
+  provider: string | undefined,
+  model: string,
+  models: readonly { id: string }[] | null,
+): string | null {
+  if (provider !== OPENROUTER_PROVIDER) return null;
+  if (models === null) return "Couldn't load the OpenRouter models. Reload the page to try again";
+  if (models.length === 0) return "Enable an OpenRouter model first";
+  const picked = model.trim();
+  if (picked === "") return "Pick a default model";
+  if (!models.some((m) => m.id === picked)) return "Pick one of the enabled models";
+  return null;
 }
 
 /** Where the last step sends someone: a new task with the agent and repo already picked. */

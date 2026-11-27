@@ -4,7 +4,7 @@
 
 import { test } from "bun:test";
 import { assertEquals } from "@std/assert";
-import { modelNamedIn } from "../src/core/model_field.ts";
+import { type JsonKind, modelNamedIn, visitObjects } from "../src/core/model_field.ts";
 
 const enc = new TextEncoder();
 
@@ -261,4 +261,77 @@ test("on thousands of random documents, valid and broken, the walk names what a 
   }
   // The sample exercises both answers, and broken bodies, in earnest.
   assertEquals(named > 1_000 && broken > 1_000, true, JSON.stringify({ named, broken }));
+});
+
+/** A value's kind, as the walk names it. */
+function kindOf(value: unknown): JsonKind {
+  if (value === null) return "null";
+  if (Array.isArray(value)) return "array";
+  return typeof value as JsonKind;
+}
+
+/** Every object in a parsed value, innermost first as the walk closes them, with its members'
+ * kinds and the kinds of each array member's elements. */
+function objectsOf(value: unknown, out: string[] = []): string[] {
+  if (Array.isArray(value)) {
+    for (const element of value) objectsOf(element, out);
+  } else if (value !== null && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    for (const member of Object.values(record)) objectsOf(member, out);
+    out.push(describe(
+      new Map(Object.entries(record).map(([name, member]) => [name, kindOf(member)])),
+      new Map(
+        Object.entries(record).flatMap(([name, member]) =>
+          Array.isArray(member) ? [[name, new Set(member.map(kindOf))]] : []
+        ),
+      ),
+    ));
+  }
+  return out;
+}
+
+function describe(
+  members: ReadonlyMap<string, JsonKind>,
+  elements: ReadonlyMap<string, ReadonlySet<JsonKind>>,
+): string {
+  const sorted = (entries: Array<[string, string]>) => JSON.stringify(entries.toSorted());
+  return sorted([
+    ...[...members].map(([name, kind]): [string, string] => [`m:${name}`, kind]),
+    ...[...elements].map((
+      [name, kinds],
+    ): [string, string] => [`e:${name}`, [...kinds].toSorted().join()]),
+  ]);
+}
+
+test("on random documents, the walk sees each object's members and its lists' elements as a parse does", () => {
+  const r = rng(20261127);
+  let compared = 0;
+  for (let k = 0; k < 5_000; k++) {
+    const body = randomBody(r);
+    let value: unknown;
+    try {
+      value = JSON.parse(body);
+    } catch {
+      continue;
+    }
+    const seen: string[] = [];
+    const ok = visitObjects(
+      enc.encode(body),
+      { strings: new Set(), children: new Set() },
+      64,
+      (object) => seen.push(describe(object.members, object.elements)),
+    );
+    assertEquals(ok, true, body);
+    // The walk sees every object, those in a duplicated member's earlier values too, which a
+    // parse drops (and a parse keeps a duplicated member where it first stood): when nothing was
+    // dropped, the two see the same objects; either way they agree on the top level, where the
+    // last of a duplicated member is the one each keeps.
+    const parsedObjects = objectsOf(value);
+    if (seen.length === parsedObjects.length) {
+      assertEquals(seen.toSorted(), parsedObjects.toSorted(), body);
+    }
+    assertEquals(seen.at(-1), parsedObjects.at(-1), body);
+    compared += 1;
+  }
+  assertEquals(compared > 1_000, true, String(compared));
 });

@@ -7,10 +7,13 @@ import {
   eq,
   gt,
   gte,
+  inArray,
   isNull,
   like,
   lt,
+  lte,
   ne,
+  notInArray,
   or,
   type SQL,
   sql,
@@ -18,6 +21,7 @@ import {
 import { SEALED_FORMAT } from "@ryph/sealed";
 import { NO_SECRET, PLATFORM_PRINCIPAL_PREFIX } from "../../core/types.ts";
 import { customProviderSpec, endpointShape } from "../../core/registry.ts";
+import { MISSES_BEFORE_UNLISTED, OpenRouterSyncClaimLost } from "../../core/openrouter.ts";
 import type { UsageDimension } from "../../core/usage_report.ts";
 import type { KeyStore } from "../../ports/key_store.ts";
 import type { ModelProxyDb, ModelProxyDbHandle } from "./db/db.ts";
@@ -27,6 +31,10 @@ import * as schema from "./db/schema.ts";
 const PLATFORM_POLICY_ID = "default";
 /** The one row the agent host table holds. */
 const AGENT_HOST_ID = "default";
+/** The one row the OpenRouter sync table holds. */
+const OPENROUTER_SYNC_ID = "default";
+/** Catalogue rows per INSERT: thirteen columns each, well under Postgres' bound parameters. */
+const CATALOGUE_CHUNK = 200;
 
 /** How often a waiting lock is asked for again, and how long it is waited for in all. */
 const LOCK_POLL_MS = 50;
@@ -45,6 +53,16 @@ function lockKeyOf(id: string): number {
   }
   return hash;
 }
+
+const syncRow = schema.openrouterSync;
+
+/** The sync row, while `claim` holds it: its token, and its time not up by the database's clock. */
+const claimHeld = (claim: string) =>
+  and(
+    eq(syncRow.id, OPENROUTER_SYNC_ID),
+    eq(syncRow.claim, claim),
+    gt(syncRow.claimedUntil, sql`now()`),
+  );
 
 /** Whatever a grouped read runs on: the database itself, or a transaction inside it. */
 type Queryable = Pick<ModelProxyDb, "select">;
@@ -365,6 +383,138 @@ export function drizzleKeyStore(handle: ModelProxyDbHandle): KeyStore {
         .where(eq(schema.platformModelPolicy.id, PLATFORM_POLICY_ID));
     },
 
+    async upsertOpenRouterCatalogue(models, at, claim) {
+      const rows = schema.openrouterModels;
+      await db.transaction(async (tx) => {
+        // The claim first, its row locked to the end of the transaction: a sync whose claim
+        // lapsed writes nothing, and nobody can take the claim over while this one writes.
+        const held = await tx.select({ id: syncRow.id }).from(syncRow)
+          .where(claimHeld(claim))
+          .for("update");
+        if (held.length === 0) throw new OpenRouterSyncClaimLost();
+        for (let i = 0; i < models.length; i += CATALOGUE_CHUNK) {
+          await tx.insert(rows)
+            .values(
+              models.slice(i, i + CATALOGUE_CHUNK).map((m) => ({
+                ...m,
+                listed: true,
+                missedSyncs: 0,
+                seenAt: at,
+                enabled: false,
+                updatedAt: at,
+              })),
+            )
+            .onConflictDoUpdate({
+              target: rows.id,
+              // Everything the sync knows, and nothing an admin decided: `enabled` stays.
+              set: {
+                label: sql`excluded.label`,
+                contextLength: sql`excluded.context_length`,
+                maxOutputTokens: sql`excluded.max_output_tokens`,
+                vision: sql`excluded.vision`,
+                reasoning: sql`excluded.reasoning`,
+                tools: sql`excluded.tools`,
+                price: sql`excluded.price`,
+                listed: true,
+                missedSyncs: 0,
+                seenAt: at,
+                updatedAt: at,
+              },
+            });
+        }
+        // Every listed row this sync did not carry, found by its stamp rather than by naming the
+        // ids it did (which would be a bound parameter each): one more miss, and unlisted unless
+        // it is enabled and has missed fewer than MISSES_BEFORE_UNLISTED in a row. In a SET, the
+        // columns read their values from before the update.
+        await tx.update(rows)
+          .set({
+            missedSyncs: sql`${rows.missedSyncs} + 1`,
+            listed: sql`(${rows.enabled} and ${rows.missedSyncs} + 1 < ${MISSES_BEFORE_UNLISTED})`,
+            updatedAt: at,
+          })
+          .where(and(eq(rows.listed, true), ne(rows.seenAt, at)));
+      });
+    },
+    async countListedOpenRouterModels() {
+      return await db.$count(schema.openrouterModels, eq(schema.openrouterModels.listed, true));
+    },
+    async listOpenRouterModels() {
+      return await db.query.openrouterModels.findMany({
+        columns: { seenAt: false },
+        orderBy: (m, { asc }) => [asc(m.id)],
+      });
+    },
+    async listUsableOpenRouterModels() {
+      return await db.query.openrouterModels.findMany({
+        columns: { seenAt: false },
+        where: (m, { and, eq }) => and(eq(m.enabled, true), eq(m.listed, true), eq(m.tools, true)),
+        orderBy: (m, { asc }) => [asc(m.id)],
+      });
+    },
+    async listOpenRouterPrices() {
+      const rows = await db.query.openrouterModels.findMany({
+        columns: { id: true, price: true },
+        where: (m, { isNotNull }) => isNotNull(m.price),
+      });
+      return rows.flatMap(({ id, price }) => price === null ? [] : [{ id, price }]);
+    },
+    async setOpenRouterEnabled(ids, at) {
+      const rows = schema.openrouterModels;
+      await db.transaction(async (tx) => {
+        await tx.update(rows)
+          .set({ enabled: false, updatedAt: at })
+          .where(and(
+            eq(rows.enabled, true),
+            ...(ids.length === 0 ? [] : [notInArray(rows.id, [...ids])]),
+          ));
+        if (ids.length > 0) {
+          await tx.update(rows)
+            .set({ enabled: true, updatedAt: at })
+            .where(and(eq(rows.enabled, false), inArray(rows.id, [...ids])));
+        }
+      });
+    },
+    async getOpenRouterSync() {
+      const row = await db.query.openrouterSync.findFirst({
+        columns: { syncedAt: true, attemptedAt: true, error: true, errorCode: true },
+        where: (s, { eq }) => eq(s.id, OPENROUTER_SYNC_ID),
+        // Asked of the database's clock, the one the claim was stamped by.
+        extras: (s) => ({
+          syncing: sql<boolean>`(${s.claim} is not null and ${s.claimedUntil} > now())`
+            .as("syncing"),
+        }),
+      });
+      if (row === undefined) return null;
+      return { ...row, syncing: row.syncing === true };
+    },
+    async claimOpenRouterSync(claim, forMs) {
+      const until = sql`now() + ${
+        Math.max(0, Math.round(forMs))
+      }::integer * interval '1 millisecond'`;
+      const taken = await db.insert(syncRow)
+        .values({ id: OPENROUTER_SYNC_ID, claim, claimedUntil: until })
+        .onConflictDoUpdate({
+          target: syncRow.id,
+          set: { claim, claimedUntil: until },
+          // Free, or its holder's time is up. The row lock the conflict takes is what makes two
+          // claims at once one winner and one loser.
+          setWhere: or(isNull(syncRow.claim), lte(syncRow.claimedUntil, sql`now()`)),
+        })
+        // The sync's time, on the clock the claim is timed by. Read as milliseconds: the
+        // drivers answer a timestamp in different shapes, a number in one.
+        .returning({
+          at: sql<number>`(extract(epoch from now()) * 1000)::float8`.mapWith(Number),
+        });
+      return taken.length === 1 ? new Date(Math.floor(taken[0].at)).toISOString() : null;
+    },
+    async endOpenRouterSync(claim, state) {
+      const ended = await db.update(syncRow)
+        .set({ ...(state ?? {}), claim: null, claimedUntil: null })
+        .where(claimHeld(claim))
+        .returning({ id: syncRow.id });
+      return ended.length === 1;
+    },
+
     async recordUsage(record) {
       await db.insert(schema.proxyUsage).values(record);
     },
@@ -398,6 +548,9 @@ export function drizzleKeyStore(handle: ModelProxyDbHandle): KeyStore {
       if (query.to !== undefined) conditions.push(lt(usage.at, query.to));
       const where = conditions.length === 0 ? undefined : and(...conditions);
 
+      // Rows carrying the provider's own bill are summed apart from rows priced off the list, so
+      // the report can take the one at its word and price the other.
+      const costReported = sql<boolean>`(${usage.costUsd} is not null)`;
       const group = (on: Queryable, by: UsageDimension) => {
         const key = usageKey(by);
         return on
@@ -416,6 +569,8 @@ export function drizzleKeyStore(handle: ModelProxyDbHandle): KeyStore {
             cacheWriteTokens: sumOf(usage.cacheWriteTokens),
             cacheWrite1hTokens: sumOf(usage.cacheWrite1hTokens),
             reasoningTokens: sumOf(usage.reasoningTokens),
+            costReported,
+            reportedCostUsd: sumOf(usage.costUsd),
           })
           .from(usage)
           .where(where)
@@ -424,6 +579,7 @@ export function drizzleKeyStore(handle: ModelProxyDbHandle): KeyStore {
             usage.provider,
             usage.model,
             tierFloor,
+            costReported,
           );
       };
 

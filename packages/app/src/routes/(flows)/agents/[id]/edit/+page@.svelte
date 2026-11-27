@@ -14,12 +14,14 @@ import type {
 import SteppedFlow, { type FlowStepItem } from "#lib/components/stepped-flow/stepped-flow.svelte";
 import { stepOf } from "#lib/components/stepped-flow/steps.ts";
 import UnsavedChangesGuard from "#lib/components/unsaved-changes-guard/unsaved-changes-guard.svelte";
+import * as Alert from "#lib/components/ui/alert/index.ts";
 import { Badge } from "#lib/components/ui/badge/index.ts";
 import { Button } from "#lib/components/ui/button/index.ts";
 import { Spinner } from "#lib/components/ui/spinner/index.ts";
 import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
 import ArrowRightIcon from "@lucide/svelte/icons/arrow-right";
 import CheckIcon from "@lucide/svelte/icons/check";
+import TriangleAlertIcon from "@lucide/svelte/icons/triangle-alert";
 import { untrack } from "svelte";
 import { toast } from "svelte-sonner";
 import {
@@ -45,7 +47,8 @@ import {
   composeModelPolicy,
   defaultModelThinkingLevels,
   editedDefaultThinking,
-  modelPolicyProblem,
+  editedModelPolicyCheck,
+  openRouterChoices,
   policyToFields,
 } from "../../shared/model-policy";
 import LimitPolicyFields from "../../shared/limit-policy-fields.svelte";
@@ -111,6 +114,21 @@ const sentThinking = $derived(
       data.agent.modelPolicy,
     ),
   ),
+);
+const composedPolicy = $derived(
+  composeModelPolicy(providerKeyId, allowedModels, defaultModel, data.providerKeys, sentThinking),
+);
+// The OpenRouter rules hold only once the model fields move: the server saves a policy sent back
+// as stored without checking it, so a disabled model warns here and blocks nothing else.
+const modelCheck = $derived(
+  data.modelAccessEnabled
+    ? editedModelPolicyCheck(
+      data.agent.modelPolicy,
+      composedPolicy,
+      { providerKeyId, allowedModels, defaultModel },
+      openRouterChoices(data.providers, data.providerKeys, providerKeyId, data.agent.modelPolicy),
+    )
+    : { problem: null, warning: null },
 );
 // svelte-ignore state_referenced_locally
 let toolGrants = $state(policyToGrants(data.agent.toolPolicy));
@@ -203,9 +221,7 @@ const index = $derived(STEPS.findIndex((step) => step.id === current));
 // so a policy that cannot be shown is never a problem that cannot be fixed.
 const problems = $derived<Record<AgentStepId, string | null>>({
   identity: identityProblem(name, handle, email, page.url.hostname),
-  model: data.modelAccessEnabled
-    ? modelPolicyProblem(providerKeyId, allowedModels, defaultModel)
-    : null,
+  model: modelCheck.problem,
   instructions: null,
   tools: data.toolAccessEnabled ? toolPolicyProblem(toolGrants, data.mcpServers) : null,
   skills: null,
@@ -241,15 +257,7 @@ function go(id: AgentStepId) {
  */
 function policyPatch(): { modelPolicy?: ModelPolicy | null } {
   if (data.modelAccessEnabled) {
-    return {
-      modelPolicy: composeModelPolicy(
-        providerKeyId,
-        allowedModels,
-        defaultModel,
-        data.providerKeys,
-        sentThinking,
-      ),
-    };
+    return { modelPolicy: composedPolicy };
   }
   const removed = data.agent.modelPolicy !== null && providerKeyId === "";
   return removed ? { modelPolicy: null } : {};
@@ -382,6 +390,23 @@ async function handleArchive() {
     select={(id) => go(id as AgentStepId)}
   >
     {#snippet children(shown: string)}
+      {#if modelCheck.warning}
+        <Alert.Root class="max-w-2xl">
+          <TriangleAlertIcon />
+          <Alert.Title>{modelCheck.warning}</Alert.Title>
+          <Alert.Description class="flex flex-col items-start gap-2">
+            <span>
+              Pick enabled models on the Model step, or turn them back on under
+              <a href="/model-keys" class="underline underline-offset-4">Model keys</a>.
+            </span>
+            {#if shown !== "model"}
+              <Button type="button" variant="outline" size="sm" onclick={() => go("model")}>
+                Pick models
+              </Button>
+            {/if}
+          </Alert.Description>
+        </Alert.Root>
+      {/if}
       <div hidden={shown !== "identity"} class="max-w-2xl flex flex-col gap-6">
         {#if data.agent.archivedAt}
           <div>

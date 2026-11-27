@@ -16,10 +16,12 @@ import {
   pgTable,
   serial,
   text,
+  timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import type { DeclaredModel } from "../../../core/registry.ts";
 import type { AllowedModels, PlanRegistration, PlanStatus } from "../../../core/types.ts";
+import type { PriceRates } from "../../../core/pricing.ts";
 
 export const providerKeys = pgTable("provider_keys", {
   id: text("id").primaryKey(),
@@ -95,6 +97,49 @@ export const customProviders = pgTable("custom_providers", {
   updatedAt: text("updated_at").notNull(),
 });
 
+// OpenRouter's model catalogue, synced from its public model list (core/openrouter_catalogue.ts),
+// and which of those models an admin enabled for agents. One set per deployment: the catalogue is
+// the same for every OpenRouter key. Rows are never deleted — a model that drops out of syncs is
+// marked unlisted — so a usage row spent on it keeps a price.
+export const openrouterModels = pgTable("openrouter_models", {
+  id: text("id").primaryKey(),
+  label: text("label").notNull(),
+  contextLength: integer("context_length").notNull(),
+  // Clamped at sync (core/openrouter.ts): what pi asks a call for, and what an unreported call
+  // is estimated at.
+  maxOutputTokens: integer("max_output_tokens").notNull(),
+  vision: boolean("vision").notNull(),
+  reasoning: boolean("reasoning").notNull(),
+  tools: boolean("tools").notNull(),
+  // USD per million tokens; null when OpenRouter's pricing could not be read, which reports as
+  // unpriced, never as free.
+  price: jsonb("price").$type<PriceRates>(),
+  listed: boolean("listed").notNull().default(true),
+  // Syncs in a row that left the model out, and the last sync that carried it: an enabled model
+  // is unlisted only after more than one (MISSES_BEFORE_UNLISTED), and the sync finds the rows it
+  // left out by `seen_at` rather than by a list of every id it carried.
+  missedSyncs: integer("missed_syncs").notNull().default(0),
+  seenAt: text("seen_at").notNull(),
+  enabled: boolean("enabled").notNull().default(false),
+  updatedAt: text("updated_at").notNull(),
+});
+
+// Where the catalogue sync stands: one row (`id = "default"`), like the platform policy's.
+export const openrouterSync = pgTable("openrouter_sync", {
+  id: text("id").primaryKey(),
+  syncedAt: text("synced_at"),
+  attemptedAt: text("attempted_at"),
+  error: text("error"),
+  // A code beside the error, for the one failure the admin can act on: OPENROUTER_SYNC_SHRUNK.
+  errorCode: text("error_code"),
+  // The one sync claim (KeyStore.claimOpenRouterSync): the holding sync's token, and when its
+  // claim lapses. A timestamp, unlike the text times beside it, because it is set and compared
+  // only by the database's own clock (now()), which every replica shares: two replicas whose
+  // clocks disagree cannot both believe they hold it.
+  claim: text("claim"),
+  claimedUntil: timestamp("claimed_until", { withTimezone: true, mode: "string" }),
+});
+
 export const virtualKeys = pgTable("virtual_keys", {
   id: text("id").primaryKey(),
   runId: text("run_id").notNull(),
@@ -138,7 +183,8 @@ export const proxyUsage = pgTable("proxy_usage", {
   provider: text("provider").notNull(),
   model: text("model"),
   status: integer("status").notNull(),
-  // The response's usage report, null when it carried none. Tokens only — cost is priced on read.
+  // The response's usage report, null when it carried none. Tokens only: cost is priced on read,
+  // except `cost_usd` below.
   inputTokens: integer("input_tokens"),
   outputTokens: integer("output_tokens"),
   cacheReadTokens: integer("cache_read_tokens"),
@@ -147,6 +193,9 @@ export const proxyUsage = pgTable("proxy_usage", {
   reasoningTokens: integer("reasoning_tokens"),
   // The counts are the proxy's estimate: the response never reported its usage.
   estimated: boolean("estimated").notNull().default(false),
+  // What the provider itself said the call cost, in USD: OpenRouter's `usage.cost`, the one
+  // provider whose bill is stored rather than priced from a list. Null for every other row.
+  costUsd: doublePrecision("cost_usd"),
   durationMs: integer("duration_ms"),
   at: text("at").notNull(),
 }, (t) => [

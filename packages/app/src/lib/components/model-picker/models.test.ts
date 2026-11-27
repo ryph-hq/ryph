@@ -44,6 +44,11 @@ describe("choicesFor", () => {
       { id: "mine" },
     ]);
   });
+
+  it("drops ids the provider does not list when only its list counts", () => {
+    expect(choicesFor([SONNET, HAIKU], ["claude-haiku-4-5", "mine"], true)).toEqual([HAIKU]);
+    expect(choicesFor([SONNET, HAIKU], "*", true)).toEqual([SONNET, HAIKU]);
+  });
 });
 
 describe("priceLabel", () => {
@@ -189,5 +194,40 @@ describe("an included model", () => {
     expect(INCLUDED_LABEL).toBe("Included in your ChatGPT plan");
     expect(priceHint(model)).toBeUndefined();
     expect(priceHint(SONNET)).toBeDefined();
+  });
+});
+
+describe("an OpenRouter key", () => {
+  const OPENROUTER: Provider = {
+    id: "openrouter",
+    label: "OpenRouter",
+    dialect: "openai-completions",
+    builtin: true,
+    baseUrl: "https://openrouter.ai/api/v1",
+    authHeader: "authorization",
+    authScheme: "Bearer",
+    models: [
+      { id: "openai/gpt-6", reasoning: true, compat: { thinkingFormat: "openrouter" } },
+      { id: "acme/plain", reasoning: false },
+    ],
+    archivedAt: null,
+  };
+
+  it("offers the enabled models the provider list carries", () => {
+    expect(modelsForKey([OPENROUTER], key("openrouter")).map((m) => m.id)).toEqual([
+      "openai/gpt-6",
+      "acme/plain",
+    ]);
+  });
+
+  it("takes its levels from `reasoning`, as pi does for models handed to it", () => {
+    expect(thinkingLevelsForKey([OPENROUTER], key("openrouter"), "openai/gpt-6")).toEqual([
+      "off",
+      "minimal",
+      "low",
+      "medium",
+      "high",
+    ]);
+    expect(thinkingLevelsForKey([OPENROUTER], key("openrouter"), "acme/plain")).toEqual(["off"]);
   });
 });

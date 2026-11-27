@@ -604,6 +604,44 @@ test("pi: a provider blob that speaks the Responses API is written through as su
   assertEquals(provider.baseUrl, "http://model-proxy.test:7420/v1");
 });
 
+test("pi: an OpenRouter run is told its enabled models and OpenRouter's thinking format", () => {
+  // Exactly the blob @ryph/model-proxy's issuer writes for an `openrouter` key: the enabled
+  // models, each with `compat.thinkingFormat` — pi detects OpenRouter by its base URL, which is
+  // the proxy's here, so the format has to be said.
+  const config = proxyModelsConfig(
+    { kind: "pi", provider: "openrouter" },
+    customEnv({
+      RYPH_MODEL_PROVIDER_CONFIG: JSON.stringify({
+        id: "openrouter",
+        dialect: "openai-completions",
+        models: [{
+          id: "openai/gpt-6",
+          label: "OpenAI: GPT-6",
+          contextWindow: 400_000,
+          maxOutputTokens: 65_536,
+          reasoning: true,
+          vision: true,
+          compat: { thinkingFormat: "openrouter" },
+          price: { input: 2.5, output: 10, cacheRead: 0.25, cacheWrite: 2.5 },
+        }],
+      }),
+    }),
+  );
+  assert(config !== null);
+  assertEquals(config.provider, "openrouter");
+  assertEquals(config.keyEnv, "RYPH_MODEL_API_KEY");
+  const provider = (config.models.providers as Record<string, Record<string, unknown>>)
+    .openrouter;
+  assertEquals(provider.api, "openai-completions");
+  assertEquals(provider.baseUrl, "http://model-proxy.test:7420/v1");
+  assertEquals(provider.apiKey, "$RYPH_MODEL_API_KEY");
+  const [model] = provider.models as JsonObject[];
+  assertEquals(model.compat, { thinkingFormat: "openrouter" });
+  assertEquals(model.reasoning, true);
+  assertEquals(model.maxTokens, 65_536);
+  assertEquals(model.input, ["text", "image"]);
+});
+
 test("pi: a ChatGPT plan run is a complete Responses entry on the proxy, keyed by its env var", () => {
   // Exactly the blob @ryph/model-proxy's issuer writes for a `chatgpt-plan` key: pi has no such
   // provider of its own, so it rides the custom-endpoint path, and the proxy holds the plan.

@@ -272,6 +272,10 @@ test("control plane serves every mounted surface from one handler", async () => 
   const keys = await app.handler(await authed(app, "/v1/provider-keys"));
   assertEquals(keys.status, 200);
   await keys.body?.cancel();
+  // And OpenRouter's catalogue beside it: empty until a key syncs it, never a 404.
+  const openrouter = await app.handler(await authed(app, "/v1/openrouter/models"));
+  assertEquals(openrouter.status, 200);
+  assertEquals((await openrouter.json()).models, []);
 
   // @ryph/mcp-gateway's server CRUD, mounted.
   const servers = await app.handler(await authed(app, "/v1/mcp-servers"));

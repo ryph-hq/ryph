@@ -15,6 +15,7 @@ import {
 import {
   CHATGPT_PLAN,
   type Dialect,
+  OPENROUTER,
   THINKING_LEVELS as PROXY_THINKING_LEVELS,
 } from "@ryph/model-proxy";
 import { THINKING_LEVELS } from "../src/core/types.ts";
@@ -32,7 +33,11 @@ import {
 import { DEFAULT_SERVICE_POLICY } from "../src/core/services.ts";
 import { noopForge } from "../src/adapters/forge/noop.ts";
 import type { ImagePrefetch } from "../src/ports/image_prefetch.ts";
-import { type DeploymentLimits, spendIncluded } from "../src/core/run_limits.ts";
+import {
+  type DeploymentLimits,
+  OPENROUTER_PROVIDER,
+  spendIncluded,
+} from "../src/core/run_limits.ts";
 
 /** The tests' default caller: the total-bypass principal, like RYPH_AUTH=off yields. */
 const BREAK_GLASS = { kind: "break-glass" } as const;
@@ -69,6 +74,7 @@ function fakeModelAccess(
     dialect: Dialect;
     providerArchivedAt?: string | null;
     archivedAt: string | null;
+    models?: string[] | null;
   } = {
     id: "pk-1",
     provider: "anthropic",
@@ -81,7 +87,8 @@ function fakeModelAccess(
   /** What the proxy would answer the sweep and the door: set by a test, read by the fake. */
   const spend = { byRun: new Map<string, number>(), ceilingReached: false };
   const modelAccess: ModelAccess = {
-    getKey: (id) => Promise.resolve(id === key.id ? { providerArchivedAt: null, ...key } : null),
+    getKey: (id) =>
+      Promise.resolve(id === key.id ? { providerArchivedAt: null, models: null, ...key } : null),
     issueRunCredentials(scope) {
       issued.push({ ...scope });
       return Promise.resolve({
@@ -658,6 +665,192 @@ test("an agent may not be created against an ARCHIVED model endpoint", async () 
   assert(body.error.includes("archived"), body.error);
 });
 
+test("an OpenRouter policy may name only the models an admin enabled", async () => {
+  // OpenRouter narrows every run to the enabled models at issue time; a policy naming one that
+  // is not enabled would have it narrowed away at boot, so the form refuses it instead.
+  const { modelAccess } = fakeModelAccess({
+    id: "pk-or",
+    provider: "openrouter",
+    dialect: "openai-completions",
+    archivedAt: null,
+    models: ["openai/gpt-6", "anthropic/claude-sonnet-5"],
+  });
+  const { handler } = buildApp({ modelAccess });
+  const policy = (over: Record<string, unknown>) => ({
+    ...PI_AGENT,
+    modelPolicy: {
+      ...PI_AGENT.modelPolicy,
+      providerKeyId: "pk-or",
+      provider: "openrouter",
+      allowedModels: ["openai/gpt-6"],
+      defaultModel: "openai/gpt-6",
+      ...over,
+    },
+  });
+
+  const listed = await post(
+    handler,
+    "/v1/agents",
+    policy({
+      allowedModels: ["openai/gpt-6", "x-ai/grok-9"],
+    }),
+  );
+  assertEquals(listed.status, 400);
+  assertEquals(
+    (await listed.json()).error,
+    'model "x-ai/grok-9" isn\'t enabled for OpenRouter — enable it under Model keys',
+  );
+
+  const byDefault = await post(
+    handler,
+    "/v1/agents",
+    policy({
+      allowedModels: "*",
+      defaultModel: "x-ai/grok-9",
+    }),
+  );
+  assertEquals(byDefault.status, 400);
+  assert((await byDefault.json()).error.includes("x-ai/grok-9"));
+
+  assertEquals((await post(handler, "/v1/agents", policy({}))).status, 201);
+  assertEquals((await post(handler, "/v1/agents", policy({ allowedModels: "*" }))).status, 201);
+
+  // No default model: refused. pi, told none, would pick its own out of its built-in OpenRouter
+  // catalogue, a model nobody enabled.
+  for (const allowedModels of ["*", ["openai/gpt-6"]]) {
+    const noDefault = await post(
+      handler,
+      "/v1/agents",
+      policy({ allowedModels, defaultModel: null }),
+    );
+    assertEquals(noDefault.status, 400);
+    assertEquals((await noDefault.json()).error, "Pick a default model for OpenRouter");
+  }
+
+  // Nothing enabled at all: no default can be one.
+  const none = fakeModelAccess({
+    id: "pk-or",
+    provider: "openrouter",
+    dialect: "openai-completions",
+    archivedAt: null,
+    models: [],
+  });
+  const empty = await post(
+    buildApp({ modelAccess: none.modelAccess }).handler,
+    "/v1/agents",
+    policy({ allowedModels: "*" }),
+  );
+  assertEquals(empty.status, 400);
+  assert((await empty.json()).error.includes("isn't enabled for OpenRouter"));
+});
+
+test("an OpenRouter task with no model is refused at the door, proxy or none", async () => {
+  // The id the door checks is the proxy's own, spelled twice: pinned here.
+  assertEquals(OPENROUTER_PROVIDER, OPENROUTER);
+  // A policy saved with no default model (before the form refused one, or with the proxy not
+  // narrowing): the door still refuses a task that names none.
+  const key = {
+    id: "pk-or",
+    provider: "openrouter",
+    dialect: "openai-completions" as const,
+    archivedAt: null,
+    models: null as string[] | null,
+  };
+  const { modelAccess } = fakeModelAccess(key);
+  const { handler } = buildApp({ ...imageConfig(), modelAccess });
+  const agent = await createAgent(handler, {
+    ...PI_AGENT,
+    modelPolicy: {
+      ...PI_AGENT.modelPolicy,
+      providerKeyId: "pk-or",
+      provider: "openrouter",
+      allowedModels: "*",
+      defaultModel: null,
+    },
+  });
+  modelAccess.getKey = () => Promise.reject(new Error("proxy down"));
+  const refused = await post(handler, "/v1/tasks", { agentId: agent.id, ...TASK_SPEC });
+  assertEquals(refused.status, 400);
+  assertEquals(
+    (await refused.json()).error,
+    "an OpenRouter run needs a model: pick a default model in the agent's policy",
+  );
+  // A task that names one starts.
+  const picked = await post(handler, "/v1/tasks", {
+    agentId: agent.id,
+    ...TASK_SPEC,
+    model: "openai/gpt-6",
+  });
+  assertEquals(picked.status, 201);
+});
+
+test("the door asks for a key's models only for OpenRouter, beside the ceiling, not after it", async () => {
+  const { modelAccess } = fakeModelAccess();
+  const asked: string[] = [];
+  let release = () => {};
+  const held = new Promise<void>((resolve) => (release = resolve));
+  const getKey = modelAccess.getKey;
+  const { handler } = buildApp({ ...imageConfig(), modelAccess });
+  const agent = await createAgent(handler, PI_AGENT);
+
+  // Anthropic narrows nothing: the door asks only for the ceiling.
+  modelAccess.getKey = (id) => {
+    asked.push("models");
+    return getKey(id);
+  };
+  modelAccess.ceilingReached = () => {
+    asked.push("ceiling");
+    return Promise.resolve(false);
+  };
+  assertEquals((await post(handler, "/v1/tasks", { agentId: agent.id, ...TASK_SPEC })).status, 201);
+  assertEquals(asked, ["ceiling"]);
+
+  // OpenRouter: both questions go out before either is answered.
+  const or = fakeModelAccess({
+    id: "pk-or",
+    provider: "openrouter",
+    dialect: "openai-completions",
+    archivedAt: null,
+    models: ["openai/gpt-6"],
+  });
+  const app = buildApp({ ...imageConfig(), modelAccess: or.modelAccess });
+  const orAgent = await createAgent(app.handler, {
+    ...PI_AGENT,
+    modelPolicy: {
+      ...PI_AGENT.modelPolicy,
+      providerKeyId: "pk-or",
+      provider: "openrouter",
+      allowedModels: "*",
+      defaultModel: "openai/gpt-6",
+    },
+  });
+  const orGetKey = or.modelAccess.getKey;
+  const seen: string[] = [];
+  or.modelAccess.getKey = async (id) => {
+    seen.push("models");
+    await held;
+    return await orGetKey(id);
+  };
+  or.modelAccess.ceilingReached = async () => {
+    seen.push("ceiling");
+    await held;
+    return false;
+  };
+  const started = post(app.handler, "/v1/tasks", { agentId: orAgent.id, ...TASK_SPEC });
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assertEquals(seen.sort(), ["ceiling", "models"]);
+  release();
+  assertEquals((await started).status, 201);
+
+  // Neither answering refuses nothing.
+  or.modelAccess.getKey = () => Promise.reject(new Error("proxy down"));
+  or.modelAccess.ceilingReached = () => Promise.reject(new Error("proxy down"));
+  assertEquals(
+    (await post(app.handler, "/v1/tasks", { agentId: orAgent.id, ...TASK_SPEC })).status,
+    201,
+  );
+});
+
 test("without model access configured, an agent with a policy is refused", async () => {
   const { handler } = buildApp({ modelAccess: null });
   const refused = await post(handler, "/v1/agents", PI_AGENT);
@@ -787,6 +980,54 @@ test("a task's model pick is bounded by the allowlist and frozen onto the run", 
     (await bootstrapEnv(handler, launches[1].env)).RYPH_RUN_TOKEN,
   );
   assertEquals((await spec2.json()).workItem.harness.model, "claude-sonnet-5");
+});
+
+test("a task on an OpenRouter model disabled since the policy was saved is refused at the door", async () => {
+  const key = {
+    id: "pk-or",
+    provider: "openrouter",
+    dialect: "openai-completions" as const,
+    archivedAt: null,
+    models: ["openai/gpt-6", "anthropic/claude-sonnet-5"] as string[] | null,
+  };
+  const { modelAccess } = fakeModelAccess(key);
+  const { handler } = buildApp({ ...imageConfig(), modelAccess });
+  const agent = await createAgent(handler, {
+    ...PI_AGENT,
+    modelPolicy: {
+      ...PI_AGENT.modelPolicy,
+      providerKeyId: "pk-or",
+      provider: "openrouter",
+      allowedModels: "*",
+      defaultModel: "openai/gpt-6",
+    },
+  });
+
+  // The admin turns the default model off: a task on it would boot only to fail every call.
+  key.models = ["anthropic/claude-sonnet-5"];
+  const refused = await post(handler, "/v1/tasks", { agentId: agent.id, ...TASK_SPEC });
+  assertEquals(refused.status, 400);
+  assertEquals(
+    (await refused.json()).error,
+    'model "openai/gpt-6" isn\'t enabled for OpenRouter — enable it under Model keys',
+  );
+  const picked = await post(handler, "/v1/tasks", {
+    agentId: agent.id,
+    ...TASK_SPEC,
+    model: "openai/gpt-6",
+  });
+  assertEquals(picked.status, 400);
+
+  // A model still enabled starts; so does any task when the proxy cannot say (the issuer still
+  // refuses at boot).
+  const enabled = await post(handler, "/v1/tasks", {
+    agentId: agent.id,
+    ...TASK_SPEC,
+    model: "anthropic/claude-sonnet-5",
+  });
+  assertEquals(enabled.status, 201);
+  modelAccess.getKey = () => Promise.reject(new Error("proxy down"));
+  assertEquals((await post(handler, "/v1/tasks", { agentId: agent.id, ...TASK_SPEC })).status, 201);
 });
 
 test("a task's thinking level: its pick, else the policy's default, frozen onto the run", async () => {
@@ -930,6 +1171,8 @@ test("boot credentials: minted from the frozen scope, empty without one, dead af
     providerKeyId: "pk-1",
     provider: "anthropic",
     allowedModels: ["claude-sonnet-5", "claude-haiku-4-5"],
+    // The run's own model rides along, for a provider that narrows its models to refuse.
+    model: "claude-sonnet-5",
     spendUsd: null,
     callsInFlight: null,
   }]);

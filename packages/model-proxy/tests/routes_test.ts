@@ -398,7 +398,7 @@ test("the provider list is built-ins then rows, and never carries extraHeaders",
   const before = await (await call(handler, "GET", "/v1/providers")).json();
   assertEquals(
     before.providers.map((p: { id: string }) => p.id),
-    ["anthropic", "openai", "chatgpt-plan"],
+    ["anthropic", "openai", "chatgpt-plan", "openrouter"],
   );
   assertEquals(before.providers[0].dialect, "anthropic-messages");
   // OpenAI is driven over the Responses API; a custom endpoint (below) stays on Chat Completions.
@@ -437,10 +437,10 @@ test("the provider list is built-ins then rows, and never carries extraHeaders",
   const after = await (await call(handler, "GET", "/v1/providers", undefined, USER)).json();
   assertEquals(
     after.providers.map((p: { id: string }) => p.id),
-    ["anthropic", "openai", "chatgpt-plan", "groq"],
+    ["anthropic", "openai", "chatgpt-plan", "openrouter", "groq"],
   );
   assert(!after.providers.some((p: { extraHeaders?: unknown }) => "extraHeaders" in p));
-  assertEquals(after.providers[3].authHeader, "api-key");
+  assertEquals(after.providers[4].authHeader, "api-key");
 });
 
 test("every route answers with an endpoint's models exactly as stored", async () => {
@@ -500,7 +500,7 @@ test("an admin marks an endpoint's model as taking images, and can take it back"
     { id: "llama-4-mini", vision: true },
   ]);
   const listed = await (await call(handler, "GET", "/v1/providers", undefined, USER)).json();
-  assertEquals(listed.providers[3].models[1].vision, true, "every reader sees the flag");
+  assertEquals(listed.providers[4].models[1].vision, true, "every reader sees the flag");
 
   const bad = await call(handler, "PATCH", "/v1/providers/groq", {
     models: [{ id: "llama-4", vision: "yes" }],

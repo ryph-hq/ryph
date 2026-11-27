@@ -8,9 +8,12 @@ import type { CustomProvider, PlanSignIn, ProviderKey, VirtualKey } from "../src
 import { memoryKeyStore } from "./memory_store.ts";
 import { platformPrincipal } from "../src/core/types.ts";
 import { makeTestDb } from "./db.ts";
+import { type OpenRouterCatalogueEntry, OpenRouterSyncClaimLost } from "../src/core/openrouter.ts";
+import { seedCatalogue } from "./fake_openrouter.ts";
 
 const T0 = "2026-01-01T00:00:00.000Z";
 const T1 = "2026-01-01T01:00:00.000Z";
+const T2 = "2026-01-01T02:00:00.000Z";
 
 const key: ProviderKey = {
   id: "pk-1",
@@ -110,6 +113,7 @@ test("drizzle store round-trips provider keys, virtual keys, and usage", async (
       cacheWrite1hTokens: null,
       reasoningTokens: null,
       estimated: false,
+      costUsd: null,
       durationMs: 5,
       at: T0,
     });
@@ -128,6 +132,7 @@ test("drizzle store round-trips provider keys, virtual keys, and usage", async (
       cacheWrite1hTokens: null,
       reasoningTokens: null,
       estimated: false,
+      costUsd: null,
       durationMs: 5,
       at: T1,
     });
@@ -211,6 +216,207 @@ test("custom endpoints round-trip through both stores identically", async () => 
       assertEquals((await store.getCustomProvider("groq"))?.archivedAt, T1, name);
       assertEquals((await store.listCustomProviders()).length, 2, name);
       await store.archiveCustomProvider("nope", T1); // quiet about a row that is not there
+    }
+  } finally {
+    await stores.drizzle.close();
+  }
+});
+
+// ── OpenRouter's catalogue ──────────────────────────────────────────────────────────────────
+
+const catalogueEntry = (id: string, over: Partial<OpenRouterCatalogueEntry> = {}) => ({
+  id,
+  label: id,
+  contextLength: 128_000,
+  maxOutputTokens: 16_384,
+  vision: false,
+  reasoning: false,
+  tools: true,
+  price: { input: 1, output: 2, cacheRead: 0.5, cacheWrite: 1 },
+  ...over,
+});
+
+test("the OpenRouter catalogue round-trips through both stores identically", async () => {
+  const handle = await makeTestDb();
+  const stores = { drizzle: drizzleKeyStore(handle), memory: memoryKeyStore() };
+  try {
+    for (const [name, store] of Object.entries(stores)) {
+      assertEquals(await store.listOpenRouterModels(), [], name);
+      assertEquals(await store.getOpenRouterSync(), null, name);
+
+      await seedCatalogue(store, [
+        catalogueEntry("a/one"),
+        catalogueEntry("b/two", { price: null }),
+        catalogueEntry("c/three"),
+      ], T0);
+      await store.setOpenRouterEnabled(["a/one", "b/two"], T0);
+      let rows = await store.listOpenRouterModels();
+      assertEquals(rows.map((r) => [r.id, r.listed, r.enabled]), [
+        ["a/one", true, true],
+        ["b/two", true, true],
+        ["c/three", true, false],
+      ], name);
+      // A null price stays null — unpriced, never a zero rate.
+      assertEquals(rows[1].price, null, name);
+      assertEquals(rows[0].price, { input: 1, output: 2, cacheRead: 0.5, cacheWrite: 1 }, name);
+
+      assertEquals(await store.countListedOpenRouterModels(), 3, name);
+      assertEquals((await store.listUsableOpenRouterModels()).map((r) => r.id), [
+        "a/one",
+        "b/two",
+      ], name);
+      // Only what has a price is priced.
+      assertEquals((await store.listOpenRouterPrices()).map((r) => r.id).sort(), [
+        "a/one",
+        "c/three",
+      ], name);
+
+      // The next sync drops `b/two` and `c/three` and re-prices `a/one`. Enabled, `b/two` stays
+      // listed through one miss; `c/three`, which nobody enabled, is unlisted at once. Nothing is
+      // deleted, and what an admin enabled survives the sync.
+      await seedCatalogue(store, [
+        catalogueEntry("a/one", {
+          label: "One",
+          price: { ...catalogueEntry("").price!, input: 3 },
+        }),
+      ], T1);
+      rows = await store.listOpenRouterModels();
+      assertEquals(rows.map((r) => [r.id, r.listed, r.enabled, r.missedSyncs]), [
+        ["a/one", true, true, 0],
+        ["b/two", true, true, 1],
+        ["c/three", false, false, 1],
+      ], name);
+      assertEquals(rows[0].label, "One", name);
+      assertEquals(rows[0].price?.input, 3, name);
+      assertEquals(rows[0].updatedAt, T1, name);
+
+      // A second miss in a row unlists `b/two`; `c/three` coming back is listed again.
+      await seedCatalogue(store, [catalogueEntry("a/one"), catalogueEntry("c/three")], T2);
+      rows = await store.listOpenRouterModels();
+      assertEquals(rows.map((r) => [r.id, r.listed, r.missedSyncs]), [
+        ["a/one", true, 0],
+        ["b/two", false, 2],
+        ["c/three", true, 0],
+      ], name);
+      assertEquals((await store.listUsableOpenRouterModels()).map((r) => r.id), ["a/one"], name);
+
+      // A sync that says `a/one` no longer takes tools leaves it enabled but unusable.
+      await seedCatalogue(store, [
+        catalogueEntry("a/one", { tools: false }),
+        catalogueEntry("c/three"),
+      ], T2);
+      assertEquals((await store.listOpenRouterModels())[0].enabled, true, name);
+      assertEquals(await store.listUsableOpenRouterModels(), [], name);
+
+      // The enabled set is replaced whole; an empty set disables everything.
+      await store.setOpenRouterEnabled(["c/three"], T1);
+      assertEquals(
+        (await store.listOpenRouterModels()).filter((r) => r.enabled).map((r) => r.id),
+        ["c/three"],
+        name,
+      );
+      await store.setOpenRouterEnabled([], T1);
+      assertEquals((await store.listOpenRouterModels()).filter((r) => r.enabled), [], name);
+    }
+  } finally {
+    await stores.drizzle.close();
+  }
+});
+
+test("a claim that ends writing nothing leaves the same state in both stores", async () => {
+  const handle = await makeTestDb();
+  const stores = { drizzle: drizzleKeyStore(handle), memory: memoryKeyStore() };
+  try {
+    const states = [];
+    for (const store of Object.values(stores)) {
+      assert((await store.claimOpenRouterSync("only", 60_000)) !== null);
+      assertEquals(await store.endOpenRouterSync("only", null), true);
+      states.push(await store.getOpenRouterSync());
+    }
+    // A row with every time null, not no row: a sync waiting on this one must not take it for
+    // an answer either way.
+    assertEquals(states[0], {
+      syncedAt: null,
+      attemptedAt: null,
+      error: null,
+      errorCode: null,
+      syncing: false,
+    });
+    assertEquals(states[1], states[0]);
+  } finally {
+    await stores.drizzle.close();
+  }
+});
+
+test("the sync claim: one holder at a time, writes only under it, lapsing on its own", async () => {
+  const handle = await makeTestDb();
+  const stores = { drizzle: drizzleKeyStore(handle), memory: memoryKeyStore() };
+  const lost = (p: Promise<unknown>) =>
+    p.then(() => "written", (err) => err instanceof OpenRouterSyncClaimLost ? "lost" : err);
+  try {
+    for (const [name, store] of Object.entries(stores)) {
+      // Of several claims at once, exactly one is taken, and the state says a sync runs.
+      const taken = await Promise.all(
+        ["a", "b", "c", "d"].map((c) => store.claimOpenRouterSync(c, 60_000)),
+      );
+      assertEquals(taken.filter((at) => at !== null).length, 1, name);
+      const holder = ["a", "b", "c", "d"][taken.findIndex((at) => at !== null)];
+      // The one taken answers the store's time as it took it: the sync's time.
+      const at = taken.find((at) => at !== null)!;
+      assertEquals(new Date(at).toISOString(), at, name);
+      assert(Math.abs(Date.parse(at) - Date.now()) < 60_000, `${name}: ${at}`);
+      const other = holder === "a" ? "b" : "a";
+      assertEquals(await store.getOpenRouterSync(), {
+        syncedAt: null,
+        attemptedAt: null,
+        error: null,
+        errorCode: null,
+        syncing: true,
+      }, name);
+
+      // A sync that does not hold the claim writes nothing: not the catalogue, not the state.
+      assertEquals(
+        await lost(store.upsertOpenRouterCatalogue([catalogueEntry("x/y")], T0, other)),
+        "lost",
+        name,
+      );
+      assertEquals(await store.listOpenRouterModels(), [], name);
+      const state = {
+        syncedAt: T0,
+        attemptedAt: T1,
+        error: "the list shrank",
+        errorCode: "openrouter_sync_shrunk",
+      };
+      assertEquals(await store.endOpenRouterSync(other, state), false, name);
+      assertEquals((await store.getOpenRouterSync())?.attemptedAt, null, name);
+
+      // The holder writes, and its end writes the state and frees the claim at once.
+      await store.upsertOpenRouterCatalogue([catalogueEntry("x/y")], T0, holder);
+      assertEquals((await store.listOpenRouterModels()).length, 1, name);
+      assertEquals(await store.endOpenRouterSync(holder, state), true, name);
+      assertEquals(await store.getOpenRouterSync(), { ...state, syncing: false }, name);
+      assertEquals(await store.endOpenRouterSync(holder, null), false, `${name}: ended once`);
+
+      // An end with no state frees the claim and keeps the state as it was.
+      assert((await store.claimOpenRouterSync("e", 60_000)) !== null, name);
+      assertEquals(await store.endOpenRouterSync("e", null), true, name);
+      assertEquals(await store.getOpenRouterSync(), { ...state, syncing: false }, name);
+
+      // A claim whose holder never ends it lapses: the state stops saying a sync runs, the next
+      // claim is taken, and the old holder can write nothing after it.
+      assert((await store.claimOpenRouterSync("dead", 30)) !== null, name);
+      await new Promise((resolve) => setTimeout(resolve, 80));
+      assertEquals((await store.getOpenRouterSync())?.syncing, false, name);
+      assertEquals(await lost(store.upsertOpenRouterCatalogue([], T2, "dead")), "lost", name);
+      assert((await store.claimOpenRouterSync("next", 60_000)) !== null, name);
+      assertEquals(await lost(store.upsertOpenRouterCatalogue([], T2, "dead")), "lost", name);
+      assertEquals(
+        await store.endOpenRouterSync("dead", { ...state, attemptedAt: T2 }),
+        false,
+        name,
+      );
+      assertEquals(await store.endOpenRouterSync("next", null), true, name);
+      assertEquals((await store.getOpenRouterSync())?.attemptedAt, T1, name);
     }
   } finally {
     await stores.drizzle.close();

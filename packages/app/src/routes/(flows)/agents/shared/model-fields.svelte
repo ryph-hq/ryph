@@ -1,6 +1,7 @@
 <script lang="ts">
 import type { Harness, ModelPolicy, Provider, ProviderKey } from "#lib/api/types.ts";
 import * as Alert from "#lib/components/ui/alert/index.ts";
+import CircleAlertIcon from "@lucide/svelte/icons/circle-alert";
 import InfoIcon from "@lucide/svelte/icons/info";
 import { Button } from "#lib/components/ui/button/index.ts";
 import * as Field from "#lib/components/ui/field/index.ts";
@@ -11,7 +12,12 @@ import { choicesFor, modelsForKey } from "#lib/components/model-picker/models.ts
 import ThinkingSelect from "#lib/components/model-picker/thinking-select.svelte";
 import { offersThinking, thinkingInvalid } from "#lib/components/model-picker/thinking.ts";
 import { CHATGPT_MANAGE_USAGE_URL } from "#lib/api/chatgpt-plan.ts";
-import { defaultModelThinkingLevels, storedProvider, usableProviderKeys } from "./model-policy";
+import {
+  defaultModelThinkingLevels,
+  openRouterChoices,
+  storedProvider,
+  usableProviderKeys,
+} from "./model-policy";
 
 let {
   providerKeyId = $bindable(),
@@ -60,8 +66,20 @@ const selectedKey = $derived(providerKeys.find((key) => key.id === providerKeyId
 const keyModels = $derived(
   modelsForKey(providers, selectedKey, storedProvider(storedPolicy, providerKeyId)),
 );
+// An OpenRouter key runs only the models enabled for agents, and needs a default among them.
+// Where those are known, both pickers offer them and nothing else.
+const openRouter = $derived(
+  openRouterChoices(providers, providerKeys, providerKeyId, storedPolicy),
+);
+const enabledOnly = $derived(openRouter !== null && openRouter.enabled !== null);
+const noneEnabled = $derived(openRouter?.enabled?.length === 0);
+const missingDefault = $derived(openRouter !== null && defaultModel.trim() === "");
+const defaultNotEnabled = $derived(
+  enabledOnly && defaultModel.trim() !== "" &&
+    !keyModels.some((model) => model.id === defaultModel.trim()),
+);
 // With an allowlist, the default is picked from it and from nothing else.
-const defaultChoices = $derived(choicesFor(keyModels, allowedModels));
+const defaultChoices = $derived(choicesFor(keyModels, allowedModels, enabledOnly));
 // The levels the default model takes, as pi will run it (see `thinkingLevelsFor`).
 const thinkingLevels = $derived(
   defaultModelThinkingLevels(providers, providerKeys, providerKeyId, defaultModel, storedPolicy),
@@ -212,22 +230,44 @@ $effect(() => {
   </Field.Field>
   <!-- Only offered where a save can carry them: with model access off the policy is left
        untouched, so an editable allowlist would drop every edit without a word. -->
-  {#if modelAccessEnabled && providerKeyId}
+  {#if modelAccessEnabled && providerKeyId && noneEnabled}
+    <Alert.Root variant="destructive">
+      <CircleAlertIcon />
+      <Alert.Title>No OpenRouter models are enabled</Alert.Title>
+      <Alert.Description>
+        <span>
+          Enable the models agents can use under
+          <a href="/model-keys" class="underline underline-offset-4">Model keys</a>.
+        </span>
+      </Alert.Description>
+    </Alert.Root>
+  {:else if modelAccessEnabled && providerKeyId}
     <Field.Field>
       <Field.FieldLabel for="allowed-models">Allowed models</Field.FieldLabel>
-      <ModelAllowlist id="allowed-models" bind:allowed={allowedModels} models={keyModels} />
+      <ModelAllowlist
+        id="allowed-models"
+        bind:allowed={allowedModels}
+        models={keyModels}
+        allowCustom={!enabledOnly}
+      />
       <Field.FieldDescription>The models the agent may call.</Field.FieldDescription>
     </Field.Field>
-    <Field.Field>
+    <Field.Field data-invalid={missingDefault || undefined}>
       <Field.FieldLabel for="default-model">Default model</Field.FieldLabel>
       <ModelSelect
         id="default-model"
         bind:value={defaultModel}
         models={defaultChoices}
-        emptyLabel="Harness default"
-        allowCustom={allowedModels === "*"}
+        emptyLabel={openRouter === null ? "Harness default" : undefined}
+        allowCustom={!enabledOnly && allowedModels === "*"}
+        required={openRouter !== null}
+        invalidMessage={defaultNotEnabled ? "This model isn't enabled for OpenRouter." : undefined}
       />
-      <Field.FieldDescription>Used when a task doesn't pick one.</Field.FieldDescription>
+      {#if missingDefault}
+        <Field.FieldError>OpenRouter agents need a default model.</Field.FieldError>
+      {:else}
+        <Field.FieldDescription>Used when a task doesn't pick one.</Field.FieldDescription>
+      {/if}
     </Field.Field>
     {#if offersThinking(thinkingLevels)}
       <Field.Field data-invalid={thinkingInvalid(defaultThinking, thinkingLevels) || undefined}>

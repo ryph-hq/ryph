@@ -5,8 +5,10 @@
 // asks for it, and a caller that hangs up before the stream's last event never lets the proxy
 // read it. A row with no tokens prices at $0, so either was a way past the run's spend cap and
 // the deployment's ceiling. Three answers, in order:
-// 1. a streamed Chat Completions call is made to ask (`askForStreamUsage`): one more chunk at the
-//    end, `choices: []`, which every client that reads the stream already skips
+// 1. a streamed Chat Completions call is made to ask (`stream_options.include_usage`, spliced in by
+//    `ensureObjectField`): one more chunk at the end, `choices: []`, which every client that reads
+//    the stream already skips — and an OpenRouter call is made to ask for its cost as well
+//    (`usage.include`)
 // 2. a caller that hangs up does not end the upstream call: the proxy reads it on to its end in
 //    the background, bounded by `DRAIN_MS` and `MAX_DRAIN_BYTES`, so the usage still arrives
 // 3. a spending call whose usage still never came (a cut past those bounds, an endpoint that
@@ -66,31 +68,90 @@ function spliced(
   return out;
 }
 
+/** Whether the walk's `stream` member says the call streams. */
+export function streams(bytes: Uint8Array, members: Map<string, ValueSpan>): boolean {
+  const stream = members.get("stream");
+  return stream !== undefined && dec.decode(bytes.subarray(stream.start, stream.end)) === "true";
+}
+
 /**
- * A streamed Chat Completions body made to ask for its usage (`stream_options.include_usage:
- * true`), or null when it needs no change: it does not stream, it already asks, or its
- * `stream_options` is not an object the proxy can add to (the provider refuses that anyway). The
- * body is spliced, never parsed whole; only `stream_options` itself, which is small, is.
- * `members` is the walk's spans for `stream` and `stream_options`.
+ * A body with a top-level member it did not carry: `name` set to `raw` (JSON, as written), first
+ * in the object. Null for a body that is no object. The caller knows the member is absent.
  */
-export function askForStreamUsage(
+export function insertMember(
+  bytes: Uint8Array,
+  name: string,
+  raw: string,
+): Uint8Array<ArrayBuffer> | null {
+  const open = bytes.indexOf(OPEN_OBJECT);
+  if (open === -1) return null;
+  // `{}` takes the member without the comma a following one needs.
+  let next = open + 1;
+  while (next < bytes.length && bytes[next] <= 0x20) next++;
+  const member = `${JSON.stringify(name)}:${raw}`;
+  return spliced(bytes, open + 1, open + 1, bytes[next] === 0x7d ? member : `${member},`);
+}
+
+/**
+ * A body with its top-level member `name` set to `raw` (JSON, as written): the member's value
+ * replaced where the body carries one (the last, which is the one a parse keeps), else the member
+ * added. Never a second member of the same name: JSON's last one wins, so an added one could be
+ * overruled by the body's own, or overrule it, depending on the parser. Null for a body that is no
+ * object. `members` is the walk's spans, `name` among the names it asked for.
+ */
+export function setMember(
   bytes: Uint8Array,
   members: Map<string, ValueSpan>,
+  name: string,
+  raw: string,
 ): Uint8Array<ArrayBuffer> | null {
-  const stream = members.get("stream");
-  if (stream === undefined || dec.decode(bytes.subarray(stream.start, stream.end)) !== "true") {
-    return null;
+  const span = members.get(name);
+  return span === undefined
+    ? insertMember(bytes, name, raw)
+    : spliced(bytes, span.start, span.end, raw);
+}
+
+/** The most of a member `ensureObjectField` parses to add to it. */
+export const MAX_SPLICED_MEMBER_BYTES = 64 * 1024;
+
+/**
+ * Whether a member's value (absent counts) is a JSON object of at most
+ * `MAX_SPLICED_MEMBER_BYTES`, or null: what `ensureObjectField` can make ask for something. A
+ * string, a number, `false`, an array or an object past the cap would leave it unable to.
+ */
+export function objectOrNull(bytes: Uint8Array, span: ValueSpan | undefined): boolean {
+  if (span === undefined) return true;
+  const raw = dec.decode(bytes.subarray(span.start, span.end));
+  if (raw === "null") return true;
+  if (span.end - span.start > MAX_SPLICED_MEMBER_BYTES) return false;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed);
+  } catch {
+    return false;
   }
-  const options = members.get("stream_options");
-  if (options === undefined) {
-    const open = bytes.indexOf(OPEN_OBJECT);
-    return spliced(bytes, open + 1, open + 1, '"stream_options":{"include_usage":true},');
-  }
-  const raw = dec.decode(bytes.subarray(options.start, options.end));
-  if (raw === "null") {
-    return spliced(bytes, options.start, options.end, '{"include_usage":true}');
-  }
-  if (options.end - options.start > 64 * 1024) return null;
+}
+
+/**
+ * A body whose top-level member `name` is an object with `field: true` in it — a streamed Chat
+ * Completions call's `stream_options.include_usage`, an OpenRouter call's `usage.include` — or
+ * null when it needs no change: it says so already, or `name` is not an object the proxy can add
+ * to (the provider refuses that anyway). The body is spliced, never parsed whole; only the member
+ * itself, which is small, is. `members` is the walk's spans, `name` among them; they no longer
+ * fit the body this answers, which is walked again before another splice.
+ */
+export function ensureObjectField(
+  bytes: Uint8Array,
+  members: Map<string, ValueSpan>,
+  name: string,
+  field: string,
+): Uint8Array<ArrayBuffer> | null {
+  const asked = JSON.stringify({ [field]: true });
+  const span = members.get(name);
+  if (span === undefined) return insertMember(bytes, name, asked);
+  const raw = dec.decode(bytes.subarray(span.start, span.end));
+  if (raw === "null") return spliced(bytes, span.start, span.end, asked);
+  if (span.end - span.start > MAX_SPLICED_MEMBER_BYTES) return null;
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
@@ -98,13 +159,8 @@ export function askForStreamUsage(
     return null;
   }
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return null;
-  if ((parsed as Record<string, unknown>).include_usage === true) return null;
-  return spliced(
-    bytes,
-    options.start,
-    options.end,
-    JSON.stringify({ ...parsed, include_usage: true }),
-  );
+  if ((parsed as Record<string, unknown>)[field] === true) return null;
+  return spliced(bytes, span.start, span.end, JSON.stringify({ ...parsed, [field]: true }));
 }
 
 /** The input a request body is estimated at (see the opening of this file). */

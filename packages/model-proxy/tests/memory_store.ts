@@ -18,8 +18,21 @@ import { PLATFORM_PRINCIPAL_PREFIX } from "../src/core/types.ts";
 import { customProviderSpec, endpointShape } from "../src/core/registry.ts";
 import type { KeyStore } from "../src/ports/key_store.ts";
 import type { UsageAggregateRow, UsageDimension } from "../src/core/usage_report.ts";
+import {
+  MISSES_BEFORE_UNLISTED,
+  type OpenRouterModel,
+  OpenRouterSyncClaimLost,
+  type OpenRouterSyncEnd,
+} from "../src/core/openrouter.ts";
 
-export function memoryKeyStore(): KeyStore {
+export interface MemoryKeyStoreOptions {
+  /** The store's own clock, which the sync claim lapses by (the database's `now()` on the
+   * drizzle store). */
+  now?: () => Date;
+}
+
+export function memoryKeyStore(opts: MemoryKeyStoreOptions = {}): KeyStore {
+  const now = opts.now ?? (() => new Date());
   const providerKeys = new Map<string, ProviderKey>();
   const customProviders = new Map<string, CustomProvider>();
   const virtualKeys = new Map<string, VirtualKey>();
@@ -27,6 +40,18 @@ export function memoryKeyStore(): KeyStore {
   let platformPolicy: PlatformModelPolicy | null = null;
   const signIns = new Map<string, PlanSignIn>();
   let agentHostId: string | null = null;
+  const openRouterModels = new Map<string, OpenRouterModel>();
+  let openRouterSync: OpenRouterSyncEnd | null = null;
+  /** Whether the sync's row exists: from the first claim on, as the drizzle store's does. */
+  let syncRowWritten = false;
+  // The sync claim: the holder's token and when it lapses, by `now`.
+  let syncClaim: { claim: string; until: number } | null = null;
+  const claimHeld = (claim: string) =>
+    syncClaim !== null && syncClaim.claim === claim && syncClaim.until > now().getTime();
+  const openRouterRows = () =>
+    structuredClone(
+      [...openRouterModels.values()].sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+    );
 
   return {
     createProviderKey(key) {
@@ -228,6 +253,81 @@ export function memoryKeyStore(): KeyStore {
       return Promise.resolve();
     },
 
+    upsertOpenRouterCatalogue(models, at, claim) {
+      if (!claimHeld(claim)) return Promise.reject(new OpenRouterSyncClaimLost());
+      // Mirrors the drizzle store's one transaction: upserted, listed and its misses cleared,
+      // `enabled` kept; every listed row the sync left out one miss more, and unlisted unless it
+      // is enabled and short of MISSES_BEFORE_UNLISTED.
+      const ids = new Set(models.map((m) => m.id));
+      for (const [id, row] of openRouterModels) {
+        if (!ids.has(id) && row.listed) {
+          const missedSyncs = row.missedSyncs + 1;
+          openRouterModels.set(id, {
+            ...row,
+            missedSyncs,
+            listed: row.enabled && missedSyncs < MISSES_BEFORE_UNLISTED,
+            updatedAt: at,
+          });
+        }
+      }
+      for (const model of models) {
+        const enabled = openRouterModels.get(model.id)?.enabled ?? false;
+        openRouterModels.set(
+          model.id,
+          structuredClone({ ...model, listed: true, missedSyncs: 0, enabled, updatedAt: at }),
+        );
+      }
+      return Promise.resolve();
+    },
+    countListedOpenRouterModels() {
+      return Promise.resolve([...openRouterModels.values()].filter((m) => m.listed).length);
+    },
+    listOpenRouterModels() {
+      return Promise.resolve(openRouterRows());
+    },
+    listUsableOpenRouterModels() {
+      return Promise.resolve(openRouterRows().filter((m) => m.enabled && m.listed && m.tools));
+    },
+    listOpenRouterPrices() {
+      return Promise.resolve(
+        openRouterRows().flatMap(({ id, price }) => price === null ? [] : [{ id, price }]),
+      );
+    },
+    setOpenRouterEnabled(ids, at) {
+      const wanted = new Set(ids);
+      for (const [id, row] of openRouterModels) {
+        if (row.enabled !== wanted.has(id)) {
+          openRouterModels.set(id, { ...row, enabled: wanted.has(id), updatedAt: at });
+        }
+      }
+      return Promise.resolve();
+    },
+    getOpenRouterSync() {
+      // The drizzle store's row is there from the first claim on, every time null until a sync
+      // ends with a state.
+      if (!syncRowWritten) return Promise.resolve(null);
+      return Promise.resolve({
+        syncedAt: null,
+        attemptedAt: null,
+        error: null,
+        errorCode: null,
+        ...openRouterSync,
+        syncing: syncClaim !== null && syncClaim.until > now().getTime(),
+      });
+    },
+    claimOpenRouterSync(claim, forMs) {
+      if (syncClaim !== null && syncClaim.until > now().getTime()) return Promise.resolve(null);
+      syncClaim = { claim, until: now().getTime() + forMs };
+      syncRowWritten = true;
+      return Promise.resolve(now().toISOString());
+    },
+    endOpenRouterSync(claim, state) {
+      if (!claimHeld(claim)) return Promise.resolve(false);
+      if (state !== null) openRouterSync = { ...state };
+      syncClaim = null;
+      return Promise.resolve(true);
+    },
+
     recordUsage(record) {
       usage.push(structuredClone(record));
       return Promise.resolve();
@@ -236,9 +336,9 @@ export function memoryKeyStore(): KeyStore {
       return Promise.resolve(structuredClone(usage.filter((u) => u.runId === runId)));
     },
     aggregateUsage(query) {
-      // Mirrors the drizzle store's GROUP BY key, provider, model, tier bucket — and its ONE
-      // snapshot for every dimension asked, so a row written while a report runs belongs to
-      // none of its breakdowns rather than to some of them.
+      // Mirrors the drizzle store's GROUP BY key, provider, model, tier bucket, cost reported —
+      // and its ONE snapshot for every dimension asked, so a row written while a report runs
+      // belongs to none of its breakdowns rather than to some of them.
       const snapshot = usage.filter((u) => {
         if (query.runId !== undefined && u.runId !== query.runId) return false;
         if (query.from !== undefined && u.at < query.from) return false;
@@ -267,7 +367,8 @@ export function memoryKeyStore(): KeyStore {
             (u.cacheWriteTokens ?? 0);
           const tierFloor = thresholds.find((t) => totalInput > t) ?? 0;
           const key = keyOf(u, by);
-          const id = JSON.stringify([key, u.provider, u.model, tierFloor]);
+          const costReported = u.costUsd !== null;
+          const id = JSON.stringify([key, u.provider, u.model, tierFloor, costReported]);
           let row = groups.get(id);
           if (row === undefined) {
             row = {
@@ -284,6 +385,8 @@ export function memoryKeyStore(): KeyStore {
               cacheWriteTokens: 0,
               cacheWrite1hTokens: 0,
               reasoningTokens: 0,
+              costReported,
+              reportedCostUsd: 0,
             };
             groups.set(id, row);
           }
@@ -296,6 +399,7 @@ export function memoryKeyStore(): KeyStore {
           row.cacheWriteTokens += u.cacheWriteTokens ?? 0;
           row.cacheWrite1hTokens += u.cacheWrite1hTokens ?? 0;
           row.reasoningTokens += u.reasoningTokens ?? 0;
+          row.reportedCostUsd += u.costUsd ?? 0;
         }
         return [...groups.values()];
       };

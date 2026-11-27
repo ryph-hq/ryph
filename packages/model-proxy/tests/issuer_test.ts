@@ -2,10 +2,12 @@
 
 import { test } from "bun:test";
 import { assert, assertEquals, assertRejects } from "@std/assert";
-import { makeCredentialIssuer } from "../src/core/service.ts";
+import { CredentialRefusedError, makeCredentialIssuer } from "../src/core/service.ts";
 import { memoryKeyStore } from "./memory_store.ts";
 import { sha256Hex } from "@ryph/sealed";
 import type { CustomProvider, ProviderKey } from "../src/core/types.ts";
+import { catalogueOf, OPENROUTER } from "../src/core/openrouter.ts";
+import { listedModel, seedCatalogue } from "./fake_openrouter.ts";
 
 const T0 = "2026-01-01T00:00:00.000Z";
 
@@ -334,5 +336,135 @@ test("platform: a store-wide revoke kills every consumer's credential and nothin
     (await store.getVirtualKeyByTokenHash(await sha256Hex(run.ANTHROPIC_API_KEY)))?.revokedAt,
     null,
     "a run's credential is not the platform's to revoke",
+  );
+});
+
+// ── OpenRouter ──────────────────────────────────────────────────────────────────────────────
+
+/** A store with OpenRouter's catalogue synced — three models, one later unlisted — and a key. */
+async function openRouterStore(enabled: string[]) {
+  const store = memoryKeyStore();
+  const one = listedModel("a/one");
+  const two = listedModel("b/two", { supported_parameters: ["tools", "reasoning"] });
+  await seedCatalogue(store, catalogueOf({ data: [one, two, listedModel("c/gone")] }), T0);
+  await store.setOpenRouterEnabled(enabled, T0);
+  // `c/gone` drops out of OpenRouter's list for two syncs in a row: still enabled, but no longer
+  // usable.
+  await seedCatalogue(store, catalogueOf({ data: [one, two] }), T0);
+  await seedCatalogue(store, catalogueOf({ data: [one, two] }), T0);
+  await store.createProviderKey(anthropicKey({ id: "pk-or", provider: OPENROUTER }));
+  return store;
+}
+
+const OPENROUTER_SCOPE = { ...SCOPE, providerKeyId: "pk-or", provider: OPENROUTER };
+
+test("an OpenRouter credential is narrowed to the enabled models, in the policy's order", async () => {
+  const store = await openRouterStore(["a/one", "b/two", "c/gone"]);
+  const { issuer } = makeIssuer(store);
+
+  const all = await issuer.issue({ ...OPENROUTER_SCOPE, allowedModels: "*", model: "a/one" });
+  // ryph's own two variables, like a custom endpoint, and the proxy's /v1.
+  assertEquals(all.RYPH_MODEL_BASE_URL, "http://model-proxy.internal:7420/v1");
+  const allRow = await store.getVirtualKeyByTokenHash(await sha256Hex(all.RYPH_MODEL_API_KEY));
+  // "*" is the enabled set, never every model OpenRouter serves.
+  assertEquals(allRow?.allowedModels, ["a/one", "b/two"]);
+  const blob = JSON.parse(all.RYPH_MODEL_PROVIDER_CONFIG);
+  assertEquals(blob.id, OPENROUTER);
+  assertEquals(blob.dialect, "openai-completions");
+  assertEquals(blob.models.map((m: { id: string }) => m.id), ["a/one", "b/two"]);
+  // pi detects OpenRouter by a base URL that is the proxy's, so the format is said outright.
+  assertEquals(blob.models[1].compat, { thinkingFormat: "openrouter" });
+  assertEquals(blob.models[1].reasoning, true);
+  assertEquals(blob.models[0].price, { input: 3, output: 15, cacheRead: 3, cacheWrite: 3 });
+
+  const listed = await issuer.issue({
+    ...OPENROUTER_SCOPE,
+    runId: "r-2",
+    allowedModels: ["b/two", "x/never-enabled", "c/gone", "a/one"],
+    model: "b/two",
+  });
+  const row = await store.getVirtualKeyByTokenHash(await sha256Hex(listed.RYPH_MODEL_API_KEY));
+  assertEquals(row?.allowedModels, ["b/two", "a/one"]);
+});
+
+test("an OpenRouter scope with no enabled model left is refused definitively", async () => {
+  const store = await openRouterStore(["a/one", "c/gone"]);
+  const { issuer } = makeIssuer(store);
+  for (const allowedModels of [["b/two"], ["c/gone"]]) {
+    await assertRejects(
+      () => issuer.issue({ ...OPENROUTER_SCOPE, allowedModels }),
+      CredentialRefusedError,
+      "none of this agent's models is enabled for OpenRouter",
+    );
+  }
+  await store.setOpenRouterEnabled([], T0);
+  await assertRejects(
+    () => issuer.issue({ ...OPENROUTER_SCOPE, allowedModels: "*" }),
+    CredentialRefusedError,
+    "enable them under Model keys",
+  );
+});
+
+test("an OpenRouter run whose own model is not enabled is refused, not booted to fail", async () => {
+  const store = await openRouterStore(["a/one", "c/gone"]);
+  const { issuer } = makeIssuer(store);
+  // The run's model narrowed away — never enabled, or enabled and then gone from the list —
+  // is refused, naming it, even with other models left.
+  for (const model of ["b/two", "c/gone"]) {
+    await assertRejects(
+      () => issuer.issue({ ...OPENROUTER_SCOPE, allowedModels: "*", model }),
+      CredentialRefusedError,
+      `model "${model}" isn't enabled for OpenRouter`,
+    );
+  }
+  // Its model enabled: issued.
+  const env = await issuer.issue({ ...OPENROUTER_SCOPE, allowedModels: "*", model: "a/one" });
+  assert(env.RYPH_MODEL_API_KEY.startsWith("ryph-vk-"));
+  // No model of its own: refused. pi, told none, would pick its own default out of its built-in
+  // OpenRouter catalogue, a model nobody enabled, and every call would be refused.
+  for (const model of [null, undefined]) {
+    await assertRejects(
+      () => issuer.issue({ ...OPENROUTER_SCOPE, runId: "r-2", allowedModels: "*", model }),
+      CredentialRefusedError,
+      "an OpenRouter run needs a model",
+    );
+  }
+
+  // A re-issue narrows again: disabled since, the model is refused to the same run.
+  await store.setOpenRouterEnabled(["c/gone"], T0);
+  await assertRejects(
+    () => issuer.issue({ ...OPENROUTER_SCOPE, allowedModels: "*", model: "a/one" }),
+    CredentialRefusedError,
+  );
+});
+
+test("platform: an OpenRouter policy is narrowed, and its own model must be enabled", async () => {
+  const store = await openRouterStore(["a/one", "b/two"]);
+  const issuer = makePlatformCredentialIssuer({ store, now: () => new Date(T0) });
+  await store.savePlatformPolicy({
+    providerKeyId: "pk-or",
+    provider: OPENROUTER,
+    allowedModels: "*",
+    model: "a/one",
+    updatedAt: T0,
+  });
+  const cred = await issuer.issue("memory");
+  assertEquals(cred.allowedModels, ["a/one", "b/two"]);
+  assertEquals(cred.dialect, "openai-completions");
+  assertEquals(cred.basePath, "/v1");
+  const row = await store.getVirtualKeyByTokenHash(await sha256Hex(cred.token));
+  assertEquals(row?.allowedModels, ["a/one", "b/two"]);
+
+  await store.savePlatformPolicy({
+    providerKeyId: "pk-or",
+    provider: OPENROUTER,
+    allowedModels: "*",
+    model: "c/gone",
+    updatedAt: T0,
+  });
+  await assertRejects(
+    () => issuer.issue("memory"),
+    CredentialRefusedError,
+    `the platform's model "c/gone" isn't enabled for OpenRouter`,
   );
 });

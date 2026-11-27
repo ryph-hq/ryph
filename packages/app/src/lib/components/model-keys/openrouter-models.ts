@@ -1,0 +1,283 @@
+// The OpenRouter model picker's logic, kept out of the component so it can be tested: which
+// models are offered, how a search matches them, their order, and the words for prices, context,
+// the sync and a key's credit.
+
+import { ApiError } from "#lib/api/call.ts";
+import {
+  type EnableRefusal,
+  getOpenRouterCatalogue,
+  isOpenRouterKeyRefused,
+  type OpenRouterCatalogue,
+  type OpenRouterKeyInfo,
+  type OpenRouterModel,
+  type OpenRouterSync,
+} from "#lib/api/openrouter.ts";
+import { isModelAccessDisabled } from "#lib/api/provider-keys.ts";
+import { formatRelativeTime, formatUsd } from "#lib/utils/format.ts";
+
+/** Rows drawn at first, and added by each "Show more". */
+export const PAGE_SIZE = 50;
+
+/** Which rows the list shows: every offered model, or only the enabled ones. */
+export type ModelFilter = "all" | "enabled";
+
+/**
+ * The models an admin can choose from: those that take tools, plus any already enabled, so one
+ * that is on is always visible and can be turned off.
+ */
+export function offeredModels(models: readonly OpenRouterModel[]): OpenRouterModel[] {
+  return models.filter((m) => m.tools || m.enabled);
+}
+
+/**
+ * Whether a model matches a search. Every word must appear in its name or its id, in any order
+ * and any case, so "claude sonnet" finds `anthropic/claude-sonnet-4.5`.
+ */
+export function matchesSearch(model: Pick<OpenRouterModel, "id" | "label">, query: string) {
+  const words = query.toLowerCase().split(/\s+/).filter((w) => w !== "");
+  if (words.length === 0) return true;
+  const haystack = `${model.label} ${model.id}`.toLowerCase();
+  return words.every((w) => haystack.includes(w));
+}
+
+/**
+ * The list's order: saved-enabled models first, then by name. It sorts on what is saved, not on
+ * the unsaved choice, so a row stays where it is while it is being ticked.
+ */
+export function sortModels(
+  models: readonly OpenRouterModel[],
+  saved: ReadonlySet<string>,
+): OpenRouterModel[] {
+  return [...models].sort((a, b) => {
+    const enabled = Number(saved.has(b.id)) - Number(saved.has(a.id));
+    if (enabled !== 0) return enabled;
+    return a.label.localeCompare(b.label, "en", { sensitivity: "base" }) ||
+      a.id.localeCompare(b.id);
+  });
+}
+
+/**
+ * The rows to show, in order. "Enabled" keeps every model that is enabled either as saved or in
+ * the unsaved choice, so turning one off in that view does not make it vanish.
+ */
+export function visibleModels(
+  models: readonly OpenRouterModel[],
+  options: {
+    query: string;
+    filter: ModelFilter;
+    saved: ReadonlySet<string>;
+    draft: ReadonlySet<string>;
+  },
+): OpenRouterModel[] {
+  const { query, filter, saved, draft } = options;
+  const shown = offeredModels(models).filter((m) =>
+    (filter === "all" || saved.has(m.id) || draft.has(m.id)) && matchesSearch(m, query)
+  );
+  return sortModels(shown, saved);
+}
+
+/** The ids enabled as saved. */
+export function enabledIds(models: readonly OpenRouterModel[]): Set<string> {
+  return new Set(models.filter((m) => m.enabled).map((m) => m.id));
+}
+
+/**
+ * The unsaved choice as ticks and unticks on top of what is saved, so a refresh that brings in
+ * another admin's change keeps it: their newly enabled model shows ticked, and Save keeps it.
+ */
+export type ModelDraft = { added: ReadonlySet<string>; removed: ReadonlySet<string> };
+
+/**
+ * The draft after ticking or unticking one model, or null when it no longer differs from what is
+ * saved. Ids that match the saved set already are dropped, so the draft holds only real changes.
+ */
+export function toggleDraft(
+  draft: ModelDraft | null,
+  saved: ReadonlySet<string>,
+  id: string,
+  on: boolean,
+): ModelDraft | null {
+  const added = new Set(draft?.added);
+  const removed = new Set(draft?.removed);
+  added.delete(id);
+  removed.delete(id);
+  if (on && !saved.has(id)) added.add(id);
+  if (!on && saved.has(id)) removed.add(id);
+  for (const a of added) if (saved.has(a)) added.delete(a);
+  for (const r of removed) if (!saved.has(r)) removed.delete(r);
+  return added.size === 0 && removed.size === 0 ? null : { added, removed };
+}
+
+/** The ticked ids: what is saved, plus the draft's ticks, less its unticks. */
+export function applyDraft(saved: ReadonlySet<string>, draft: ModelDraft | null): Set<string> {
+  const ids = new Set(saved);
+  if (draft === null) return ids;
+  for (const id of draft.added) ids.add(id);
+  for (const id of draft.removed) ids.delete(id);
+  return ids;
+}
+
+/**
+ * The draft, less any id the catalogue no longer has at all: a sync can drop a model that was
+ * ticked but not saved, and its tick must not linger as a change with no row.
+ */
+export function draftInCatalogue(
+  draft: ModelDraft,
+  models: readonly Pick<OpenRouterModel, "id">[],
+): ModelDraft {
+  const ids = new Set(models.map((m) => m.id));
+  return {
+    added: new Set([...draft.added].filter((id) => ids.has(id))),
+    removed: new Set([...draft.removed].filter((id) => ids.has(id))),
+  };
+}
+
+/** How many ids differ between two sets: what the Save bar counts as changes. */
+export function changeCount(a: ReadonlySet<string>, b: ReadonlySet<string>): number {
+  let n = 0;
+  for (const id of a) if (!b.has(id)) n++;
+  for (const id of b) if (!a.has(id)) n++;
+  return n;
+}
+
+/**
+ * The ids a save sends: the choice, less any model OpenRouter no longer lists. Those can't be
+ * enabled, and agents can't use them, so saving turns them off.
+ */
+export function idsToSave(
+  draft: ReadonlySet<string>,
+  models: readonly OpenRouterModel[],
+): string[] {
+  const listed = new Set(models.filter((m) => m.listed).map((m) => m.id));
+  return [...draft].filter((id) => listed.has(id)).sort();
+}
+
+/** A context window as people say it: "128K", "1M", "1.05M". */
+export function formatContext(tokens: number): string {
+  if (tokens >= 1_000_000) return `${trim(tokens / 1_000_000)}M`;
+  if (tokens >= 1_000) return `${trim(tokens / 1_000)}K`;
+  return String(tokens);
+}
+
+const trim = (n: number) => String(Math.round(n * 100) / 100);
+
+const perMillion = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 3,
+});
+
+/** "$3 / $15" per million tokens in and out, "Free" when both are zero, null when unpriced. */
+export function formatModelPrice(price: OpenRouterModel["price"]): string | null {
+  if (price === null) return null;
+  if (price.input === 0 && price.output === 0) return "Free";
+  return `${perMillion.format(price.input)} / ${perMillion.format(price.output)}`;
+}
+
+/**
+ * "Syncing…", "Synced 2h ago" or "Not synced yet", as of `now`. A failed sync is said apart, in
+ * full, so this line only says where the list stands.
+ */
+export function syncLine(sync: OpenRouterSync, now = Date.now()): string {
+  if (sync.syncing) return "Syncing…";
+  if (sync.syncedAt === null) return "Not synced yet";
+  return `Synced ${formatRelativeTime(sync.syncedAt, now)}`;
+}
+
+/** What a failed OpenRouter call says to a person: model access being off in plain words. */
+export function openRouterErrorText(e: unknown, fallback: string): string {
+  if (e instanceof ApiError && isModelAccessDisabled(e)) return "Model access is off";
+  return e instanceof Error && e.message !== "" ? e.message : fallback;
+}
+
+/** The catalogue as a page's load hands it on: the read, or why it failed. */
+export type CatalogueRead = { catalogue: OpenRouterCatalogue | null; error: string | null };
+
+/**
+ * A page load's catalogue read. A read that fails answers its reason and, when `remember` is on
+ * (in the browser), the catalogue the page last had, so a poll that misses a beat keeps the list
+ * on screen and keeps polling.
+ */
+export function catalogueReader(remember: boolean) {
+  let shown: OpenRouterCatalogue | null = null;
+  return async (f: typeof fetch): Promise<CatalogueRead> => {
+    try {
+      const catalogue = await getOpenRouterCatalogue(f);
+      if (remember) shown = catalogue;
+      return { catalogue, error: null };
+    } catch (e) {
+      return {
+        catalogue: shown,
+        error: openRouterErrorText(e, "Couldn't load OpenRouter's models"),
+      };
+    }
+  };
+}
+
+/** A refused save as lines to show, each naming the models by their names where known. */
+export function refusalLines(
+  refusal: EnableRefusal,
+  models: readonly Pick<OpenRouterModel, "id" | "label">[],
+): string[] {
+  const names = new Map(models.map((m) => [m.id, m.label]));
+  const named = (ids: string[]) => ids.map((id) => names.get(id) ?? id).join(", ");
+  const lines = [
+    refusal.unknown.length > 0 && `Not on OpenRouter: ${named(refusal.unknown)}`,
+    refusal.unlisted.length > 0 && `No longer on OpenRouter: ${named(refusal.unlisted)}`,
+    refusal.noTools.length > 0 && `Can't use tools: ${named(refusal.noTools)}`,
+  ].filter((line): line is string => typeof line === "string");
+  return lines.length > 0 ? lines : [refusal.message];
+}
+
+/** A key card's credit line, and whether it is a problem. */
+export type CreditLine = { text: string; problem: boolean };
+
+/**
+ * "No credits left" when the key's limit is spent, "$4.20 of $10 left" under a limit, and
+ * nothing for a key without one: its spend is OpenRouter's account balance, which this does not
+ * read.
+ */
+export function creditLine(info: OpenRouterKeyInfo): CreditLine | null {
+  if (info.limitRemaining !== null && info.limitRemaining <= 0) {
+    return { text: "No credits left", problem: true };
+  }
+  if (info.limit !== null && info.limitRemaining !== null) {
+    return {
+      text: `${formatUsd(info.limitRemaining)} of ${formatUsd(info.limit)} left`,
+      problem: false,
+    };
+  }
+  return null;
+}
+
+/**
+ * A credit read that failed: said when OpenRouter refused the key, else nothing, since the key
+ * may still work and the card already says when its secret is missing.
+ */
+export function creditFailureLine(e: unknown): CreditLine | null {
+  return isOpenRouterKeyRefused(e) ? { text: "OpenRouter refused this key", problem: true } : null;
+}
+
+/** A key card's line on the deployment's OpenRouter models, and whether it needs attention. */
+export type ModelsLine = { text: string; problem: boolean };
+
+/**
+ * "2 models enabled", counting only models agents can use now, "No models enabled" as a problem
+ * once the list is in, and "Syncing models…" while the first sync has not brought any.
+ */
+export function enabledModelsLine(catalogue: OpenRouterCatalogue): ModelsLine {
+  if (catalogue.sync.syncing && catalogue.models.length === 0) {
+    return { text: "Syncing models…", problem: false };
+  }
+  const usable = catalogue.models.filter((m) => m.enabled && m.listed && m.tools).length;
+  if (usable === 0) return { text: "No models enabled", problem: true };
+  return { text: `${usable} ${usable === 1 ? "model" : "models"} enabled`, problem: false };
+}
+
+/** The picker's `Dialog.Content` classes: wide enough for a row, the list scrolling inside. */
+export const PICKER_DIALOG_CLASS =
+  "flex max-h-[min(85dvh,56rem)] flex-col gap-4 p-4 sm:max-w-3xl sm:gap-6 sm:p-6";
+
+/** What the picker shows before the page's load has read the catalogue: its loading state. */
+export const CATALOGUE_NOT_READ: CatalogueRead = { catalogue: null, error: null };

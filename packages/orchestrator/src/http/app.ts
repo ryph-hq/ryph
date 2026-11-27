@@ -211,6 +211,9 @@ export interface ModelAccess {
       providerArchivedAt: string | null;
       /** When the KEY itself was archived. */
       archivedAt: string | null;
+      /** The models the provider holds every policy to — OpenRouter's enabled ones — or null for
+       * a provider whose models nothing narrows. */
+      models: string[] | null;
     } | null
   >;
   issueRunCredentials(scope: {
@@ -221,6 +224,9 @@ export interface ModelAccess {
     providerKeyId: string;
     provider: string;
     allowedModels: string[] | "*";
+    /** The model the run will call, frozen with the scope; null when the harness picks. A
+     * provider that narrows its models refuses a credential that would not carry it. */
+    model: string | null;
     /** The run's spend cap and calls-in-flight cap, frozen onto the credential like the
      * allowlist; null is uncapped. */
     spendUsd: number | null;

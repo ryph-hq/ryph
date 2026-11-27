@@ -19,7 +19,12 @@
 // - usage recording is fire-and-forget: metering must never fail or slow a model call
 // - the provider is resolved PER REQUEST through the store (built-ins ∪ custom rows), so
 //   registering or archiving an endpoint takes effect on the next request with no restart and
-//   no cache to go stale — the same stance the live provider-key liveness check takes
+//   no cache to go stale — the same stance the live provider-key liveness check takes. The one
+//   cache is OpenRouter's usable models (core/openrouter_usable.ts), at most a minute old
+// - an OPENROUTER call is held to the models agents may use as they stand, beside its credential's
+//   frozen allowlist: a model turned off or unlisted mid-run stops answering within that minute,
+//   and one turned on in another replica answers at once (the store is read again before a
+//   refusal)
 // - the caps are the ONE stateful thing in this process (see spend_meter.ts): what a run has
 //   spent is seeded from the store the first time the process sees the run and then counted here
 //   as each row is priced, so the cap is judged from a map lookup rather than an aggregate per
@@ -58,19 +63,32 @@ import {
 import { authenticates, decide, type ProxiedRequest, type SpendState } from "../core/enforce.ts";
 import { makeUsageMeter, type UsageMeter } from "../core/metering.ts";
 import {
-  askForStreamUsage,
   DRAIN_MS,
+  ensureObjectField,
   estimatedInputTokens,
   estimatedTokens,
   FALLBACK_OUTPUT_TOKENS,
   MAX_DRAIN_BYTES,
   MAX_OUTPUT_FIELDS,
+  objectOrNull,
   requestedMaxOutput,
+  setMember,
+  streams,
 } from "../core/usage_fallback.ts";
-import { REFUSED_TOP_LEVEL_FIELDS, refusedInBody } from "../core/body_policy.ts";
+import {
+  OPENROUTER_FILE_PARSER,
+  REFUSED_TOP_LEVEL_FIELDS,
+  refusedInBody,
+  vetBody,
+} from "../core/body_policy.ts";
+import { OPENROUTER, openRouterModelForRun } from "../core/openrouter.ts";
+import {
+  makeUsableOpenRouterModels,
+  type UsableOpenRouterModels,
+} from "../core/openrouter_usable.ts";
 import { modelOf, rawValue, topLevelMembers, type ValueSpan } from "../core/model_field.ts";
 import type { PlanKeys } from "../core/plan_keys.ts";
-import { included, priceFor, type PriceOverlay, priceOverlayOf } from "../core/pricing.ts";
+import { included, priceFor, type PriceOverlay, priceOverlayFrom } from "../core/pricing.ts";
 import { makeResponsesStreamReader } from "../core/responses_stream.ts";
 import type { ProviderSpec } from "../core/registry.ts";
 import { resolveProvider } from "../core/service.ts";
@@ -119,6 +137,9 @@ export interface ProxyHandlerDeps {
   /** A ChatGPT plan key's tokens and state. Absent — a deployment that is not local — plan keys
    * are refused with a 403. */
   plan?: Pick<PlanKeys, "accessToken" | "markLimited" | "clearLimited">;
+  /** OpenRouter's usable models, cached; shared with the routes that change them so a change
+   * made in this process reaches the next call. One of the proxy's own when not given. */
+  openRouterModels?: UsableOpenRouterModels;
 }
 
 /** How much of a plan's error body is read to find its code and relayed. Error bodies are
@@ -234,7 +255,8 @@ async function errorAnswerBytes(
 /** How long a custom endpoint's host is trusted to resolve outside the network once it has. */
 const ADDRESS_TTL_MS = 30_000;
 
-/** How long the caps trust one reading of the custom endpoints' declared rates. */
+/** How long the caps trust one reading of the custom endpoints' declared rates and OpenRouter's
+ * synced ones. */
 const OVERLAY_TTL_MS = 60_000;
 
 /** `{"detail": {"code": …}}`, the other shape OpenAI's backend answers a refusal in. */
@@ -375,13 +397,14 @@ function bodyRefusal(refused: string[]): Response {
 }
 
 /** The top-level members of a request body the proxy reads, in the one walk over it: the model,
- * `background`, what says whether and how long it streams, and the fields core/body_policy.ts
- * refuses. */
+ * `background`, what says whether and how long it streams, OpenRouter's `usage` (made to ask
+ * for the cost), and the fields core/body_policy.ts refuses. */
 const READ_MEMBERS: ReadonlySet<string> = new Set([
   "model",
   "background",
   "stream",
   "stream_options",
+  "usage",
   ...MAX_OUTPUT_FIELDS,
   ...REFUSED_TOP_LEVEL_FIELDS,
 ]);
@@ -458,6 +481,16 @@ export async function logUpstreamError(
   sentCredential: string | null,
   fields: { runId: string; provider: string; model: string | null; status: number },
 ): Promise<void> {
+  const body = await errorBodyStart(response);
+  const clipped = withoutCredential(body, sentCredential).trim().slice(0, UPSTREAM_ERROR_LOG_CHARS);
+  diag.warn("proxy.upstream_error", { ...fields, body: clipped });
+}
+
+/** The first UPSTREAM_ERROR_READ_BYTES or so of an error answer's body, as text; what arrived
+ * when the read fails. The rest is cancelled. Never throws. */
+async function errorBodyStart(
+  response: { body: ReadableStream<Uint8Array> | null },
+): Promise<string> {
   let body = "";
   try {
     const reader = response.body?.getReader();
@@ -473,16 +506,27 @@ export async function logUpstreamError(
       await reader.cancel().catch(() => {});
     }
   } catch {
-    // What arrived is what is logged.
+    // What arrived is what there is.
   }
-  const clipped = withoutCredential(body, sentCredential).trim().slice(0, UPSTREAM_ERROR_LOG_CHARS);
-  diag.warn("proxy.upstream_error", { ...fields, body: clipped });
+  return body;
+}
+
+/**
+ * Whether OpenRouter refused a call for the account's money: a 402 (out of credit, or unable to
+ * cover the call's `max_tokens`), or a 403 that says a key's spending limit was hit. Its body
+ * tells how much credit is left, which is the account's business, not the run's. Any other 403
+ * (a moderation flag, say) is the run's to read, and is relayed.
+ */
+export function isOpenRouterCreditRefusal(status: number, body: string): boolean {
+  return status === 402 || (status === 403 && /\blimit\b|\bcredits?\b/i.test(body));
 }
 
 export function makeProxyHandler(deps: ProxyHandlerDeps): (req: Request) => Promise<Response> {
   const upstreamFetch = deps.upstreamFetch ?? fetch;
   const baseUrlFor = deps.baseUrlFor ?? ((p: ProviderSpec) => p.baseUrl);
   const { meter, gauge } = deps.limits;
+  const openRouterModels = deps.openRouterModels ??
+    makeUsableOpenRouterModels({ store: deps.store, now: deps.now });
 
   // Hostname → until when it is known to resolve outside the network. Only a pass is kept: a
   // refusal is asked again, so a fixed record serves on the next request.
@@ -508,8 +552,12 @@ export function makeProxyHandler(deps: ProxyHandlerDeps): (req: Request) => Prom
   let overlayCache: { overlay: PriceOverlay; freshUntilMs: number } | null = null;
   const overlayAt = async (nowMs: number): Promise<PriceOverlay> => {
     if (overlayCache === null || nowMs >= overlayCache.freshUntilMs) {
+      const [custom, openRouter] = await Promise.all([
+        deps.store.listCustomProviders(),
+        deps.store.listOpenRouterPrices(),
+      ]);
       overlayCache = {
-        overlay: priceOverlayOf(await deps.store.listCustomProviders()),
+        overlay: priceOverlayFrom(custom, openRouter),
         freshUntilMs: nowMs + OVERLAY_TTL_MS,
       };
     }
@@ -759,7 +807,9 @@ export function makeProxyHandler(deps: ProxyHandlerDeps): (req: Request) => Prom
     // provider that does not resolve, or that is archived, still come after `decide`.
     const provider = providerKey === null
       ? null
-      : await resolveProvider(deps.store, providerKey.provider);
+      : await resolveProvider(deps.store, providerKey.provider, {
+        openRouterModels: openRouterModels.get,
+      });
     const route = provider === null ? null : providerRoute(provider, req.method, url.pathname);
     // A route the provider does not serve to a run is refused here, unread: batches, files,
     // fine-tuning, stored responses, an organization's admin API and a gateway's key-info route
@@ -847,6 +897,53 @@ export function makeProxyHandler(deps: ProxyHandlerDeps): (req: Request) => Prom
       deps.diag.debug("proxy.denied", { runId: decision.virtualKey.runId, status: 403 });
       return final(403, { error: "the model endpoint backing this run was archived" });
     }
+    // OpenRouter's models list is answered here, never asked of OpenRouter: what a run may call
+    // is the usable set within its credential's allowlist, and OpenRouter's own list is every
+    // model it serves, which nothing here lets the run use.
+    if (provider.id === OPENROUTER && route !== null && !route.spends) {
+      const allowed = decision.virtualKey.allowedModels;
+      const models = (await openRouterModels.get())
+        .filter((model) => allowed === "*" || allowed.includes(model.id));
+      return json(200, {
+        object: "list",
+        data: models.map((model) => ({
+          id: model.id,
+          object: "model",
+          owned_by: model.id.split("/", 1)[0],
+          name: model.label,
+          context_length: model.contextLength,
+        })),
+      });
+    }
+    // OpenRouter's usable set as it stands, beside the allowlist frozen when the credential was
+    // issued: a model an admin turned off, or that a sync unlisted, is refused from the next call
+    // on (give or take the cache's minute), platform credentials included. The same answer as
+    // the allowlist's. A model missing from the cached set is looked up once more in the store
+    // before the refusal: it may have been enabled through another replica, whose change this
+    // process's cache never heard of. That costs a query on the refusal path only, and at most
+    // one a second however many calls are refused (core/openrouter_usable.ts).
+    let served = provider.models;
+    if (
+      provider.id === OPENROUTER && route?.spends === true && named !== null &&
+      !served.some((model) => model.id === named)
+    ) {
+      served = (await openRouterModels.reread()).map(openRouterModelForRun);
+    }
+    if (
+      provider.id === OPENROUTER && route?.spends === true &&
+      (named === null || !served.some((model) => model.id === named))
+    ) {
+      deps.diag.debug("proxy.denied", {
+        runId: decision.virtualKey.runId,
+        status: 403,
+        model: named,
+      });
+      return json(403, {
+        error: named === null
+          ? "this run may only use certain models, and this request names none"
+          : `model "${named}" is not allowed for this run: it isn't enabled for OpenRouter`,
+      });
+    }
 
     // A model call carries a JSON object, and only a body this proxy has read can be
     // held to anything: one it cannot walk (not JSON, not an object, not UTF-8) would be judged
@@ -873,8 +970,16 @@ export function makeProxyHandler(deps: ProxyHandlerDeps): (req: Request) => Prom
     // What the body asks the provider to do beyond one metered completion: a tool it runs on
     // its own side, an image or file it fetches by URL or reads from storage, a stored response.
     // A plan's body is held to the same rule after its own refusals (`preparePlanCall`).
+    // OpenRouter's body is held to its own rules as well: no fallback models, plugins or stored
+    // preset, and only the content parts it reads, every one inline.
+    let carriesFile = false;
     if (route?.shape && body !== null && members !== null && provider.id !== CHATGPT_PLAN) {
-      const refused = refusedInBody(body, route.shape, presentMembers(body, members));
+      const vetted = vetBody(body, route.shape, presentMembers(body, members), {
+        openRouter: provider.id === OPENROUTER,
+        named: new Set(members.keys()),
+      });
+      const refused = vetted.refused;
+      carriesFile = vetted.carriesFile;
       if (refused.length > 0) {
         deps.diag.debug("proxy.body_refused", { runId: decision.virtualKey.runId, refused });
         return bodyRefusal(refused);
@@ -884,14 +989,44 @@ export function makeProxyHandler(deps: ProxyHandlerDeps): (req: Request) => Prom
     // The most output the request allowed, for the estimate a call that never reports its usage
     // is charged. Read before the body is spliced below, while the walk's spans still fit it.
     const requestedOutput = body === null ? null : requestedMaxOutput(body, members);
+    // OpenRouter reports what a call cost only when asked to: made to ask, streamed or not, so the
+    // row carries the bill rather than a list price. A file it parses with the free engine, never
+    // the per-page one (`OPENROUTER_FILE_PARSER`). Each splice walks the body again: the spans of
+    // the walk before it no longer fit.
+    // Both splices replace a member the body already carries rather than add a second one: JSON's
+    // last one wins, and a second `plugins` would leave the body's own in force.
+    if (provider.id === OPENROUTER && body !== null && members !== null) {
+      // Only an object (or null) can be made to ask: anything else would leave the cost unasked.
+      if (!objectOrNull(body, members.get("usage"))) {
+        deps.diag.debug("proxy.body_refused", {
+          runId: decision.virtualKey.runId,
+          refused: "usage",
+        });
+        return bodyRefusal(["usage (it must be a small JSON object, or null)"]);
+      }
+      const asked = ensureObjectField(body, members, "usage", "include");
+      if (asked !== null) {
+        body = asked;
+        members = topLevelMembers(body, READ_MEMBERS);
+      }
+      if (carriesFile && members !== null) {
+        const parsed = setMember(body, members, "plugins", OPENROUTER_FILE_PARSER);
+        if (parsed !== null) {
+          body = parsed;
+          members = topLevelMembers(body, READ_MEMBERS);
+        }
+      }
+    }
     // A streamed Chat Completions call reports its usage only when it asks to: made to ask, so a
     // run cannot opt out of being priced by leaving the option off. A custom endpoint's model
     // declared not to take the option (pi's `supportsUsageInStreaming: false`) is sent as it
     // came, and charged the estimate.
-    if (route?.shape === "openai-chat" && body !== null && members !== null) {
-      const declared = provider.models.find((m) => m.id === named);
+    if (
+      route?.shape === "openai-chat" && body !== null && members !== null && streams(body, members)
+    ) {
+      const declared = served.find((m) => m.id === named);
       if (declared?.compat?.supportsUsageInStreaming !== false) {
-        body = askForStreamUsage(body, members) ?? body;
+        body = ensureObjectField(body, members, "stream_options", "include_usage") ?? body;
       }
     }
 
@@ -939,7 +1074,8 @@ export function makeProxyHandler(deps: ProxyHandlerDeps): (req: Request) => Prom
       body = prepared.body;
       // The two routes take no query; whatever a caller put there stays here.
       target.search = "";
-    } else if (!provider.builtin) {
+    } else if (!provider.builtin || provider.id === OPENROUTER) {
+      // OpenRouter's model call reads no query either.
       keepCustomQuery(target);
     }
 
@@ -1089,7 +1225,7 @@ export function makeProxyHandler(deps: ProxyHandlerDeps): (req: Request) => Prom
     const estimate = () => ({
       input: estimatedInputTokens(body ?? new Uint8Array()),
       output: requestedOutput ??
-        provider.models.find((m) => m.id === named)?.maxOutputTokens ??
+        served.find((m) => m.id === named)?.maxOutputTokens ??
         FALLBACK_OUTPUT_TOKENS,
     });
 
@@ -1123,7 +1259,8 @@ export function makeProxyHandler(deps: ProxyHandlerDeps): (req: Request) => Prom
       release();
       if (drainTimer !== null) clearTimeout(drainTimer);
       req.signal.removeEventListener("abort", onHangUp);
-      const metered = usage?.finish() ?? { tokens: null, model: null, final: false };
+      const metered = usage?.finish() ??
+        { tokens: null, model: null, final: false, costUsd: null };
       const status = answeredStatus ??
         (upstreamStatus === null || (outcome === "cut" && upstreamStatus < 400)
           ? STREAM_CUT_STATUS
@@ -1140,8 +1277,10 @@ export function makeProxyHandler(deps: ProxyHandlerDeps): (req: Request) => Prom
         providerKeyId: decision.providerKey.id,
         provider: provider.id,
         // What the provider says it served; the request's own name only when it said nothing
-        // (an error, a body that carried no usage at all).
-        model: metered.model ?? named,
+        // (an error, a body that carried no usage at all). OpenRouter's is always the request's:
+        // it answers with the id of whichever variant served the call, and the row must name the
+        // allowlisted id its catalogue prices.
+        model: provider.id === OPENROUTER ? named ?? metered.model : metered.model ?? named,
         status,
         inputTokens: tokens?.input ?? null,
         outputTokens: tokens?.output ?? null,
@@ -1150,6 +1289,9 @@ export function makeProxyHandler(deps: ProxyHandlerDeps): (req: Request) => Prom
         cacheWrite1hTokens: tokens?.cacheWrite1h ?? null,
         reasoningTokens: tokens?.reasoning ?? null,
         estimated,
+        // OpenRouter's own bill for the call. An estimated row has none to carry: the response
+        // never said, and the estimate is priced from the catalogue like any other.
+        costUsd: estimated ? null : metered.costUsd,
         durationMs: Math.max(0, deps.now().getTime() - startedAt.getTime()),
         at: startedAt.toISOString(),
       };
@@ -1282,7 +1424,11 @@ export function makeProxyHandler(deps: ProxyHandlerDeps): (req: Request) => Prom
     }
 
     upstreamStatus = upstream.status;
-    usage = makeUsageMeter(provider.dialect, upstream.headers.get("content-type"));
+    // Only OpenRouter's stated cost is read as what a call cost: a custom endpoint must never
+    // be able to price its own calls.
+    usage = makeUsageMeter(provider.dialect, upstream.headers.get("content-type"), {
+      reportsCost: provider.id === OPENROUTER && provider.builtin,
+    });
 
     // The upstream refused the credential the PROXY sent. A custom endpoint's or a plan's
     // refusal is answered with a fixed body, never relayed: what an arbitrary gateway writes into
@@ -1320,8 +1466,28 @@ export function makeProxyHandler(deps: ProxyHandlerDeps): (req: Request) => Prom
       });
     }
 
-    // Anthropic's and OpenAI's headers come back by allowlist, so the organization behind the
-    // key stays here; every other provider's as they came, less the hop-by-hop ones.
+    // But not OpenRouter's refusal for money: its body says what the account has left. The run
+    // gets a fixed body at the same status (a 402 is what its harness treats as fatal); the
+    // operator still has the whole body, in the line just logged.
+    if (
+      provider.id === OPENROUTER && provider.builtin &&
+      (upstream.status === 402 || upstream.status === 403) &&
+      isOpenRouterCreditRefusal(upstream.status, await errorBodyStart(upstream.clone()))
+    ) {
+      await upstream.body?.cancel().catch(() => {});
+      record("ended");
+      return final(upstream.status, {
+        error: {
+          message: "OpenRouter refused the call: the account is out of credit or over its " +
+            "limit. An admin must check the key under Model keys",
+          type: "upstream_credit_refused",
+        },
+        code: "upstream_credit_refused",
+      });
+    }
+
+    // Anthropic's, OpenAI's and OpenRouter's headers come back by allowlist, so the account
+    // behind the key stays here; every other provider's as they came, less the hop-by-hop ones.
     const responseHeaders = returnedResponseHeaders(provider.id, upstream.headers) ??
       new Headers(upstream.headers);
     for (const name of STRIP_RESPONSE) responseHeaders.delete(name);

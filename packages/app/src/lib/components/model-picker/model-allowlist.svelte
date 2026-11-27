@@ -16,9 +16,12 @@ let {
   allowed = $bindable(),
   models,
   id,
+  allowCustom = true,
 }: {
   allowed: "*" | string[];
   models: DeclaredModel[];
+  /** False offers only `models`: no id can be typed in. Ids already listed still show. */
+  allowCustom?: boolean;
   /** Lands on the mode toggle, which is what a field label names. */
   id?: string;
 } = $props();
@@ -35,7 +38,9 @@ const known = $derived(new Map(models.map((m) => [m.id, m])));
 const list = $derived(allowed === "*" ? [] : [...new Set(allowed)]);
 const customIds = $derived(list.filter((m) => !known.has(m)));
 const typed = $derived(search.trim());
-const canAdd = $derived(typed !== "" && !known.has(typed) && !list.includes(typed));
+const canAdd = $derived(
+  allowCustom && typed !== "" && !known.has(typed) && !list.includes(typed),
+);
 
 // Ids are matched as text, not fuzzily: "haiku" should find claude-haiku-4-5 and nothing else.
 // "Add" always shows while offered but ranks last, so Enter picks a real match when there is one.
@@ -119,11 +124,15 @@ function stop(event: Event) {
         <Command.Root {filter}>
           <Command.Input
             bind:value={search}
-            placeholder={models.length > 0 ? "Search, or type a model id" : "Type a model id"}
+            placeholder={!allowCustom
+            ? "Search models"
+            : models.length > 0
+            ? "Search, or type a model id"
+            : "Type a model id"}
           />
           <Command.List>
             <Command.Empty>
-              {models.length > 0 ? "No model matches." : "Type a model id to add it."}
+              {models.length > 0 || !allowCustom ? "No model matches." : "Type a model id to add it."}
             </Command.Empty>
             {#if models.length > 0}
               <Command.Group heading="Models">

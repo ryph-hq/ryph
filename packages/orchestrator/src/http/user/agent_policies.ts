@@ -138,8 +138,9 @@ export async function refuseNetworkPolicy(
 }
 
 /**
- * Checks a model policy against everything the schema cannot see: the live key rows and the
- * static harness capability registry. Returns the refusal to send, or null to proceed.
+ * Checks a model policy against everything the schema cannot see: the live key rows, the static
+ * harness capability registry, and — for a provider that narrows its models — which models it
+ * serves at all. Returns the refusal to send, or null to proceed.
  *
  * The KEY IS FETCHED FIRST, which is the one thing to hold on to here. The harness check used
  * to be answerable from the policy alone, because a provider id was one of two compile-time
@@ -186,6 +187,27 @@ export async function refuseModelPolicy(
         `(${key.dialect})`,
       supportedDialects: dialects,
     });
+  }
+  // A provider that narrows its models (OpenRouter: the ones an admin enabled) issues a run only
+  // those. A policy naming any other would have it narrowed away at boot — or refused outright
+  // when nothing is left — so it is refused here instead, naming the model.
+  if (key.models !== null) {
+    // And a run on it must be told its model: pi, told none, picks its own default out of its
+    // built-in OpenRouter catalogue, a model nobody enabled, and every call is refused.
+    if (policy.defaultModel === null) {
+      return json(400, { error: "Pick a default model for OpenRouter" });
+    }
+    const enabled = new Set(key.models);
+    const named = [
+      ...(policy.allowedModels === "*" ? [] : policy.allowedModels),
+      ...(policy.defaultModel === null ? [] : [policy.defaultModel]),
+    ];
+    const missing = named.find((model) => !enabled.has(model));
+    if (missing !== undefined) {
+      return json(400, {
+        error: `model "${missing}" isn't enabled for OpenRouter — enable it under Model keys`,
+      });
+    }
   }
   return null;
 }

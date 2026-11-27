@@ -67,6 +67,7 @@ test("getKey reads the internal lookup with the service token", async () => {
         dialect: "anthropic-messages",
         providerArchivedAt: null,
         archivedAt: null,
+        models: null,
       });
       assertEquals(calls[0].url, "http://model-proxy.test/internal/v1/provider-keys/pk-1");
       assertEquals(calls[0].method, "GET");
@@ -116,6 +117,31 @@ test("getKey tells the ENDPOINT's archived state apart from the key's", async ()
       assertEquals((await access.getKey("pk-1"))?.providerArchivedAt, null);
     },
   );
+});
+
+test("getKey carries the models a provider narrows to, and refuses a list it cannot read", async () => {
+  const key = { id: "pk-or", provider: "openrouter", dialect: "openai-completions" };
+  await withFetch(
+    () => json(200, { ...key, models: ["openai/gpt-6", "anthropic/claude-sonnet-5"] }),
+    async (access) => {
+      assertEquals((await access.getKey("pk-or"))?.models, [
+        "openai/gpt-6",
+        "anthropic/claude-sonnet-5",
+      ]);
+    },
+  );
+  await withFetch(() => json(200, { ...key, models: [] }), async (access) => {
+    assertEquals((await access.getKey("pk-or"))?.models, [], "nothing enabled is not null");
+  });
+  await withFetch(() => json(200, { ...key, models: null }), async (access) => {
+    assertEquals((await access.getKey("pk-or"))?.models, null);
+  });
+  // Read as "no narrowing", a garbled list would let every model through: it is malformed.
+  for (const models of ["openai/gpt-6", [1, 2], { a: 1 }]) {
+    await withFetch(() => json(200, { ...key, models }), async (access) => {
+      await assertRejects(() => access.getKey("pk-or"), Error, "malformed");
+    });
+  }
 });
 
 test("getKey throws when the proxy could not answer", async () => {
@@ -170,6 +196,7 @@ test("issueRunCredentials posts the frozen scope and returns the env", async () 
         providerKeyId: "pk-1",
         provider: "anthropic",
         allowedModels: ["claude-opus-5"],
+        model: "claude-opus-5",
         spendUsd: null,
         callsInFlight: null,
       });
@@ -183,6 +210,7 @@ test("issueRunCredentials posts the frozen scope and returns the env", async () 
         providerKeyId: "pk-1",
         provider: "anthropic",
         allowedModels: ["claude-opus-5"],
+        model: "claude-opus-5",
         spendUsd: null,
         callsInFlight: null,
       });
@@ -205,6 +233,7 @@ test("issueRunCredentials carries the proxy's reason into the thrown error", asy
             providerKeyId: "pk-1",
             provider: "anthropic",
             allowedModels: "*",
+            model: null,
             spendUsd: null,
             callsInFlight: null,
           }),
@@ -233,6 +262,7 @@ test("issueRunCredentials rejects an env that is not all strings", async () => {
             providerKeyId: "pk-1",
             provider: "anthropic",
             allowedModels: "*",
+            model: null,
             spendUsd: null,
             callsInFlight: null,
           }),

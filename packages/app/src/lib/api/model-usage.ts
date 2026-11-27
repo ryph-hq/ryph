@@ -6,7 +6,8 @@ import { includedPricingSchema } from "./types";
 
 // What the model proxy's metering trail cost. Tokens are what each provider reported on the
 // response; costs are priced when read, from ryph's own hand-kept price list, in US dollars — an
-// estimate at list price, not an invoice.
+// estimate at list price, not an invoice. OpenRouter's calls are the exception: each carries what
+// OpenRouter billed for it, and that is its cost.
 
 const tokensSchema = z.object({
   /** Uncached input: cache reads and writes are counted apart. */
@@ -37,6 +38,9 @@ const totalsShape = {
   /** Metered on a model a subscription pays for (a ChatGPT plan's): tokens counted, cost $0 and
    * not spend. Absent from a proxy that predates the included state. */
   includedRequests: z.number().default(0),
+  /** Costed at what the provider billed rather than at list price (OpenRouter's own figure for
+   * each call). Absent from a proxy that predates it. */
+  reportedRequests: z.number().default(0),
   tokens: tokensSchema,
   cost: costSchema,
 };
@@ -47,8 +51,9 @@ export type UsageTotals = z.infer<typeof usageTotalsSchema>;
 export const modelUsageSchema = z.object({
   provider: z.string(),
   model: z.string().nullable(),
-  /** How this model's calls were costed; "included" when a plan pays for them. */
-  pricing: z.enum(["priced", includedPricingSchema.value, "unpriced"]).optional(),
+  /** How this model's calls were costed; "included" when a plan pays for them, "reported" when
+   * the provider's own bill is the cost. */
+  pricing: z.enum(["priced", includedPricingSchema.value, "unpriced", "reported"]).optional(),
   ...totalsShape,
 });
 export type ModelUsage = z.infer<typeof modelUsageSchema>;
@@ -100,11 +105,13 @@ export function isIncluded(t: UsageTotals & { pricing?: ModelUsage["pricing"] })
 /**
  * The cost cell of a usage row: "Included" for calls a plan paid for, "Unpriced" for calls on a
  * model the price list does not know, else the dollar figure. A row mixing included calls with
- * priced ones shows its priced cost, which is all it spent.
+ * priced ones shows its priced cost, which is all it spent. A row costed at what the provider
+ * billed is a dollar figure even at $0: the bill said so.
  */
 export function costLabel(t: UsageTotals & { pricing?: ModelUsage["pricing"] }): string {
   if (isIncluded(t)) return "Included";
-  if (t.unpricedRequests > 0 && t.cost.total === 0) return "Unpriced";
+  const billed = t.pricing === "reported" || t.reportedRequests > 0;
+  if (!billed && t.unpricedRequests > 0 && t.cost.total === 0) return "Unpriced";
   return formatUsd(t.cost.total);
 }
 
@@ -163,5 +170,44 @@ export async function getUsageReportOrOff(
   } catch (e) {
     if (e instanceof ApiError && isModelAccessDisabled(e)) return null;
     throw e;
+  }
+}
+
+/**
+ * How these totals were costed: `list` when every priced call is at list price, `billed` when
+ * every priced call carries OpenRouter's bill, `mixed` when both. Calls a plan included and calls
+ * on an unpriced model are neither, so they do not move it.
+ */
+export type CostBasis = "list" | "billed" | "mixed";
+
+export function costBasis(t: UsageTotals): CostBasis {
+  if (t.reportedRequests === 0) return "list";
+  const listPriced = t.meteredRequests - t.reportedRequests - t.includedRequests -
+    t.unpricedRequests;
+  return listPriced > 0 ? "mixed" : "billed";
+}
+
+/** The headline cost's label: plain "Cost" when OpenRouter billed every priced call. */
+export function costHeadline(t: UsageTotals): string {
+  return costBasis(t) === "billed" ? "Cost" : "Estimated cost";
+}
+
+/** The sentence under a bill that says where its costs come from. */
+export function costSourceNote(t: UsageTotals, source: string): string {
+  const estimate = `Costs are list-price estimates from Ryph's built-in price list (${source})`;
+  switch (costBasis(t)) {
+    case "billed": {
+      if (t.includedRequests === 0 && t.unpricedRequests === 0) {
+        return "Costs are what OpenRouter billed.";
+      }
+      const n = t.reportedRequests;
+      return `Costs are what OpenRouter billed for ${n} ${n === 1 ? "call" : "calls"}.`;
+    }
+    case "mixed": {
+      const n = t.reportedRequests;
+      return `${estimate}, except ${n} ${n === 1 ? "call" : "calls"} priced at OpenRouter's bill.`;
+    }
+    case "list":
+      return `${estimate}, not an invoice.`;
   }
 }

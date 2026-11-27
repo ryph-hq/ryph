@@ -1,6 +1,12 @@
 // Pricing, as pure functions of a model's catalogue entry and a request's tokens — what turns the
-// metering trail into money. Applied at READ time: rows hold tokens only, so a price edit in the
+// metering trail into money. Applied at READ time: rows hold tokens, so a price edit in the
 // catalogue re-prices everything already recorded, which is what a hand-kept list wants.
+//
+// OPENROUTER is the one exception to read-time pricing: what it billed for a call comes back on
+// the response (`usage.cost`) and is stored on the row (`UsageRecord.costUsd`), and a row that
+// carries it is that much spend, whatever its catalogue price says (spend.ts, usage_report.ts).
+// Its synced catalogue prices only what has no bill yet: a cap's pre-call check, an estimated
+// row, a row the response gave no cost for.
 //
 // Invariants:
 // - a price applies PER REQUEST. Long-context tiers switch on one request's input size, so summed
@@ -18,6 +24,8 @@ import { CHATGPT_PLAN } from "./chatgpt_plan.ts";
 import { PRICE_CATALOGUE } from "./pricing_catalogue.ts";
 import { THINKING_CATALOGUE } from "./thinking_catalogue.ts";
 import type { DeclaredModel, ProviderSpec } from "./registry.ts";
+import { OPENROUTER } from "./openrouter.ts";
+import type { KeyStore } from "../ports/key_store.ts";
 
 export interface PriceRates {
   input: number;
@@ -126,6 +134,34 @@ export function priceOverlayOf(
   return overlay;
 }
 
+/**
+ * The overlay every reader prices with: the custom endpoints' declared rates, and OpenRouter's
+ * synced ones under `openrouter`. Every synced row with a price is in it, listed or not and
+ * enabled or not — an old row is priced at the rate its model last had — and a row with no price
+ * is left out, so it reports as unpriced.
+ */
+export function priceOverlayFrom(
+  customProviders: ReadonlyArray<Pick<ProviderSpec, "id"> & { models: readonly DeclaredModel[] }>,
+  openRouterPrices: readonly { id: string; price: PriceRates }[],
+): PriceOverlay {
+  return priceOverlayOf([
+    ...customProviders,
+    {
+      id: OPENROUTER,
+      models: openRouterPrices.map((m) => ({ id: m.id, price: m.price })),
+    },
+  ]);
+}
+
+/** `priceOverlayFrom`, read from the store. */
+export async function priceOverlay(store: KeyStore): Promise<PriceOverlay> {
+  const [custom, openRouter] = await Promise.all([
+    store.listCustomProviders(),
+    store.listOpenRouterPrices(),
+  ]);
+  return priceOverlayFrom(custom, openRouter);
+}
+
 /** One catalogue's lookup: the exact id, else the alias a dated snapshot hangs off. */
 function lookup(models: Record<string, ModelPrice>, model: string): ModelPrice | null {
   if (Object.hasOwn(models, model)) return models[model];
@@ -165,8 +201,9 @@ export function included(provider: string): boolean {
   return provider === CHATGPT_PLAN;
 }
 
-/** How a model's usage is reported: at list `priced`, `included` in a plan, or `unpriced`. */
-export type PricingKind = "priced" | "included" | "unpriced";
+/** How a model's usage is reported: at list `priced`, `included` in a plan, `unpriced`, or at
+ * what the provider itself `reported` it cost (OpenRouter's stored bill). */
+export type PricingKind = "priced" | "included" | "unpriced" | "reported";
 
 export function pricingOf(
   provider: string,

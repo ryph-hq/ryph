@@ -380,3 +380,40 @@ test("a report is final only once the response has said all it will", () => {
   const created = { type: "response.created", response: { model: "gpt-5", usage: null } };
   assertEquals(metered("openai-responses", "text/event-stream", sse(created)).final, false);
 });
+
+test("OpenRouter's stated cost is read off a JSON body or a stream, only when asked", () => {
+  const json = JSON.stringify({
+    model: "openai/gpt-6",
+    choices: [],
+    usage: { prompt_tokens: 100, completion_tokens: 10, cost: 0.0012 },
+  });
+  const stream = ": OPENROUTER PROCESSING\n\n" +
+    sse(
+      { model: "openai/gpt-6", choices: [{ delta: { content: "x" } }] },
+      { model: "openai/gpt-6", choices: [], usage: { prompt_tokens: 5, cost: 0.00003 } },
+      "data: [DONE]\n\n",
+    );
+  const read = (body: string, type: string, reportsCost: boolean, size = Infinity) => {
+    const m = makeUsageMeter("openai-completions", type, { reportsCost });
+    const bytes = encoder.encode(body);
+    const step = Number.isFinite(size) ? size : bytes.length;
+    for (let i = 0; i < bytes.length; i += step) m.push(bytes.slice(i, i + step));
+    return m.finish();
+  };
+  assertEquals(read(json, "application/json", true).costUsd, 0.0012);
+  assertEquals(read(stream, "text/event-stream", true, 7).costUsd, 0.00003);
+  assertEquals(read(stream, "text/event-stream", true, 7).tokens?.input, 5);
+  // Not OpenRouter: a `cost` an endpoint writes is no bill of ours, and is never read.
+  assertEquals(read(json, "application/json", false).costUsd, null);
+  assertEquals(metered("openai-completions", "application/json", json).costUsd, null);
+  // A cost that is no amount is no cost.
+  for (const cost of [-1, "0.5", null, Infinity]) {
+    const body = JSON.stringify({ usage: { prompt_tokens: 1, cost } });
+    assertEquals(read(body, "application/json", true).costUsd, null, String(cost));
+  }
+  assertEquals(
+    read(JSON.stringify({ usage: { prompt_tokens: 1, cost: 0 } }), "application/json", true)
+      .costUsd,
+    0,
+  );
+});
