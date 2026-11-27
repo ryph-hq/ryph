@@ -22,7 +22,9 @@
 //   no cache to go stale — the same stance the live provider-key liveness check takes. The one
 //   cache is OpenRouter's usable models (core/openrouter_usable.ts), at most a minute old
 // - an OPENROUTER call is held to the models agents may use as they stand, beside its credential's
-//   frozen allowlist: a model turned off or unlisted mid-run stops answering within that minute
+//   frozen allowlist: a model turned off or unlisted mid-run stops answering within that minute,
+//   and one turned on in another replica answers at once (the store is read again before a
+//   refusal)
 // - the caps are the ONE stateful thing in this process (see spend_meter.ts): what a run has
 //   spent is seeded from the store the first time the process sees the run and then counted here
 //   as each row is priced, so the cap is judged from a map lookup rather than an aggregate per
@@ -79,7 +81,7 @@ import {
   refusedInBody,
   vetBody,
 } from "../core/body_policy.ts";
-import { OPENROUTER } from "../core/openrouter.ts";
+import { OPENROUTER, openRouterModelForRun } from "../core/openrouter.ts";
 import {
   makeUsableOpenRouterModels,
   type UsableOpenRouterModels,
@@ -879,10 +881,19 @@ export function makeProxyHandler(deps: ProxyHandlerDeps): (req: Request) => Prom
     // OpenRouter's usable set as it stands, beside the allowlist frozen when the credential was
     // issued: a model an admin turned off, or that a sync unlisted, is refused from the next call
     // on (give or take the cache's minute), platform credentials included. The same answer as
-    // the allowlist's.
+    // the allowlist's. A model missing from the cached set is looked up once more in the store
+    // before the refusal: it may have been enabled through another replica, whose change this
+    // process's cache never heard of. That costs a query on the refusal path only.
+    let served = provider.models;
+    if (
+      provider.id === OPENROUTER && route?.spends === true && named !== null &&
+      !served.some((model) => model.id === named)
+    ) {
+      served = (await openRouterModels.reread()).map(openRouterModelForRun);
+    }
     if (
       provider.id === OPENROUTER && route?.spends === true &&
-      (named === null || !provider.models.some((model) => model.id === named))
+      (named === null || !served.some((model) => model.id === named))
     ) {
       deps.diag.debug("proxy.denied", {
         runId: decision.virtualKey.runId,
@@ -975,7 +986,7 @@ export function makeProxyHandler(deps: ProxyHandlerDeps): (req: Request) => Prom
     if (
       route?.shape === "openai-chat" && body !== null && members !== null && streams(body, members)
     ) {
-      const declared = provider.models.find((m) => m.id === named);
+      const declared = served.find((m) => m.id === named);
       if (declared?.compat?.supportsUsageInStreaming !== false) {
         body = ensureObjectField(body, members, "stream_options", "include_usage") ?? body;
       }
@@ -1176,7 +1187,7 @@ export function makeProxyHandler(deps: ProxyHandlerDeps): (req: Request) => Prom
     const estimate = () => ({
       input: estimatedInputTokens(body ?? new Uint8Array()),
       output: requestedOutput ??
-        provider.models.find((m) => m.id === named)?.maxOutputTokens ??
+        served.find((m) => m.id === named)?.maxOutputTokens ??
         FALLBACK_OUTPUT_TOKENS,
     });
 

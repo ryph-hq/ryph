@@ -497,6 +497,58 @@ test("a change made in another process reaches the proxy once its cache runs out
   await refused.body?.cancel();
 });
 
+test("a model enabled through another replica is served here at once", async () => {
+  // Two proxy replicas over one store, each with its own cache. This one has read the set
+  // before the model was enabled, and nothing tells it of the change.
+  let here: UsableOpenRouterModels | null = null;
+  const { handler, call, store } = await makeSlice({
+    enabled: ["anthropic/claude-sonnet-5"],
+    openRouterModels: (
+      store,
+    ) => (here = makeUsableOpenRouterModels({ store, now: () => new Date(T0) })),
+  });
+  const warm = await call({ model: "anthropic/claude-sonnet-5", messages: [] });
+  assertEquals(warm.status, 200);
+  await warm.body?.cancel();
+  assertEquals((await here!.get()).map((m) => m.id), ["anthropic/claude-sonnet-5"]);
+
+  // The admin enables gpt-6 through the other replica, which drops only its own cache; a run
+  // is then issued a credential that carries it.
+  const there = makeUsableOpenRouterModels({ store, now: () => new Date(T0) });
+  await store.setOpenRouterEnabled(["anthropic/claude-sonnet-5", "openai/gpt-6"], T0);
+  there.invalidate();
+  const env = await makeCredentialIssuer({
+    store,
+    now: () => new Date(T0),
+    proxyUrl: "http://proxy.test",
+  }).issue({
+    runId: "r-2",
+    agentId: "a-1",
+    taskId: "t-1",
+    providerKeyId: "pk-or",
+    provider: OPENROUTER,
+    allowedModels: "*",
+    model: "openai/gpt-6",
+  });
+  const res = await handler(
+    new Request("http://proxy.test/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${env.RYPH_MODEL_API_KEY}`,
+      },
+      body: JSON.stringify({ model: "openai/gpt-6", messages: [] }),
+    }),
+  );
+  assertEquals(res.status, 200, "served without waiting out this replica's cache");
+  await res.body?.cancel();
+  // The reread is cached: the next call for it costs no refusal path.
+  assertEquals((await here!.get()).map((m) => m.id), [
+    "anthropic/claude-sonnet-5",
+    "openai/gpt-6",
+  ]);
+});
+
 test("a model a sync unlists is refused from the next call", async () => {
   let cache: UsableOpenRouterModels | null = null;
   const { call, store } = await makeSlice({

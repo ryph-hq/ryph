@@ -11,6 +11,8 @@
 // - a cached set is at most `USABLE_TTL_MS` old. That is the window in which a model turned off in
 //   ANOTHER process (a second proxy replica) still answers; a change made in this process (the
 //   enabled set saved, a sync written) drops the cache at once (`invalidate`)
+// - a model turned ON in another process answers at once: the proxy rereads the store
+//   (`reread`) before it refuses a model the cached set lacks. Only refusals pay that query
 // - a read that began before an invalidation never puts its answer in the cache: it may predate
 //   the change
 // - issuing a credential never reads this: it reads the store, so a run is never issued a model
@@ -27,6 +29,8 @@ export interface UsableOpenRouterModels {
   get(): Promise<OpenRouterModel[]>;
   /** Drops the cached set, so the next `get` reads the store. */
   invalidate(): void;
+  /** `invalidate`, then `get`: the set as the store holds it now, cached afresh. */
+  reread(): Promise<OpenRouterModel[]>;
 }
 
 export function makeUsableOpenRouterModels(deps: {
@@ -37,18 +41,24 @@ export function makeUsableOpenRouterModels(deps: {
   const ttlMs = deps.ttlMs ?? USABLE_TTL_MS;
   let cached: { models: OpenRouterModel[]; freshUntilMs: number } | null = null;
   let generation = 0;
+  const get = async () => {
+    const nowMs = deps.now().getTime();
+    if (cached !== null && nowMs < cached.freshUntilMs) return cached.models;
+    const started = generation;
+    const models = await deps.store.listUsableOpenRouterModels();
+    if (started === generation) cached = { models, freshUntilMs: nowMs + ttlMs };
+    return models;
+  };
+  const invalidate = () => {
+    generation += 1;
+    cached = null;
+  };
   return {
-    async get() {
-      const nowMs = deps.now().getTime();
-      if (cached !== null && nowMs < cached.freshUntilMs) return cached.models;
-      const started = generation;
-      const models = await deps.store.listUsableOpenRouterModels();
-      if (started === generation) cached = { models, freshUntilMs: nowMs + ttlMs };
-      return models;
-    },
-    invalidate() {
-      generation += 1;
-      cached = null;
+    get,
+    invalidate,
+    reread() {
+      invalidate();
+      return get();
     },
   };
 }

@@ -72,3 +72,20 @@ test("a read that began before an invalidation is not cached", async () => {
   assertEquals(await usable.get(), [], "the next call reads again");
   assertEquals(s.reads(), 2);
 });
+
+test("two caches over one store: a reread sees what the other's process enabled", async () => {
+  const s = countingStore();
+  const here = makeUsableOpenRouterModels({ store: s.store, now: () => new Date(T0) });
+  const there = makeUsableOpenRouterModels({ store: s.store, now: () => new Date(T0) });
+  s.set(["a/one"]);
+  assertEquals((await here.get()).map((m) => m.id), ["a/one"]);
+
+  s.set(["a/one", "b/two"]);
+  there.invalidate();
+  assertEquals((await there.get()).map((m) => m.id), ["a/one", "b/two"]);
+  // Nothing told this cache, so its minute still holds; a reread reads the store, and keeps it.
+  assertEquals((await here.get()).map((m) => m.id), ["a/one"]);
+  assertEquals((await here.reread()).map((m) => m.id), ["a/one", "b/two"]);
+  assertEquals((await here.get()).map((m) => m.id), ["a/one", "b/two"]);
+  assertEquals(s.reads(), 3);
+});
