@@ -105,11 +105,13 @@ export function isIncluded(t: UsageTotals & { pricing?: ModelUsage["pricing"] })
 /**
  * The cost cell of a usage row: "Included" for calls a plan paid for, "Unpriced" for calls on a
  * model the price list does not know, else the dollar figure. A row mixing included calls with
- * priced ones shows its priced cost, which is all it spent.
+ * priced ones shows its priced cost, which is all it spent. A row costed at what the provider
+ * billed is a dollar figure even at $0: the bill said so.
  */
 export function costLabel(t: UsageTotals & { pricing?: ModelUsage["pricing"] }): string {
   if (isIncluded(t)) return "Included";
-  if (t.unpricedRequests > 0 && t.cost.total === 0) return "Unpriced";
+  const billed = t.pricing === "reported" || t.reportedRequests > 0;
+  if (!billed && t.unpricedRequests > 0 && t.cost.total === 0) return "Unpriced";
   return formatUsd(t.cost.total);
 }
 

@@ -503,6 +503,10 @@ const costCell = costLabel;
             {totals.includedRequests === 1 ? "call was" : "calls were"} included in a ChatGPT plan
             and {totals.includedRequests === 1 ? "is" : "are"} not counted as spend.
           {/if}
+          {#if totals.reportedRequests > 0}
+            {totals.reportedRequests}
+            {totals.reportedRequests === 1 ? "call is" : "calls are"} costed at what OpenRouter billed.
+          {/if}
           {#if totals.unpricedRequests > 0}
             {totals.unpricedRequests}
             {totals.unpricedRequests === 1 ? "call was" : "calls were"} on a model the price list does

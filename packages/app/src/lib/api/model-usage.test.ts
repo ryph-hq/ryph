@@ -112,3 +112,31 @@ describe("included usage", () => {
     expect(costLabel(unpriced)).toBe("Unpriced");
   });
 });
+
+describe("reported usage", () => {
+  const zero = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 };
+
+  it("defaults reportedRequests to 0 for a proxy that does not send it", () => {
+    const { reportedRequests: _, ...before } = totals;
+    expect(usageTotalsSchema.parse(before).reportedRequests).toBe(0);
+  });
+
+  it("shows what the provider billed as a cost, never as unpriced", () => {
+    const row = modelUsageSchema.parse({
+      provider: "openrouter",
+      model: "anthropic/claude-sonnet-4.5",
+      pricing: "reported",
+      ...totals,
+      reportedRequests: 2,
+    });
+    expect(row.pricing).toBe("reported");
+    expect(costLabel(row)).toBe(formatUsd(totals.cost.total));
+    const free = usageTotalsSchema.parse({
+      ...totals,
+      reportedRequests: 1,
+      unpricedRequests: 1,
+      cost: zero,
+    });
+    expect(costLabel(free)).toBe(formatUsd(0));
+  });
+});
