@@ -17,6 +17,7 @@ import type { AllowedModels, PlatformModelPolicy } from "./types.ts";
 import { platformPrincipal, secretCleared } from "./types.ts";
 import type { DeclaredModel, Dialect, ProviderSpec } from "./registry.ts";
 import { CHATGPT_PLAN, PLAN_LOCAL_ONLY, type PlanModel } from "./chatgpt_plan.ts";
+import { OPENROUTER, openRouterModelForRun, usableOpenRouterModels } from "./openrouter.ts";
 import {
   BUILTIN_PROVIDERS,
   customProviderSpec,
@@ -58,7 +59,8 @@ export async function resolveProvider(store: KeyStore, id: string): Promise<Prov
  * Every provider this deployment knows, built-ins first — the order the pickers show. The
  * `chatgpt-plan` entry carries the union of its live keys' model lists, in their order: a plan's
  * models are whatever the signed-in accounts serve, and nothing else in the system knows them.
- * Where plan keys are off (a deployment that is not local) the entry is left out altogether.
+ * Where plan keys are off (a deployment that is not local) the entry is left out altogether. The
+ * `openrouter` entry carries the models an admin enabled that OpenRouter still lists.
  */
 export async function listProviderSpecs(
   store: KeyStore,
@@ -72,11 +74,17 @@ export async function listProviderSpecs(
       if (!planModels.has(model.id)) planModels.set(model.id, model);
     }
   }
+  const openRouterModels = usableOpenRouterModels(await store.listOpenRouterModels())
+    .map(openRouterModelForRun);
   return [
     ...Object.values(BUILTIN_PROVIDERS)
       .filter((spec) => opts.planOn || spec.id !== CHATGPT_PLAN)
       .map((spec) =>
-        spec.id === CHATGPT_PLAN ? { ...spec, models: [...planModels.values()] } : spec
+        spec.id === CHATGPT_PLAN
+          ? { ...spec, models: [...planModels.values()] }
+          : spec.id === OPENROUTER
+          ? { ...spec, models: openRouterModels }
+          : spec
       ),
     ...custom.map(customProviderSpec),
   ];

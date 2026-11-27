@@ -390,3 +390,12 @@ export const StartPlanSignInSchema = z.object({
   label: singleLine.optional(),
   keyId: z.string().min(1).max(200).optional(),
 });
+
+// ── OpenRouter ─────────────────────────────────────────────────────────────────────────────
+
+/** What PUT /v1/openrouter/models/enabled accepts: the whole enabled set, which replaces the old
+ * one. The route holds each id to the catalogue (known, listed, takes tools). */
+export const SetOpenRouterEnabledSchema = z.object({
+  ids: z.array(z.string().trim().min(1).max(200)).max(2000)
+    .transform((ids) => [...new Set(ids)]),
+});

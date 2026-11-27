@@ -262,7 +262,10 @@ test("the OpenRouter catalogue round-trips through both stores identically", asy
       // The next sync drops `b/two` and re-prices `a/one`: the dropped row is kept, unlisted, and
       // what an admin enabled survives the sync.
       await store.upsertOpenRouterCatalogue([
-        catalogueEntry("a/one", { label: "One", price: { ...catalogueEntry("").price!, input: 3 } }),
+        catalogueEntry("a/one", {
+          label: "One",
+          price: { ...catalogueEntry("").price!, input: 3 },
+        }),
         catalogueEntry("c/three"),
       ], T1);
       rows = await store.listOpenRouterModels();

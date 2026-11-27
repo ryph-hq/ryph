@@ -92,6 +92,20 @@ export {
  * that this knob is on, and there must be exactly ONE reader of the variable. */
 export { privateModelEndpointsAllowed } from "./schema.ts";
 export { CHATGPT_PLAN, isLocalAppUrl } from "./core/chatgpt_plan.ts";
+export {
+  OPENROUTER,
+  type OpenRouterCatalogueEntry,
+  type OpenRouterModel,
+  type OpenRouterSync,
+} from "./core/openrouter.ts";
+export {
+  OPENROUTER_KEY_REFUSED,
+  OPENROUTER_PATHS,
+  type OpenRouterModelView,
+  openRouterRoutes,
+} from "./http/openrouter.ts";
+export type { OpenRouterApi, OpenRouterKeyInfo } from "./ports/openrouter_api.ts";
+export { openRouterApi } from "./adapters/openrouter/api.ts";
 export { isThinkingLevel, THINKING_LEVELS, type ThinkingLevel } from "./core/thinking.ts";
 export { type CallbackListener, PLAN_PATHS } from "./http/chatgpt_plan.ts";
 export type { KeyStore } from "./ports/key_store.ts";

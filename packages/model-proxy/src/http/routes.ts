@@ -65,6 +65,9 @@ const PATHS = {
 
 import { USAGE_PATHS } from "./usage.ts";
 import { PLAN_PATHS } from "./chatgpt_plan.ts";
+import { OPENROUTER_PATHS, syncStaleInBackground } from "./openrouter.ts";
+import type { OpenRouterCatalogue } from "../core/openrouter_catalogue.ts";
+import type { OpenRouterApi } from "../ports/openrouter_api.ts";
 
 /**
  * The machine-readable marker on a "model access is off" refusal. The VALUE is the contract,
@@ -114,6 +117,14 @@ export interface ProviderKeyRoutesDeps {
   /** Resolves a custom endpoint's host, to refuse one whose name points inside the network
    * (`endpointAddressProblem`); the platform's DNS unless a test fakes it. */
   resolveHost?: ResolveHost;
+  /** OpenRouter's API and its catalogue: a key is checked with OpenRouter before it is saved,
+   * the first one saved syncs the catalogue, and the provider list keeps it fresh. Absent, an
+   * OpenRouter key is saved unchecked and nothing syncs. */
+  openRouter?: {
+    api: OpenRouterApi;
+    catalogue: OpenRouterCatalogue;
+    diag: { warn(event: string, data?: Record<string, unknown>): void };
+  };
 }
 
 export function providerKeyRoutes(deps: ProviderKeyRoutesDeps): Route[] {
@@ -309,6 +320,9 @@ export function providerKeyRoutes(deps: ProviderKeyRoutesDeps): Route[] {
   const listProviders = async (req: Request): Promise<Response> => {
     const denied = await deps.authenticate(req);
     if (denied) return denied;
+    if (deps.openRouter) {
+      syncStaleInBackground(store, deps.openRouter.catalogue, deps.openRouter.diag);
+    }
     const specs = await listProviderSpecs(store, { planOn: deps.planOn ?? false });
     return json(200, { providers: specs.map(toPublicProviderSpec) });
   };
@@ -551,5 +565,9 @@ export function disabledProviderKeyRoutes(
     route("POST", PLAN_PATHS.signIns, off),
     route("GET", PLAN_PATHS.signIn, off),
     route("POST", PLAN_PATHS.models, off),
+    route("GET", OPENROUTER_PATHS.models, off),
+    route("PUT", OPENROUTER_PATHS.enabled, off),
+    route("POST", OPENROUTER_PATHS.sync, off),
+    route("GET", OPENROUTER_PATHS.keyStatus, off),
   ];
 }

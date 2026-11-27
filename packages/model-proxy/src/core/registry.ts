@@ -1,7 +1,7 @@
 // The static knowledge about providers and harnesses — plus the projection that lets a ROW say
 // the same things a compile-time constant does.
 //
-// Three providers ship as code (`BUILTIN_PROVIDERS`); the rest are however many `custom_providers`
+// Four providers ship as code (`BUILTIN_PROVIDERS`); the rest are however many `custom_providers`
 // rows an admin registered, projected into the very same `ProviderSpec` by `customProviderSpec`
 // so that nothing downstream — the proxy's forward path, the issuer's env map, the metering
 // switch — ever asks which kind it got. "Where do providers come from" has exactly one answer
@@ -17,8 +17,14 @@
 // array into its config, and the hand-kept price list cannot know what a self-hosted vLLM
 // charges. The declaration is the only source there is, which is why it is required rather than
 // decorative.
+//
+// OPENROUTER is the third case: a built-in whose catalogue is neither pi's nor hand-declared but
+// SYNCED from OpenRouter's own model list into rows (core/openrouter.ts), of which an admin enables
+// the ones agents may use. Its spec carries no models here; the provider list and a run's config
+// blob are given the enabled rows.
 
 import { CHATGPT_PLAN, PLAN_RESOURCE, type PlanModel } from "./chatgpt_plan.ts";
+import { OPENROUTER, OPENROUTER_API, OPENROUTER_HEADERS } from "./openrouter.ts";
 import { catalogueModels } from "./pricing.ts";
 import { planThinkingLevels, type ThinkingLevel } from "./thinking.ts";
 import type { CustomProvider } from "./types.ts";
@@ -100,9 +106,9 @@ export interface ProviderSpec {
    *  key and rides `auth`; nothing sealed ever lives here. */
   extraHeaders: Record<string, string>;
   /** Declared models. Empty for built-ins — pi has its own catalogue and the price list covers
-   *  them; `toPublicProviderSpec` lists the price list's. See this file's opening. The one
-   *  exception is `chatgpt-plan` in the provider LIST, which carries the union of its live keys'
-   *  model lists (`listProviderSpecs`). */
+   *  them; `toPublicProviderSpec` lists the price list's. See this file's opening. The two
+   *  exceptions are in the provider LIST (`listProviderSpecs`): `chatgpt-plan` carries the union
+   *  of its live keys' model lists, and `openrouter` the models an admin enabled. */
   models: DeclaredModel[];
   builtin: boolean;
   /** Archiving a custom endpoint is a kill switch, exactly like archiving a provider key: the
@@ -172,6 +178,24 @@ export const BUILTIN_PROVIDERS: Record<string, ProviderSpec> = {
     clientBasePath: "/v1",
     auth: { header: "authorization", scheme: "Bearer" },
     extraHeaders: {},
+    models: [],
+    builtin: true,
+    archivedAt: null,
+  },
+  // OpenRouter: one key for hundreds of models, spoken to in Chat Completions. A run gets it the
+  // way it gets a custom endpoint — ryph's two variables and the config blob — because the blob is
+  // where the enabled models and their `thinkingFormat` ride; pi composes the entry over its own
+  // built-in `openrouter` provider. The attribution headers are fixed (OPENROUTER_HEADERS).
+  [OPENROUTER]: {
+    id: OPENROUTER,
+    label: "OpenRouter",
+    dialect: "openai-completions",
+    baseUrl: OPENROUTER_API,
+    keyEnv: CUSTOM_KEY_ENV,
+    baseUrlEnv: CUSTOM_BASE_URL_ENV,
+    clientBasePath: "/v1",
+    auth: { header: "authorization", scheme: "Bearer" },
+    extraHeaders: { ...OPENROUTER_HEADERS },
     models: [],
     builtin: true,
     archivedAt: null,
@@ -406,7 +430,8 @@ export interface PublicProviderSpec {
    * (the list, the admin read, a create, an edit, an archive) — so one saved back is the
    * declaration unchanged. A built-in's are the price list's, priced alike, with the levels
    * pi's catalogue gives each; a ChatGPT plan's are its signed-in accounts' own lists, each
-   * `pricing: "included"`, with the levels those lists name. */
+   * `pricing: "included"`, with the levels those lists name; OpenRouter's are the models an admin
+   * enabled, priced from its synced catalogue. */
   models: PublicModel[];
   archivedAt: string | null;
 }
@@ -444,7 +469,7 @@ export function toPublicProviderSpec(spec: ProviderSpec): PublicProviderSpec {
     authScheme: spec.auth.scheme,
     models: spec.id === CHATGPT_PLAN
       ? spec.models.map((model) => ({ ...planModelForRun(model), pricing: "included" as const }))
-      : spec.builtin
+      : spec.builtin && spec.id !== OPENROUTER
       ? catalogueModels(spec.id)
       : spec.models,
     archivedAt: spec.archivedAt,
