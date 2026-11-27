@@ -2,8 +2,9 @@
 // for a report. The same rules as usage_report.ts, applied where a number is compared to a cap.
 //
 // Invariants:
-// - money is never read off a row: every figure here is priced at read time from the catalogue
-//   and the custom endpoints' declared rates, exactly as the report prices it
+// - money is priced at read time from the catalogue, the custom endpoints' declared rates and
+//   OpenRouter's synced ones, exactly as the report prices it — except a row that carries the
+//   provider's own bill (`costUsd`, OpenRouter's), which is that much and is never re-priced
 // - an unpriced model counts as nothing here and is reported as such, so a caller comparing to a
 //   cap can refuse it instead of waving it through as free
 
@@ -11,7 +12,7 @@ import {
   costOf,
   priceFor,
   type PriceOverlay,
-  priceOverlayOf,
+  priceOverlay,
   TIER_THRESHOLDS,
   tierFloorOf,
 } from "./pricing.ts";
@@ -23,7 +24,8 @@ import type { KeyStore } from "../ports/key_store.ts";
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export interface RunSpend {
-  /** USD at list price, over every metered request of the run. */
+  /** USD at list price — or at what the provider billed, where it said — over every metered
+   * request of the run. */
   spentUsd: number;
   /** Metered requests the catalogue could not price; their tokens are not in `spentUsd`. */
   unpricedRequests: number;
@@ -31,7 +33,7 @@ export interface RunSpend {
 
 /** Prices one run's whole trail. */
 export async function spendOfRun(store: KeyStore, runId: string): Promise<RunSpend> {
-  const overlay = priceOverlayOf(await store.listCustomProviders());
+  const overlay = await priceOverlay(store);
   const [rows] = await store.aggregateUsage({
     runId,
     by: ["model"],
@@ -46,7 +48,7 @@ export async function spendOfRun(store: KeyStore, runId: string): Promise<RunSpe
 
 /** Prices every run's trail with `at` in `[from, to)`, the platform's included. */
 export async function spendInWindow(store: KeyStore, from: string, to: string): Promise<number> {
-  const overlay = priceOverlayOf(await store.listCustomProviders());
+  const overlay = await priceOverlay(store);
   const [rows] = await store.aggregateUsage({
     from,
     to,
@@ -84,10 +86,12 @@ export async function refreshGauge(
 }
 
 /**
- * Prices one record the way the report would price its row: null when the catalogue has no rate
- * for the model, zero when the response carried no usage.
+ * Prices one record the way the report would price its row: what the provider billed when the row
+ * carries it, else the catalogue's price; null when the catalogue has no rate for the model, zero
+ * when the response carried no usage.
  */
 export function priceRecord(record: UsageRecord, overlay: PriceOverlay): number | null {
+  if (record.costUsd !== null) return record.costUsd;
   if (record.inputTokens === null) return 0;
   const price = priceFor(record.provider, record.model, overlay);
   if (price === null) return null;

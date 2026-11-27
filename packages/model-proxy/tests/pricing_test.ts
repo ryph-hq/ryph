@@ -7,6 +7,7 @@ import {
   catalogueModels,
   costOf,
   priceFor,
+  priceOverlayFrom,
   priceOverlayOf,
   pricingOf,
   ratesAt,
@@ -100,6 +101,8 @@ const row = (over: Partial<UsageAggregateRow>): UsageAggregateRow => ({
   cacheWriteTokens: 0,
   cacheWrite1hTokens: 0,
   reasoningTokens: 0,
+  costReported: false,
+  reportedCostUsd: 0,
   ...over,
 });
 
@@ -226,4 +229,52 @@ test("catalogueModels: the price list's models, dated snapshots folded into thei
   const gpt54 = catalogueModels("openai").find((m) => m.id === "gpt-5.4");
   assertEquals(gpt54?.price, { input: 2.5, output: 15, cacheRead: 0.25, cacheWrite: 0 });
   assertEquals(catalogueModels("groq"), []);
+});
+
+test("rollUp takes a stated bill at its word, scales its split, and adds the unbilled rows", () => {
+  const overlay = priceOverlayFrom([], [
+    { id: "openai/gpt-6", price: { input: 1, output: 3, cacheRead: 0, cacheWrite: 0 } },
+    { id: "x/unpriced", price: null },
+  ]);
+  const openrouter = { provider: "openrouter", model: "openai/gpt-6" };
+  const [all] = rollUp([
+    // Two billed calls: $0.006 at list price, billed $0.012 — the bill stands, split 1:3.
+    row({
+      ...openrouter,
+      requests: 2,
+      meteredRequests: 2,
+      inputTokens: 3_000,
+      outputTokens: 1_000,
+      costReported: true,
+      reportedCostUsd: 0.012,
+    }),
+    // One estimated call, priced off the list: 1,000 in and 1,000 out is $0.004.
+    row({ ...openrouter, inputTokens: 1_000, outputTokens: 1_000 }),
+    // A billed call the catalogue cannot price: not unpriced, all of it under output.
+    row({
+      provider: "openrouter",
+      model: "x/unpriced",
+      inputTokens: 10,
+      outputTokens: 10,
+      costReported: true,
+      reportedCostUsd: 0.002,
+    }),
+  ], overlay);
+  assertAlmostEquals(all.totals.cost.total, 0.012 + 0.004 + 0.002);
+  assertEquals(all.totals.unpricedRequests, 0);
+  assertEquals(all.totals.reportedRequests, 3);
+  const gpt = all.models.find((m) => m.model === "openai/gpt-6")!;
+  assertEquals(gpt.pricing, "reported");
+  assertAlmostEquals(gpt.cost.input, 0.006 + 0.001);
+  assertAlmostEquals(gpt.cost.output, 0.006 + 0.003);
+  assertEquals(gpt.requests, 3);
+  const unpriced = all.models.find((m) => m.model === "x/unpriced")!;
+  assertEquals(unpriced.pricing, "reported");
+  assertEquals(unpriced.cost, {
+    input: 0,
+    output: 0.002,
+    cacheRead: 0,
+    cacheWrite: 0,
+    total: 0.002,
+  });
 });

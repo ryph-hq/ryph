@@ -30,6 +30,9 @@
 // - `input` never includes cache reads or writes, whichever provider's own figure did
 // - the MODEL comes back with the tokens, off the same payloads: what a call cost is a fact
 //   about the response, not about what the caller asked for
+// - a COST the response states is read only when the caller says the provider's figure is its
+//   bill (`reportsCost`: OpenRouter's `usage.cost`, the last usage object in its JSON body or
+//   stream); for every other provider money is the price list's
 
 import type { Dialect } from "./registry.ts";
 import type { TokenCounts } from "./pricing.ts";
@@ -48,6 +51,19 @@ export interface MeteredUsage {
    * `message_delta`, an OpenAI stream's usage-bearing last event. False for a body that carried
    * none, and for an Anthropic stream that stopped after `message_start`. */
   final: boolean;
+  /** What the provider said the call cost, in USD (`usage.cost`), when the meter was told to read
+   * it (`reportsCost`) and the response said; null otherwise. */
+  costUsd: number | null;
+}
+
+/** What a meter reads beyond the tokens. */
+export interface UsageMeterOptions {
+  /**
+   * Read `usage.cost` as what the call cost. Only for a provider whose figure is the bill it sends
+   * the key's account — OpenRouter's — and never for a custom endpoint: anything that can be
+   * registered could otherwise price its own calls, at $0 under a run's cap.
+   */
+  reportsCost?: boolean;
 }
 
 export interface UsageMeter {
@@ -77,13 +93,18 @@ const isObject = (value: unknown): value is Json =>
 const count = (value: unknown): number | null =>
   typeof value === "number" && Number.isFinite(value) && value >= 0 ? Math.round(value) : null;
 
-export function makeUsageMeter(dialect: Dialect, contentType: string | null): UsageMeter {
+export function makeUsageMeter(
+  dialect: Dialect,
+  contentType: string | null,
+  opts: UsageMeterOptions = {},
+): UsageMeter {
   const type = contentType?.toLowerCase() ?? "";
   const mode = type.includes("text/event-stream") ? "sse" : type.includes("json") ? "json" : "none";
   const decoder = new TextDecoder();
   let tokens: TokenCounts | null = null;
   let model: string | null = null;
   let final = false;
+  let costUsd: number | null = null;
   // sse: the line being read.
   let pending = "";
   // sse: that line outgrew the buffer, and is skipped to its end.
@@ -105,6 +126,10 @@ export function makeUsageMeter(dialect: Dialect, contentType: string | null): Us
     // An OpenAI shape reports usage once, at the end; Anthropic's stream in installments, the
     // last of them on `message_delta`.
     if (tokens !== null && (dialect !== "anthropic-messages" || closing)) final = true;
+    if (opts.reportsCost === true) {
+      const cost = usage.cost;
+      if (typeof cost === "number" && Number.isFinite(cost) && cost >= 0) costUsd = cost;
+    }
   };
 
   const observe = (payload: unknown): void => {
@@ -191,7 +216,7 @@ export function makeUsageMeter(dialect: Dialect, contentType: string | null): Us
       pending = "";
       head = "";
       tail = "";
-      return { tokens, model, final };
+      return { tokens, model, final, costUsd };
     },
   };
 }

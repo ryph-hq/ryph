@@ -58,6 +58,7 @@ import {
 import { authenticates, decide, type ProxiedRequest, type SpendState } from "../core/enforce.ts";
 import { makeUsageMeter, type UsageMeter } from "../core/metering.ts";
 import {
+  askForCost,
   askForStreamUsage,
   DRAIN_MS,
   estimatedInputTokens,
@@ -67,10 +68,15 @@ import {
   MAX_OUTPUT_FIELDS,
   requestedMaxOutput,
 } from "../core/usage_fallback.ts";
-import { REFUSED_TOP_LEVEL_FIELDS, refusedInBody } from "../core/body_policy.ts";
+import {
+  REFUSED_TOP_LEVEL_FIELDS,
+  refusedForOpenRouter,
+  refusedInBody,
+} from "../core/body_policy.ts";
+import { OPENROUTER } from "../core/openrouter.ts";
 import { modelOf, rawValue, topLevelMembers, type ValueSpan } from "../core/model_field.ts";
 import type { PlanKeys } from "../core/plan_keys.ts";
-import { included, priceFor, type PriceOverlay, priceOverlayOf } from "../core/pricing.ts";
+import { included, priceFor, type PriceOverlay, priceOverlayFrom } from "../core/pricing.ts";
 import { makeResponsesStreamReader } from "../core/responses_stream.ts";
 import type { ProviderSpec } from "../core/registry.ts";
 import { resolveProvider } from "../core/service.ts";
@@ -234,7 +240,8 @@ async function errorAnswerBytes(
 /** How long a custom endpoint's host is trusted to resolve outside the network once it has. */
 const ADDRESS_TTL_MS = 30_000;
 
-/** How long the caps trust one reading of the custom endpoints' declared rates. */
+/** How long the caps trust one reading of the custom endpoints' declared rates and OpenRouter's
+ * synced ones. */
 const OVERLAY_TTL_MS = 60_000;
 
 /** `{"detail": {"code": …}}`, the other shape OpenAI's backend answers a refusal in. */
@@ -375,13 +382,14 @@ function bodyRefusal(refused: string[]): Response {
 }
 
 /** The top-level members of a request body the proxy reads, in the one walk over it: the model,
- * `background`, what says whether and how long it streams, and the fields core/body_policy.ts
- * refuses. */
+ * `background`, what says whether and how long it streams, OpenRouter's `usage` (made to ask
+ * for the cost), and the fields core/body_policy.ts refuses. */
 const READ_MEMBERS: ReadonlySet<string> = new Set([
   "model",
   "background",
   "stream",
   "stream_options",
+  "usage",
   ...MAX_OUTPUT_FIELDS,
   ...REFUSED_TOP_LEVEL_FIELDS,
 ]);
@@ -505,15 +513,28 @@ export function makeProxyHandler(deps: ProxyHandlerDeps): (req: Request) => Prom
     return problem.detail;
   };
 
-  let overlayCache: { overlay: PriceOverlay; freshUntilMs: number } | null = null;
-  const overlayAt = async (nowMs: number): Promise<PriceOverlay> => {
-    if (overlayCache === null || nowMs >= overlayCache.freshUntilMs) {
-      overlayCache = {
-        overlay: priceOverlayOf(await deps.store.listCustomProviders()),
+  /** The rates the caps count with, and OpenRouter's output caps for the estimate of a call
+   * that never reported its usage: both read from rows, both re-read once a minute. */
+  interface Catalogue {
+    overlay: PriceOverlay;
+    openRouterMaxOutput: ReadonlyMap<string, number>;
+  }
+  let catalogueCache: { catalogue: Catalogue; freshUntilMs: number } | null = null;
+  const catalogueAt = async (nowMs: number): Promise<Catalogue> => {
+    if (catalogueCache === null || nowMs >= catalogueCache.freshUntilMs) {
+      const [custom, openRouter] = await Promise.all([
+        deps.store.listCustomProviders(),
+        deps.store.listOpenRouterModels(),
+      ]);
+      catalogueCache = {
+        catalogue: {
+          overlay: priceOverlayFrom(custom, openRouter),
+          openRouterMaxOutput: new Map(openRouter.map((m) => [m.id, m.maxOutputTokens])),
+        },
         freshUntilMs: nowMs + OVERLAY_TTL_MS,
       };
     }
-    return overlayCache.overlay;
+    return catalogueCache.catalogue;
   };
 
   /** What the meter says about this run's spend, seeding it from the store on first sight. */
@@ -805,7 +826,8 @@ export function makeProxyHandler(deps: ProxyHandlerDeps): (req: Request) => Prom
     // The caps are asked only of an authenticated purchase: an unknown token learns nothing
     // about the deployment's ceiling from a 401, and a models list is never counted.
     const judged = spends && virtualKey !== null && providerKey !== null && provider !== null;
-    const overlay = judged ? await overlayAt(nowMs) : undefined;
+    const catalogue = judged ? await catalogueAt(nowMs) : undefined;
+    const overlay = catalogue?.overlay;
     const request: ProxiedRequest = {
       model: named,
       spends,
@@ -874,7 +896,13 @@ export function makeProxyHandler(deps: ProxyHandlerDeps): (req: Request) => Prom
     // its own side, an image or file it fetches by URL or reads from storage, a stored response.
     // A plan's body is held to the same rule after its own refusals (`preparePlanCall`).
     if (route?.shape && body !== null && members !== null && provider.id !== CHATGPT_PLAN) {
-      const refused = refusedInBody(body, route.shape, presentMembers(body, members));
+      const present = presentMembers(body, members);
+      const refused = [
+        ...refusedInBody(body, route.shape, present),
+        // OpenRouter's own ways past the allowlist and the meter: fallback models, plugins,
+        // a stored preset.
+        ...(provider.id === OPENROUTER ? refusedForOpenRouter(present) : []),
+      ];
       if (refused.length > 0) {
         deps.diag.debug("proxy.body_refused", { runId: decision.virtualKey.runId, refused });
         return bodyRefusal(refused);
@@ -884,6 +912,16 @@ export function makeProxyHandler(deps: ProxyHandlerDeps): (req: Request) => Prom
     // The most output the request allowed, for the estimate a call that never reports its usage
     // is charged. Read before the body is spliced below, while the walk's spans still fit it.
     const requestedOutput = body === null ? null : requestedMaxOutput(body, members);
+    // OpenRouter reports what a call cost only when asked to: made to ask, streamed or not, so the
+    // row carries the bill rather than a list price. First, because it hands back the walk's
+    // spans moved to fit, which the stream splice below reads.
+    if (provider.id === OPENROUTER && body !== null && members !== null) {
+      const asked = askForCost(body, members);
+      if (asked !== null) {
+        body = asked.body;
+        members = asked.members;
+      }
+    }
     // A streamed Chat Completions call reports its usage only when it asks to: made to ask, so a
     // run cannot opt out of being priced by leaving the option off. A custom endpoint's model
     // declared not to take the option (pi's `supportsUsageInStreaming: false`) is sent as it
@@ -939,7 +977,8 @@ export function makeProxyHandler(deps: ProxyHandlerDeps): (req: Request) => Prom
       body = prepared.body;
       // The two routes take no query; whatever a caller put there stays here.
       target.search = "";
-    } else if (!provider.builtin) {
+    } else if (!provider.builtin || provider.id === OPENROUTER) {
+      // OpenRouter's model call reads no query either.
       keepCustomQuery(target);
     }
 
@@ -1090,6 +1129,9 @@ export function makeProxyHandler(deps: ProxyHandlerDeps): (req: Request) => Prom
       input: estimatedInputTokens(body ?? new Uint8Array()),
       output: requestedOutput ??
         provider.models.find((m) => m.id === named)?.maxOutputTokens ??
+        (provider.id === OPENROUTER && named !== null
+          ? catalogue?.openRouterMaxOutput.get(named)
+          : undefined) ??
         FALLBACK_OUTPUT_TOKENS,
     });
 
@@ -1123,7 +1165,8 @@ export function makeProxyHandler(deps: ProxyHandlerDeps): (req: Request) => Prom
       release();
       if (drainTimer !== null) clearTimeout(drainTimer);
       req.signal.removeEventListener("abort", onHangUp);
-      const metered = usage?.finish() ?? { tokens: null, model: null, final: false };
+      const metered = usage?.finish() ??
+        { tokens: null, model: null, final: false, costUsd: null };
       const status = answeredStatus ??
         (upstreamStatus === null || (outcome === "cut" && upstreamStatus < 400)
           ? STREAM_CUT_STATUS
@@ -1150,7 +1193,9 @@ export function makeProxyHandler(deps: ProxyHandlerDeps): (req: Request) => Prom
         cacheWrite1hTokens: tokens?.cacheWrite1h ?? null,
         reasoningTokens: tokens?.reasoning ?? null,
         estimated,
-        costUsd: null,
+        // OpenRouter's own bill for the call. An estimated row has none to carry: the response
+        // never said, and the estimate is priced from the catalogue like any other.
+        costUsd: estimated ? null : metered.costUsd,
         durationMs: Math.max(0, deps.now().getTime() - startedAt.getTime()),
         at: startedAt.toISOString(),
       };
@@ -1283,7 +1328,11 @@ export function makeProxyHandler(deps: ProxyHandlerDeps): (req: Request) => Prom
     }
 
     upstreamStatus = upstream.status;
-    usage = makeUsageMeter(provider.dialect, upstream.headers.get("content-type"));
+    // Only OpenRouter's stated cost is read as what a call cost: a custom endpoint must never
+    // be able to price its own calls.
+    usage = makeUsageMeter(provider.dialect, upstream.headers.get("content-type"), {
+      reportsCost: provider.id === OPENROUTER && provider.builtin,
+    });
 
     // The upstream refused the credential the PROXY sent. A custom endpoint's or a plan's
     // refusal is answered with a fixed body, never relayed: what an arbitrary gateway writes into

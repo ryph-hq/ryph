@@ -21,6 +21,7 @@
 //   fine-tuning and the account's own key-info endpoints (OpenRouter's `/api/v1/auth/key`,
 //   LiteLLM's `/key/info`) just as OpenAI's does, so a run gets the same default deny
 // - a ChatGPT plan keeps its own route table and header list (core/chatgpt_plan.ts)
+// - OpenRouter is a built-in: its route table and header list are here, like OpenAI's
 //
 // Where the list comes from (re-check it whenever a harness version moves):
 // - pi (images/harness, pi-coding-agent 1.6.1): `POST /v1/messages` for Anthropic, and for
@@ -34,6 +35,7 @@
 //   and expose nothing a run does not already know
 
 import { CHATGPT_PLAN, PLAN_FORWARDED_HEADERS, planRoute } from "./chatgpt_plan.ts";
+import { OPENROUTER } from "./openrouter.ts";
 import type { Dialect, ProviderSpec } from "./registry.ts";
 
 /** The request shape a model call's body has, which is what its vetting reads
@@ -131,6 +133,9 @@ const ROUTES: Record<string, RouteEntry[]> = {
     ...MODELS,
   ],
   openai: [RESPONSES, CHAT_COMPLETIONS, ...MODELS],
+  // The model call pi makes and the models list. Everything else an OpenRouter key reaches —
+  // its credits, its key management, generation lookups — is refused like any other route.
+  [OPENROUTER]: [CHAT_COMPLETIONS, ...MODELS],
 };
 
 /**
@@ -215,6 +220,9 @@ const FORWARDED_REQUEST_HEADERS: Record<string, readonly string[]> = {
   // `openai-project`.
   openai: [...PLAN_FORWARDED_HEADERS],
   [CHATGPT_PLAN]: PLAN_FORWARDED_HEADERS,
+  // Nothing of the caller's that steers OpenRouter: its attribution headers are the proxy's own
+  // (OPENROUTER_HEADERS), sent as the provider's static ones.
+  [OPENROUTER]: COMMON_REQUEST_HEADERS,
 };
 
 /**

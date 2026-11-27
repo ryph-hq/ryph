@@ -69,10 +69,35 @@ const REFUSED_TOP_LEVEL: Record<BodyShape, readonly string[]> = {
   "openai-chat": ["web_search_options"],
 };
 
+/**
+ * Top-level fields OPENROUTER reads that reach past the model a run was allowed, refused on an
+ * OpenRouter body whatever its shape:
+ * - `models`: a fallback list OpenRouter tries when the named model fails — models the allowlist
+ *   never saw, at prices the cap never counted
+ * - `plugins`: web search, file parsing and the like, run on OpenRouter's side and billed per
+ *   request, not in the tokens metered here
+ * - `preset`: a configuration stored in the OpenRouter account, which can name its own models
+ *   and plugins
+ * A model id's own suffixes (`:online`, `@preset/…`) need no rule: the allowlist is exact ids.
+ */
+const OPENROUTER_REFUSED: Readonly<Record<string, string>> = {
+  models: "fallback models the run's allowlist does not cover",
+  plugins: "OpenRouter-side plugins, billed per request",
+  preset: "a preset stored in the OpenRouter account",
+};
+
+export const OPENROUTER_REFUSED_FIELDS: readonly string[] = Object.keys(OPENROUTER_REFUSED);
+
 /** Every top-level field any shape refuses, for the walk that finds them. */
 export const REFUSED_TOP_LEVEL_FIELDS: readonly string[] = [
-  ...new Set(Object.values(REFUSED_TOP_LEVEL).flat()),
+  ...new Set([...Object.values(REFUSED_TOP_LEVEL).flat(), ...OPENROUTER_REFUSED_FIELDS]),
 ];
+
+/** What an OpenRouter body asks for that `OPENROUTER_REFUSED_FIELDS` refuses, each named. */
+export function refusedForOpenRouter(present: ReadonlySet<string>): string[] {
+  return OPENROUTER_REFUSED_FIELDS.filter((field) => present.has(field))
+    .map((field) => `${field} (${OPENROUTER_REFUSED[field]})`);
+}
 
 /** Anthropic media sources that carry their content inline. `url` has the provider fetch it,
  * `file` reads the Files API. */

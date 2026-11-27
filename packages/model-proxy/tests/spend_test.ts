@@ -4,7 +4,7 @@
 import { test } from "bun:test";
 import { assertAlmostEquals, assertEquals } from "@std/assert";
 import { priceRecord, refreshGauge, spendInWindow, spendOfRun } from "../src/core/spend.ts";
-import { priceOverlayOf } from "../src/core/pricing.ts";
+import { priceOverlayFrom, priceOverlayOf } from "../src/core/pricing.ts";
 import { makeDeploymentGauge } from "../src/core/spend_meter.ts";
 import { memoryKeyStore } from "./memory_store.ts";
 import { TRAIL, usageRow } from "./usage_fixtures.ts";
@@ -90,4 +90,40 @@ test("priceRecord prices one row as the report prices it, and says when it canno
     priceRecord(usageRow({ provider: "groq", model: "llama-4" }), declared)!,
     100 * 1e-6 + 50 * 2e-6,
   );
+});
+
+test("priceRecord takes OpenRouter's stated cost over any catalogue price", () => {
+  const overlay = priceOverlayFrom([], [{
+    id: "openai/gpt-6",
+    price: { input: 1, output: 2, cacheRead: 0, cacheWrite: 0 },
+  }]);
+  const row = usageRow({ provider: "openrouter", model: "openai/gpt-6" });
+  assertAlmostEquals(priceRecord(row, overlay)!, 100 * 1e-6 + 50 * 2e-6);
+  assertEquals(priceRecord({ ...row, costUsd: 0.5 }, overlay), 0.5);
+  // A billed $0 (a free model) is $0, never re-priced.
+  assertEquals(priceRecord({ ...row, costUsd: 0 }, overlay), 0);
+  // An unpriced model with a bill is priced at the bill.
+  assertEquals(priceRecord({ ...row, model: "x/unknown", costUsd: 0.1 }, overlay), 0.1);
+  assertEquals(priceRecord({ ...row, model: "x/unknown" }, overlay), null);
+});
+
+test("spendOfRun counts OpenRouter's bills and prices its unbilled rows from the catalogue", async () => {
+  const store = memoryKeyStore();
+  await store.upsertOpenRouterCatalogue([{
+    id: "openai/gpt-6",
+    label: "GPT-6",
+    contextLength: 100_000,
+    maxOutputTokens: 10_000,
+    vision: false,
+    reasoning: false,
+    tools: true,
+    price: { input: 1, output: 2, cacheRead: 0, cacheWrite: 0 },
+    rawPricing: null,
+  }], "2026-09-01T00:00:00.000Z");
+  const row = usageRow({ provider: "openrouter", model: "openai/gpt-6" });
+  await store.recordUsage({ ...row, costUsd: 0.5 });
+  await store.recordUsage({ ...row, estimated: true });
+  const spend = await spendOfRun(store, "r-1");
+  assertAlmostEquals(spend.spentUsd, 0.5 + 100 * 1e-6 + 50 * 2e-6);
+  assertEquals(spend.unpricedRequests, 0);
 });

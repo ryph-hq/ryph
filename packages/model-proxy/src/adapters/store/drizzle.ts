@@ -477,6 +477,9 @@ export function drizzleKeyStore(handle: ModelProxyDbHandle): KeyStore {
       if (query.to !== undefined) conditions.push(lt(usage.at, query.to));
       const where = conditions.length === 0 ? undefined : and(...conditions);
 
+      // Rows carrying the provider's own bill are summed apart from rows priced off the list, so
+      // the report can take the one at its word and price the other.
+      const costReported = sql<boolean>`(${usage.costUsd} is not null)`;
       const group = (on: Queryable, by: UsageDimension) => {
         const key = usageKey(by);
         return on
@@ -495,6 +498,8 @@ export function drizzleKeyStore(handle: ModelProxyDbHandle): KeyStore {
             cacheWriteTokens: sumOf(usage.cacheWriteTokens),
             cacheWrite1hTokens: sumOf(usage.cacheWrite1hTokens),
             reasoningTokens: sumOf(usage.reasoningTokens),
+            costReported,
+            reportedCostUsd: sumOf(usage.costUsd),
           })
           .from(usage)
           .where(where)
@@ -503,6 +508,7 @@ export function drizzleKeyStore(handle: ModelProxyDbHandle): KeyStore {
             usage.provider,
             usage.model,
             tierFloor,
+            costReported,
           );
       };
 

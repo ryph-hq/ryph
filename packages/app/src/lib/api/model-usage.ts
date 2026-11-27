@@ -6,7 +6,8 @@ import { includedPricingSchema } from "./types";
 
 // What the model proxy's metering trail cost. Tokens are what each provider reported on the
 // response; costs are priced when read, from ryph's own hand-kept price list, in US dollars — an
-// estimate at list price, not an invoice.
+// estimate at list price, not an invoice. OpenRouter's calls are the exception: each carries what
+// OpenRouter billed for it, and that is its cost.
 
 const tokensSchema = z.object({
   /** Uncached input: cache reads and writes are counted apart. */
@@ -37,6 +38,9 @@ const totalsShape = {
   /** Metered on a model a subscription pays for (a ChatGPT plan's): tokens counted, cost $0 and
    * not spend. Absent from a proxy that predates the included state. */
   includedRequests: z.number().default(0),
+  /** Costed at what the provider billed rather than at list price (OpenRouter's own figure for
+   * each call). Absent from a proxy that predates it. */
+  reportedRequests: z.number().default(0),
   tokens: tokensSchema,
   cost: costSchema,
 };
@@ -47,8 +51,9 @@ export type UsageTotals = z.infer<typeof usageTotalsSchema>;
 export const modelUsageSchema = z.object({
   provider: z.string(),
   model: z.string().nullable(),
-  /** How this model's calls were costed; "included" when a plan pays for them. */
-  pricing: z.enum(["priced", includedPricingSchema.value, "unpriced"]).optional(),
+  /** How this model's calls were costed; "included" when a plan pays for them, "reported" when
+   * the provider's own bill is the cost. */
+  pricing: z.enum(["priced", includedPricingSchema.value, "unpriced", "reported"]).optional(),
   ...totalsShape,
 });
 export type ModelUsage = z.infer<typeof modelUsageSchema>;

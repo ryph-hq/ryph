@@ -280,9 +280,9 @@ export function memoryKeyStore(): KeyStore {
       return Promise.resolve(structuredClone(usage.filter((u) => u.runId === runId)));
     },
     aggregateUsage(query) {
-      // Mirrors the drizzle store's GROUP BY key, provider, model, tier bucket — and its ONE
-      // snapshot for every dimension asked, so a row written while a report runs belongs to
-      // none of its breakdowns rather than to some of them.
+      // Mirrors the drizzle store's GROUP BY key, provider, model, tier bucket, cost reported —
+      // and its ONE snapshot for every dimension asked, so a row written while a report runs
+      // belongs to none of its breakdowns rather than to some of them.
       const snapshot = usage.filter((u) => {
         if (query.runId !== undefined && u.runId !== query.runId) return false;
         if (query.from !== undefined && u.at < query.from) return false;
@@ -311,7 +311,8 @@ export function memoryKeyStore(): KeyStore {
             (u.cacheWriteTokens ?? 0);
           const tierFloor = thresholds.find((t) => totalInput > t) ?? 0;
           const key = keyOf(u, by);
-          const id = JSON.stringify([key, u.provider, u.model, tierFloor]);
+          const costReported = u.costUsd !== null;
+          const id = JSON.stringify([key, u.provider, u.model, tierFloor, costReported]);
           let row = groups.get(id);
           if (row === undefined) {
             row = {
@@ -328,6 +329,8 @@ export function memoryKeyStore(): KeyStore {
               cacheWriteTokens: 0,
               cacheWrite1hTokens: 0,
               reasoningTokens: 0,
+              costReported,
+              reportedCostUsd: 0,
             };
             groups.set(id, row);
           }
@@ -340,6 +343,7 @@ export function memoryKeyStore(): KeyStore {
           row.cacheWriteTokens += u.cacheWriteTokens ?? 0;
           row.cacheWrite1hTokens += u.cacheWrite1hTokens ?? 0;
           row.reasoningTokens += u.reasoningTokens ?? 0;
+          row.reportedCostUsd += u.costUsd ?? 0;
         }
         return [...groups.values()];
       };

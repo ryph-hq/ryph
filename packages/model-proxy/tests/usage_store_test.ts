@@ -13,7 +13,7 @@ import type {
 import type { KeyStore } from "../src/ports/key_store.ts";
 import { makeTestDb } from "./db.ts";
 import { memoryKeyStore } from "./memory_store.ts";
-import { TRAIL } from "./usage_fixtures.ts";
+import { TRAIL, usageRow } from "./usage_fixtures.ts";
 
 const WINDOW = { from: "2026-09-01T00:00:00.000Z", to: "2026-09-04T00:00:00.000Z" };
 const DIMENSIONS = ["model", "agent", "providerKey", "day", "task"] as const;
@@ -102,6 +102,32 @@ test("drizzle aggregateUsage: per dimension, tier-bucketed, windowed — and the
     const run = await rows(sql, "model", { runId: "r-2" });
     assertEquals(run.reduce((n, r) => n + r.requests, 0), 2);
     assertEquals(await rows(sql, "model", { runId: "r-none" }), []);
+  } finally {
+    await handle.close();
+  }
+});
+
+test("rows carrying OpenRouter's bill are summed apart, in SQL and in the double alike", async () => {
+  const handle = await makeTestDb();
+  const sql = drizzleKeyStore(handle);
+  const mem = memoryKeyStore();
+  const openrouter = { provider: "openrouter", model: "openai/gpt-6" };
+  try {
+    for (const store of [sql, mem]) {
+      await store.recordUsage(usageRow({ ...openrouter, costUsd: 0.25 }));
+      await store.recordUsage(usageRow({ ...openrouter, costUsd: 0.5 }));
+      // An estimated row carries no bill, and is priced from the catalogue.
+      await store.recordUsage(usageRow({ ...openrouter, estimated: true }));
+    }
+    const query = { by: ["model"] as const, tierThresholds: TIER_THRESHOLDS };
+    const [rows] = await sql.aggregateUsage(query);
+    assertEquals(canonical(rows), canonical((await mem.aggregateUsage(query))[0]));
+    const reported = rows.find((r) => r.costReported)!;
+    const listed = rows.find((r) => !r.costReported)!;
+    assertEquals([reported.requests, reported.reportedCostUsd], [2, 0.75]);
+    assertEquals([listed.requests, listed.reportedCostUsd], [1, 0]);
+    // And the stored figure comes back as it went in.
+    assertEquals((await sql.listUsageForRun("r-1")).map((r) => r.costUsd), [0.25, 0.5, null]);
   } finally {
     await handle.close();
   }

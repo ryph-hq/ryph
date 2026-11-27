@@ -7,6 +7,7 @@
 // the deployment's ceiling. Three answers, in order:
 // 1. a streamed Chat Completions call is made to ask (`askForStreamUsage`): one more chunk at the
 //    end, `choices: []`, which every client that reads the stream already skips
+//    — and an OpenRouter call is made to ask for its cost as well (`askForCost`)
 // 2. a caller that hangs up does not end the upstream call: the proxy reads it on to its end in
 //    the background, bounded by `DRAIN_MS` and `MAX_DRAIN_BYTES`, so the usage still arrives
 // 3. a spending call whose usage still never came (a cut past those bounds, an endpoint that
@@ -105,6 +106,75 @@ export function askForStreamUsage(
     options.end,
     JSON.stringify({ ...parsed, include_usage: true }),
   );
+}
+
+/**
+ * The walk's spans after `[start, end)` of the body was replaced with `length` bytes: a span
+ * past the edit moves by the difference, the edited member's own span covers what replaced it,
+ * and one before the edit stays where it was. Lets a second splice use the first walk.
+ */
+function shiftedSpans(
+  members: Map<string, ValueSpan>,
+  start: number,
+  end: number,
+  length: number,
+): Map<string, ValueSpan> {
+  const delta = length - (end - start);
+  const out = new Map<string, ValueSpan>();
+  for (const [name, span] of members) {
+    if (span.start >= end) out.set(name, { start: span.start + delta, end: span.end + delta });
+    else if (span.start === start && span.end === end) {
+      out.set(name, { start, end: start + length });
+    } else out.set(name, span);
+  }
+  return out;
+}
+
+/**
+ * An OpenRouter body made to ask for its cost (`usage: {include: true}`), which OpenRouter then
+ * reports as `usage.cost` on the response — streamed or not — and the proxy stores as the call's
+ * spend. Null when it needs no change: it already asks, or its `usage` is not an object the proxy
+ * can add to (OpenRouter refuses that anyway). Spliced, never parsed whole, like
+ * `askForStreamUsage`; the answer carries the walk's spans moved to fit the new body, so that
+ * splice can follow this one without a second walk. `members` is the walk's spans, `usage`
+ * among them.
+ */
+export function askForCost(
+  bytes: Uint8Array,
+  members: Map<string, ValueSpan>,
+): { body: Uint8Array<ArrayBuffer>; members: Map<string, ValueSpan> } | null {
+  const usage = members.get("usage");
+  if (usage === undefined) {
+    const open = bytes.indexOf(OPEN_OBJECT);
+    if (open === -1) return null;
+    // `{}` takes the member without the comma a following one needs.
+    let next = open + 1;
+    while (next < bytes.length && (bytes[next] <= 0x20)) next++;
+    const insert = bytes[next] === 0x7d ? '"usage":{"include":true}' : '"usage":{"include":true},';
+    return {
+      body: spliced(bytes, open + 1, open + 1, insert),
+      members: shiftedSpans(members, open + 1, open + 1, enc.encode(insert).length),
+    };
+  }
+  const raw = dec.decode(bytes.subarray(usage.start, usage.end));
+  let replacement: string;
+  if (raw === "null") replacement = '{"include":true}';
+  else {
+    if (usage.end - usage.start > 64 * 1024) return null;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return null;
+    }
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return null;
+    if ((parsed as Record<string, unknown>).include === true) return null;
+    replacement = JSON.stringify({ ...parsed, include: true });
+  }
+  return {
+    body: spliced(bytes, usage.start, usage.end, replacement),
+    members: shiftedSpans(members, usage.start, usage.end, enc.encode(replacement).length),
+  };
 }
 
 /** The input a request body is estimated at (see the opening of this file). */

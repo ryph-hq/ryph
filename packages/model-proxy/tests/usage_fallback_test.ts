@@ -4,6 +4,7 @@
 import { test } from "bun:test";
 import { assertEquals } from "@std/assert";
 import {
+  askForCost,
   askForStreamUsage,
   estimatedInputTokens,
   estimatedTokens,
@@ -84,5 +85,55 @@ test("what a response did report stands; only what it did not is estimated", () 
   assertEquals(estimatedTokens(reported, { input: 10, output: 20 }), {
     ...reported,
     output: 20,
+  });
+});
+
+function costAsked(body: string): unknown {
+  const bytes = enc.encode(body);
+  const members = topLevelMembers(bytes, new Set([...FIELDS, "usage"]))!;
+  const out = askForCost(bytes, members);
+  if (out === null) return null;
+  // The spans handed back fit the new body: each still points at its member's own value.
+  const text = dec.decode(out.body);
+  for (const [name, span] of out.members) {
+    assertEquals(
+      JSON.parse(text.slice(span.start, span.end)),
+      (JSON.parse(text) as Record<string, unknown>)[name],
+      name,
+    );
+  }
+  return JSON.parse(text);
+}
+
+test("an OpenRouter body is made to ask for its cost, spliced in place", () => {
+  assertEquals(costAsked('{"model":"m","stream":true}'), {
+    usage: { include: true },
+    model: "m",
+    stream: true,
+  });
+  assertEquals(costAsked(" {}"), { usage: { include: true } });
+  assertEquals(costAsked('{"usage":null,"stream":false}'), {
+    usage: { include: true },
+    stream: false,
+  });
+  assertEquals(costAsked('{"usage":{"include":false},"stream":true}'), {
+    usage: { include: true },
+    stream: true,
+  });
+  // Already asking, or a `usage` that is no object: left as it came.
+  assertEquals(costAsked('{"usage":{"include":true}}'), null);
+  assertEquals(costAsked('{"usage":"yes"}'), null);
+  assertEquals(costAsked('{"usage":[1]}'), null);
+});
+
+test("the cost splice and the stream splice compose on one walk", () => {
+  const bytes = enc.encode('{"usage":{"x":1},"model":"m","stream":true,"stream_options":null}');
+  const first = askForCost(bytes, topLevelMembers(bytes, new Set([...FIELDS, "usage"]))!)!;
+  const second = askForStreamUsage(first.body, first.members)!;
+  assertEquals(JSON.parse(dec.decode(second)), {
+    usage: { x: 1, include: true },
+    model: "m",
+    stream: true,
+    stream_options: { include_usage: true },
   });
 });
