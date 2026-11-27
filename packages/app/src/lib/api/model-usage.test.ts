@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  costBasis,
+  costHeadline,
   costLabel,
+  costSourceNote,
   getRunUsageState,
   getUsageReportOrOff,
   isIncluded,
@@ -138,5 +141,47 @@ describe("reported usage", () => {
       cost: zero,
     });
     expect(costLabel(free)).toBe(formatUsd(0));
+  });
+});
+
+describe("where the costs come from", () => {
+  const source = "pi-ai 1.6.1 model catalogue";
+
+  it("says list-price estimates when nothing was billed", () => {
+    const t = usageTotalsSchema.parse(totals);
+    expect(costBasis(t)).toBe("list");
+    expect(costHeadline(t)).toBe("Estimated cost");
+    expect(costSourceNote(t, source)).toBe(
+      `Costs are list-price estimates from Ryph's built-in price list (${source}), not an invoice.`,
+    );
+  });
+
+  it("says Cost when OpenRouter billed every priced call", () => {
+    const t = usageTotalsSchema.parse({ ...totals, reportedRequests: 2 });
+    expect(costBasis(t)).toBe("billed");
+    expect(costHeadline(t)).toBe("Cost");
+    expect(costSourceNote(t, source)).toBe("Costs are what OpenRouter billed.");
+  });
+
+  it("does not count included or unpriced calls as estimates", () => {
+    const t = usageTotalsSchema.parse({
+      ...totals,
+      meteredRequests: 4,
+      reportedRequests: 2,
+      includedRequests: 1,
+      unpricedRequests: 1,
+    });
+    expect(costBasis(t)).toBe("billed");
+  });
+
+  it("keeps the estimate wording for the rest of a mix", () => {
+    const one = usageTotalsSchema.parse({ ...totals, reportedRequests: 1 });
+    expect(costBasis(one)).toBe("mixed");
+    expect(costHeadline(one)).toBe("Estimated cost");
+    expect(costSourceNote(one, source)).toBe(
+      `Costs are list-price estimates from Ryph's built-in price list (${source}), except 1 call priced at OpenRouter's bill.`,
+    );
+    const two = usageTotalsSchema.parse({ ...totals, meteredRequests: 5, reportedRequests: 2 });
+    expect(costSourceNote(two, source)).toMatch(/except 2 calls priced at OpenRouter's bill\.$/);
   });
 });

@@ -172,3 +172,37 @@ export async function getUsageReportOrOff(
     throw e;
   }
 }
+
+/**
+ * How these totals were costed: `list` when every priced call is at list price, `billed` when
+ * every priced call carries OpenRouter's bill, `mixed` when both. Calls a plan included and calls
+ * on an unpriced model are neither, so they do not move it.
+ */
+export type CostBasis = "list" | "billed" | "mixed";
+
+export function costBasis(t: UsageTotals): CostBasis {
+  if (t.reportedRequests === 0) return "list";
+  const listPriced = t.meteredRequests - t.reportedRequests - t.includedRequests -
+    t.unpricedRequests;
+  return listPriced > 0 ? "mixed" : "billed";
+}
+
+/** The headline cost's label: plain "Cost" when OpenRouter billed every priced call. */
+export function costHeadline(t: UsageTotals): string {
+  return costBasis(t) === "billed" ? "Cost" : "Estimated cost";
+}
+
+/** The sentence under a bill that says where its costs come from. */
+export function costSourceNote(t: UsageTotals, source: string): string {
+  const estimate = `Costs are list-price estimates from Ryph's built-in price list (${source})`;
+  switch (costBasis(t)) {
+    case "billed":
+      return "Costs are what OpenRouter billed.";
+    case "mixed": {
+      const n = t.reportedRequests;
+      return `${estimate}, except ${n} ${n === 1 ? "call" : "calls"} priced at OpenRouter's bill.`;
+    }
+    case "list":
+      return `${estimate}, not an invoice.`;
+  }
+}

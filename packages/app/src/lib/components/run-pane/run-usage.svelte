@@ -1,5 +1,11 @@
 <script lang="ts">
-import { costLabel, isIncluded, type RunUsageState } from "#lib/api/model-usage.ts";
+import {
+  costHeadline,
+  costLabel,
+  costSourceNote,
+  isIncluded,
+  type RunUsageState,
+} from "#lib/api/model-usage.ts";
 import * as Card from "#lib/components/ui/card/index.ts";
 import { Badge } from "#lib/components/ui/badge/index.ts";
 import { formatCount, formatElapsed, formatUsd } from "#lib/utils/format.ts";
@@ -51,7 +57,7 @@ const modelLabel = (model: string | null) => model ?? "(no model named)";
     <div class="grid gap-3 @md:grid-cols-2">
       <Card.Root size="sm" class={[card, "@md:col-span-2"]}>
         <Card.Header>
-          <Card.Description>Estimated cost</Card.Description>
+          <Card.Description>{costHeadline(bill.totals)}</Card.Description>
           <!-- The one number a reader opens this tab for, a size above the rest. The `!`s outrank the
                small card's own title size. -->
           <Card.Title class="text-2xl! font-semibold tracking-tight tabular-nums">
@@ -188,8 +194,9 @@ const modelLabel = (model: string | null) => model ?? "(no model named)";
 
     <div class="text-muted-foreground flex flex-col gap-1 px-1 text-xs">
       <p>
-        Estimated at list price, not an invoice. Tokens are what the provider reported. Input counts
-        uncached tokens only; reads from and writes to the prompt cache are priced apart.
+        {costSourceNote(bill.totals, bill.pricing.source)} Tokens are what the provider reported.
+        Input counts uncached tokens only; reads from and writes to the prompt cache are priced
+        apart.
       </p>
       {#if bill.totals.failedRequests > 0}
         <p>
@@ -201,12 +208,6 @@ const modelLabel = (model: string | null) => model ?? "(no model named)";
           {bill.totals.includedRequests}
           {bill.totals.includedRequests === 1 ? "call was" : "calls were"} included in a ChatGPT
           plan and {bill.totals.includedRequests === 1 ? "is" : "are"} not counted as spend.
-        </p>
-      {/if}
-      {#if bill.totals.reportedRequests > 0}
-        <p>
-          {bill.totals.reportedRequests}
-          {bill.totals.reportedRequests === 1 ? "call is" : "calls are"} priced at OpenRouter's bill.
         </p>
       {/if}
       {#if bill.totals.unpricedRequests > 0}

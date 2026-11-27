@@ -2,7 +2,15 @@
 import PageTitle from "#lib/components/page-title/page-title.svelte";
 import { goto } from "$app/navigation";
 import { navigating } from "$app/state";
-import { costLabel, isIncluded, type UsageReport, type UsageTotals } from "#lib/api/model-usage.ts";
+import {
+  costBasis,
+  costHeadline,
+  costLabel,
+  costSourceNote,
+  isIncluded,
+  type UsageReport,
+  type UsageTotals,
+} from "#lib/api/model-usage.ts";
 import { Badge } from "#lib/components/ui/badge/index.ts";
 import { Button } from "#lib/components/ui/button/index.ts";
 import * as Card from "#lib/components/ui/card/index.ts";
@@ -210,7 +218,7 @@ const costCell = costLabel;
           {/if}
           <Card.Root class="@container/card from-foreground/5 to-card bg-linear-to-t shadow-xs">
             <Card.Header>
-              <Card.Description class="whitespace-nowrap">Estimated cost</Card.Description>
+              <Card.Description class="whitespace-nowrap">{costHeadline(totals)}</Card.Description>
               <Card.Title class="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
                 {allIncluded ? "Included" : formatUsd(totals.cost.total)}
               </Card.Title>
@@ -306,7 +314,9 @@ const costCell = costLabel;
         <section class="flex min-w-0 flex-col gap-3">
           <div class="flex flex-col gap-1">
             <h2 class="text-base font-medium">Cost per day</h2>
-            <p class="text-muted-foreground text-sm">Estimated, in US dollars. Days are UTC.</p>
+            <p class="text-muted-foreground text-sm">
+              {costBasis(totals) === "billed" ? "In" : "Estimated, in"} US dollars. Days are UTC.
+            </p>
           </div>
           <div class="flex flex-col gap-3">
             <DailyCostChart {bars} />
@@ -496,16 +506,12 @@ const costCell = costLabel;
         </div>
 
         <p class="text-muted-foreground text-xs">
-          Tokens are what each provider reported on its responses. Costs are list-price estimates
-          from Ryph's built-in price list ({report.pricing.source}), not an invoice.
+          Tokens are what each provider reported on its responses.
+          {costSourceNote(totals, report.pricing.source)}
           {#if totals.includedRequests > 0}
             {totals.includedRequests}
             {totals.includedRequests === 1 ? "call was" : "calls were"} included in a ChatGPT plan
             and {totals.includedRequests === 1 ? "is" : "are"} not counted as spend.
-          {/if}
-          {#if totals.reportedRequests > 0}
-            {totals.reportedRequests}
-            {totals.reportedRequests === 1 ? "call is" : "calls are"} priced at OpenRouter's bill.
           {/if}
           {#if totals.unpricedRequests > 0}
             {totals.unpricedRequests}
