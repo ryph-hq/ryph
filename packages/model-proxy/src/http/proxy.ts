@@ -452,7 +452,9 @@ export function withoutCredential(text: string, sent: string | null): string {
  */
 export async function logUpstreamError(
   diag: ProxyDiag,
-  response: Response,
+  // Only its body is read, and typed by that alone: a package typechecking this file against
+  // undici's `Response` (the orchestrator's) hands over one Bun's global type does not accept.
+  response: { body: ReadableStream<Uint8Array> | null },
   sentCredential: string | null,
   fields: { runId: string; provider: string; model: string | null; status: number },
 ): Promise<void> {
