@@ -481,6 +481,16 @@ export async function logUpstreamError(
   sentCredential: string | null,
   fields: { runId: string; provider: string; model: string | null; status: number },
 ): Promise<void> {
+  const body = await errorBodyStart(response);
+  const clipped = withoutCredential(body, sentCredential).trim().slice(0, UPSTREAM_ERROR_LOG_CHARS);
+  diag.warn("proxy.upstream_error", { ...fields, body: clipped });
+}
+
+/** The first UPSTREAM_ERROR_READ_BYTES or so of an error answer's body, as text; what arrived
+ * when the read fails. The rest is cancelled. Never throws. */
+async function errorBodyStart(
+  response: { body: ReadableStream<Uint8Array> | null },
+): Promise<string> {
   let body = "";
   try {
     const reader = response.body?.getReader();
@@ -496,10 +506,19 @@ export async function logUpstreamError(
       await reader.cancel().catch(() => {});
     }
   } catch {
-    // What arrived is what is logged.
+    // What arrived is what there is.
   }
-  const clipped = withoutCredential(body, sentCredential).trim().slice(0, UPSTREAM_ERROR_LOG_CHARS);
-  diag.warn("proxy.upstream_error", { ...fields, body: clipped });
+  return body;
+}
+
+/**
+ * Whether OpenRouter refused a call for the account's money: a 402 (out of credit, or unable to
+ * cover the call's `max_tokens`), or a 403 that says a key's spending limit was hit. Its body
+ * tells how much credit is left, which is the account's business, not the run's. Any other 403
+ * (a moderation flag, say) is the run's to read, and is relayed.
+ */
+export function isOpenRouterCreditRefusal(status: number, body: string): boolean {
+  return status === 402 || (status === 403 && /\blimit\b|\bcredits?\b/i.test(body));
 }
 
 export function makeProxyHandler(deps: ProxyHandlerDeps): (req: Request) => Promise<Response> {
@@ -1443,6 +1462,26 @@ export function makeProxyHandler(deps: ProxyHandlerDeps): (req: Request) => Prom
         provider: provider.id,
         model: named,
         status: upstream.status,
+      });
+    }
+
+    // But not OpenRouter's refusal for money: its body says what the account has left. The run
+    // gets a fixed body at the same status (a 402 is what its harness treats as fatal); the
+    // operator still has the whole body, in the line just logged.
+    if (
+      provider.id === OPENROUTER && provider.builtin &&
+      (upstream.status === 402 || upstream.status === 403) &&
+      isOpenRouterCreditRefusal(upstream.status, await errorBodyStart(upstream.clone()))
+    ) {
+      await upstream.body?.cancel().catch(() => {});
+      record("ended");
+      return final(upstream.status, {
+        error: {
+          message: "OpenRouter refused the call: the account is out of credit or over its " +
+            "limit. An admin must check the key under Model keys",
+          type: "upstream_credit_refused",
+        },
+        code: "upstream_credit_refused",
       });
     }
 

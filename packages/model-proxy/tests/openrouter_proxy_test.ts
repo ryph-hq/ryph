@@ -30,6 +30,7 @@ async function makeSlice(opts: {
   upstream?: (req: Request) => Response | Promise<Response>;
   now?: () => Date;
   openRouterModels?: (store: ReturnType<typeof memoryKeyStore>) => UsableOpenRouterModels;
+  warn?: (event: string, data?: Record<string, unknown>) => void;
 } = {}) {
   const store = memoryKeyStore();
   await store.upsertOpenRouterCatalogue(
@@ -82,7 +83,7 @@ async function makeSlice(opts: {
     store,
     decrypt: (sealed) => Promise.resolve(sealed.replace(/^sealed:/, "")),
     now: opts.now ?? (() => new Date(T0)),
-    diag: { debug() {}, warn() {} },
+    diag: { debug() {}, warn: opts.warn ?? (() => {}) },
     limits: { meter: makeSpendMeter({ backstopMs: 30_000 }), gauge: null },
     ...(opts.openRouterModels === undefined
       ? {}
@@ -265,6 +266,60 @@ test("an OpenRouter models list is answered by the proxy: the models this run ma
     }],
   });
   assertEquals(seen, [], "OpenRouter was never asked");
+});
+
+test("OpenRouter's refusal for money reaches the run without the account's credit", async () => {
+  const CREDIT_402 = {
+    error: {
+      code: 402,
+      message: "This request requires more credits. You requested up to 32000 tokens, but can " +
+        "only afford 1234. Your balance is $0.37",
+    },
+  };
+  const KEY_LIMIT_403 = {
+    error: { code: 403, message: "Key limit exceeded (daily limit). Remaining: $0.01" },
+  };
+  const MODERATION_403 = {
+    error: { code: 403, message: "Your input was flagged", metadata: { reasons: ["harassment"] } },
+  };
+  for (
+    const [status, upstreamBody, fixed] of [
+      [402, CREDIT_402, true],
+      [403, KEY_LIMIT_403, true],
+      [403, MODERATION_403, false],
+    ] as const
+  ) {
+    const logged: Array<Record<string, unknown> | undefined> = [];
+    const { call, rows } = await makeSlice({
+      upstream: () => Response.json(upstreamBody, { status }),
+      warn: (event, data) => {
+        if (event === "proxy.upstream_error") logged.push(data);
+      },
+    });
+    const res = await call({ model: "openai/gpt-6", messages: [] });
+    // The upstream's status, kept: a 402 is what the runner treats as fatal.
+    assertEquals(res.status, status);
+    const body = await res.json();
+    if (fixed) {
+      assertEquals(body, {
+        error: {
+          message: "OpenRouter refused the call: the account is out of credit or over its " +
+            "limit. An admin must check the key under Model keys",
+          type: "upstream_credit_refused",
+        },
+        code: "upstream_credit_refused",
+      });
+      assertEquals(res.headers.get("x-should-retry"), "false");
+    } else {
+      assertEquals(body, upstreamBody, "any other refusal is the run's to read");
+    }
+    // The operator's line still has what OpenRouter said, balance and all.
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    assertEquals(logged.length, 1);
+    assertEquals(logged[0]?.status, status);
+    assertEquals(logged[0]?.body, JSON.stringify(upstreamBody));
+    assertEquals((await rows()).map((r) => [r.status, r.estimated]), [[status, false]]);
+  }
 });
 
 test("OpenRouter's stated cost is the row's spend, JSON or streamed", async () => {
