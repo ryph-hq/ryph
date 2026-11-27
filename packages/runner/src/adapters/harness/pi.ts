@@ -35,7 +35,8 @@
 //   images than the provider takes, whatever the agent read
 // - stdout is strict JSONL: an unparseable line, a premature exit (mid-turn, or between turns
 //   while the run is not over), or a final stopReason "error" is mechanical breakage and throws;
-//   an error stop on a rejected credential (401/403) throws at its settle, not the run's end;
+//   an error stop no retry can fix (a refused key, an account out of credits) throws at its
+//   settle, not the run's end; every error stop is narrated as a `model_error` row;
 //   the agent stopping without delivering is a normal outcome
 // - an image a tool returns is uploaded as a run attachment before its result is narrated, and
 //   narrated by its ref, never its bytes (pi_vision.ts); narration keeps pi's order, and an
@@ -1810,11 +1811,12 @@ export function piHarness(
             if (!interrupted && (delivered !== heard || pendingPrompt !== undefined)) continue;
             settled = true;
             if (interrupted) break;
-            // A turn that ended on a rejected credential fails the run now. Handed to the core,
-            // it would wait out the idle clock (half an hour on an attended run) for a reply
-            // that cannot help, and only then throw below. Other error stops still wait: a
-            // person's next message retries the call, and a later turn supersedes the error.
-            if (final?.stopReason === "error" && credentialRejected(final.errorMessage)) {
+            // A turn that ended on an error only an admin can fix (a refused key, an account out
+            // of credits) fails the run now. Handed to the core, it would wait out the idle clock
+            // (half an hour on an attended run) for a reply that cannot help, and only then throw
+            // below. Other error stops still wait: a person's next message retries the call, and
+            // a later turn supersedes the error. Both kinds are already in the transcript.
+            if (final?.stopReason === "error" && adminMustFix(final.errorMessage)) {
               throw new Error(`pi reported an agent error: ${final.errorMessage}`);
             }
             // The core decides whether the run is over: `finish` ends it at this settle, the
@@ -2285,6 +2287,11 @@ export function resizedChars(image: HarnessImage): number {
   return asIs ? own : PI_IMAGE_MAX_CHARS;
 }
 
+/** The `system` row a turn that ended on a model error is narrated as; its payload carries
+ * `errorMessage`. */
+export const MODEL_ERROR = "model_error";
+const MODEL_ERROR_CLIP = 2000;
+
 /** The pi events narrated as a bare `system` row. */
 const SYSTEM_EVENTS = new Set([
   "session",
@@ -2346,6 +2353,23 @@ export function mapEvent(
         }
         // toolCall blocks are narrated by tool_execution_start instead
       }
+      // A turn the model call ended on an error (the provider refused it, ran out of credits,
+      // rate limited it) carries no content, only pi's errorMessage. Narrated as its own row, or
+      // the run reads as an agent that silently did nothing. The payload is flat, so the
+      // emitter's reduction of an oversized payload to its scalars keeps the message.
+      if (message.stopReason === "error") {
+        chunks.push({
+          kind: "system",
+          text: MODEL_ERROR,
+          raw: {
+            type: MODEL_ERROR,
+            errorMessage: clip(
+              typeof message.errorMessage === "string" ? message.errorMessage : "unknown error",
+              MODEL_ERROR_CLIP,
+            ),
+          },
+        });
+      }
       return chunks;
     }
     case "tool_execution_start":
@@ -2379,15 +2403,18 @@ export function mapEvent(
 }
 
 /**
- * Whether an error stop is the provider (or the model proxy in front of it) refusing the run's
- * credential: a 401 or 403, which pi-ai puts first in the message (`401 {"type":"error",...}`),
- * or the provider's own error type where no status leads. No retry or reply fixes it; only a
- * new key does.
+ * Whether an error stop is one only an admin can fix, so no retry or reply helps:
+ * - the provider (or the model proxy in front of it) refusing the run's credential: a 401 or 403,
+ *   which pi-ai puts first in the message (`401 {"type":"error",...}`), or the provider's own
+ *   error type where no status leads;
+ * - the account behind the key out of credits: a 402 (OpenRouter's "Insufficient credits"), or
+ *   OpenAI's `insufficient_quota`, which it sends as a 429 and which waiting does not end.
  */
-export function credentialRejected(errorMessage: string | undefined): boolean {
+export function adminMustFix(errorMessage: string | undefined): boolean {
   if (errorMessage === undefined) return false;
-  return /^\s*40[13]\b/.test(errorMessage) ||
-    /"type"\s*:\s*"(authentication_error|permission_error)"/.test(errorMessage);
+  return /^\s*40[123]\b/.test(errorMessage) ||
+    /"type"\s*:\s*"(authentication_error|permission_error)"/.test(errorMessage) ||
+    /\binsufficient_quota\b/.test(errorMessage);
 }
 
 /** Extracts the assistant text (and stop metadata) from a message_end event, if it is one. */

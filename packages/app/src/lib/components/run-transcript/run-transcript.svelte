@@ -762,6 +762,19 @@ function splitThought(text: string): { title: string; body: string; heading: boo
             <span class="text-muted-foreground truncate">{row.detail}</span>
             <span class="text-muted-foreground ml-auto shrink-0 pr-2">{formatTime(row.at)}</span>
           </p>
+        {:else if row.kind === "model_error"}
+          <div class="text-muted-foreground relative flex justify-center">
+            <span class="bg-background flex py-1">
+              <TriangleAlertIcon class="text-destructive size-3.5" />
+            </span>
+          </div>
+          <div class="flex items-baseline gap-2 py-0.5 text-xs">
+            <div class="flex min-w-0 flex-1 flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-2">
+              <span class="font-medium sm:shrink-0">Model call failed</span>
+              <span class="text-muted-foreground line-clamp-4 min-w-0 wrap-anywhere" title={row.detail}>{row.detail}</span>
+            </div>
+            <span class="text-muted-foreground shrink-0 pr-2">{formatTime(row.at)}</span>
+          </div>
         {:else if row.kind === "stale"}
           <div class="text-muted-foreground relative flex justify-center">
             <span class="bg-background flex py-1">
