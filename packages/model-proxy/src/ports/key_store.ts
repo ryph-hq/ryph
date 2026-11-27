@@ -179,7 +179,11 @@ export interface KeyStore {
   setOpenRouterEnabled(ids: readonly string[], at: string): Promise<void>;
   /** Where the catalogue sync stands; null before the first attempt. */
   getOpenRouterSync(): Promise<OpenRouterSync | null>;
-  putOpenRouterSync(state: OpenRouterSync): Promise<void>;
+  /** Writes how a sync ended. Its `startedAt` is left as it is: another process may have begun
+   * one since. */
+  putOpenRouterSync(state: Omit<OpenRouterSync, "startedAt">): Promise<void>;
+  /** Stamps the state's `startedAt` as a sync begins, so every process can say one is running. */
+  markOpenRouterSyncStarted(at: string): Promise<void>;
 
   /** Append-only metering trail, one row per forwarded request. */
   recordUsage(record: UsageRecord): Promise<void>;

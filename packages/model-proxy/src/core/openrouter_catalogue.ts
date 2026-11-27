@@ -8,7 +8,9 @@
 // OpenRouter at all.
 //
 // Invariants:
-// - ONE sync at a time in this process: a second caller waits for the one in flight
+// - ONE sync at a time in this process: a second caller waits for the one in flight. Each sync
+//   stamps when it began in the store, so a replica that is not running it still answers that
+//   one runs (`syncRunningIn`)
 // - a failed sync changes no model row: the old catalogue stands, and the state says what failed
 // - a list with no model in it is a failure, not an empty catalogue: it would mark every model
 //   unlisted, and with that take every enabled one away from agents
@@ -19,6 +21,8 @@
 //   (`MISSES_BEFORE_UNLISTED`, the store's to count)
 // - the error a failed sync records is short and says nothing of the store's internals: it is
 //   shown to the admin, and a failed write's message can carry the whole statement
+// - `sync` never throws, a store that fails its first read included: every step is inside the
+//   one try, and a failure is recorded like any other
 
 import {
   catalogueOf,
@@ -75,9 +79,12 @@ export function makeOpenRouterCatalogue(deps: OpenRouterCatalogueDeps): OpenRout
   }
 
   const run = async (force: boolean): Promise<OpenRouterSync> => {
-    const previous = await deps.store.getOpenRouterSync();
     const at = deps.now().toISOString();
+    // Undefined until the store answers: a sync whose first read failed has no state to keep.
+    let previous: OpenRouterSync | null | undefined;
     try {
+      previous = await deps.store.getOpenRouterSync();
+      await deps.store.markOpenRouterSyncStarted(at);
       const rows = catalogueOf(await deps.api.listModels());
       if (rows.length === 0) throw new SyncRefused("OpenRouter's model list had no model in it");
       if (rows.length > MAX_CATALOGUE_MODELS) {
@@ -104,7 +111,7 @@ export function makeOpenRouterCatalogue(deps: OpenRouterCatalogueDeps): OpenRout
       const state = { syncedAt: at, attemptedAt: at, error: null, errorCode: null };
       await deps.store.putOpenRouterSync(state);
       deps.diag.debug("openrouter.synced", { models: rows.length, forced: force });
-      return state;
+      return { ...state, startedAt: at };
     } catch (err) {
       // OpenRouter's own failures and this file's say what happened in a line; anything else is
       // a store's, whose message is no business of the admin's.
@@ -112,6 +119,11 @@ export function makeOpenRouterCatalogue(deps: OpenRouterCatalogueDeps): OpenRout
         ? err.message
         : "the sync failed";
       deps.diag.warn("openrouter.sync_failed", { error, cause: shortError(err) });
+      // The last good sync's time is kept, so it is read once more when the first read failed;
+      // if the store still cannot say, nothing is written rather than a state that forgets it.
+      if (previous === undefined) {
+        previous = await deps.store.getOpenRouterSync().catch(() => undefined);
+      }
       const state = {
         syncedAt: previous?.syncedAt ?? null,
         attemptedAt: at,
@@ -119,8 +131,8 @@ export function makeOpenRouterCatalogue(deps: OpenRouterCatalogueDeps): OpenRout
         errorCode: err instanceof SyncRefused ? err.code : null,
       };
       // A store that is down cannot hold the state either; the caller still gets it.
-      await deps.store.putOpenRouterSync(state).catch(() => {});
-      return state;
+      if (previous !== undefined) await deps.store.putOpenRouterSync(state).catch(() => {});
+      return { ...state, startedAt: at };
     }
   };
 

@@ -19,7 +19,8 @@ CREATE TABLE "openrouter_sync" (
 	"synced_at" text,
 	"attempted_at" text,
 	"error" text,
-	"error_code" text
+	"error_code" text,
+	"started_at" text
 );
 --> statement-breakpoint
 ALTER TABLE "proxy_usage" ADD COLUMN "cost_usd" double precision;

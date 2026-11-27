@@ -466,8 +466,14 @@ export function drizzleKeyStore(handle: ModelProxyDbHandle): KeyStore {
       return state;
     },
     async putOpenRouterSync(state) {
-      await db.insert(schema.openrouterSync).values({ id: OPENROUTER_SYNC_ID, ...state })
-        .onConflictDoUpdate({ target: schema.openrouterSync.id, set: state });
+      const { syncedAt, attemptedAt, error, errorCode } = state;
+      const set = { syncedAt, attemptedAt, error, errorCode };
+      await db.insert(schema.openrouterSync).values({ id: OPENROUTER_SYNC_ID, ...set })
+        .onConflictDoUpdate({ target: schema.openrouterSync.id, set });
+    },
+    async markOpenRouterSyncStarted(at) {
+      await db.insert(schema.openrouterSync).values({ id: OPENROUTER_SYNC_ID, startedAt: at })
+        .onConflictDoUpdate({ target: schema.openrouterSync.id, set: { startedAt: at } });
     },
 
     async recordUsage(record) {

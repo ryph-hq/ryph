@@ -290,8 +290,25 @@ export function memoryKeyStore(): KeyStore {
     getOpenRouterSync() {
       return Promise.resolve(openRouterSync === null ? null : { ...openRouterSync });
     },
-    putOpenRouterSync(state) {
-      openRouterSync = { ...state };
+    putOpenRouterSync({ syncedAt, attemptedAt, error, errorCode }) {
+      openRouterSync = {
+        syncedAt,
+        attemptedAt,
+        error,
+        errorCode,
+        startedAt: openRouterSync?.startedAt ?? null,
+      };
+      return Promise.resolve();
+    },
+    markOpenRouterSyncStarted(at) {
+      openRouterSync = {
+        syncedAt: null,
+        attemptedAt: null,
+        error: null,
+        errorCode: null,
+        ...openRouterSync,
+        startedAt: at,
+      };
       return Promise.resolve();
     },
 

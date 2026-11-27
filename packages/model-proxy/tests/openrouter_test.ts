@@ -7,7 +7,13 @@ import { assert, assertEquals } from "@std/assert";
 import type { Route } from "@ryph/shared/http";
 import { unauthorized } from "@ryph/sealed";
 import { forbidden } from "@ryph/auth";
-import { catalogueOf, OPENROUTER, openRouterModelForRun } from "../src/core/openrouter.ts";
+import {
+  catalogueOf,
+  OPENROUTER,
+  openRouterModelForRun,
+  SYNC_RUNNING_FOR_MS,
+  syncRunningIn,
+} from "../src/core/openrouter.ts";
 import { makeOpenRouterCatalogue } from "../src/core/openrouter_catalogue.ts";
 import { openRouterApi } from "../src/adapters/openrouter/api.ts";
 import { OpenRouterApiError } from "../src/ports/openrouter_api.ts";
@@ -209,6 +215,7 @@ test("a sync writes the catalogue; a failed one keeps it and says why", async ()
     attemptedAt: NOW.toISOString(),
     error: null,
     errorCode: null,
+    startedAt: NOW.toISOString(),
   });
   assertEquals((await store.listOpenRouterModels()).length, 3);
 
@@ -613,6 +620,87 @@ test("a catalogue read that starts a sync answers that one is running", async ()
   assertEquals(after.sync.syncing, false);
   assertEquals(after.models.length, 3);
   assertEquals(asked, 1, "fresh now: no second sync");
+});
+
+test("a sync another replica began is reported as running, until it ends or goes quiet", async () => {
+  const store = memoryKeyStore();
+  // The other replica: its own catalogue over the same store, its model list held open.
+  const api = fakeOpenRouter();
+  let release = () => {};
+  const held = new Promise<void>((resolve) => (release = resolve));
+  const listModels = api.listModels;
+  api.listModels = async () => {
+    await held;
+    return await listModels();
+  };
+  const there = makeOpenRouterCatalogue({ store, api, now: () => NOW, diag: quiet });
+  const running = there.sync();
+  await new Promise((resolve) => setTimeout(resolve, 1));
+
+  // This replica runs no sync of its own, and still answers that one runs.
+  const { call, catalogue } = makeApi({ store });
+  assertEquals(catalogue.syncing(), false);
+  const during = await (await call("GET", "/v1/openrouter/models")).json();
+  assertEquals(during.sync.syncing, true);
+
+  release();
+  await running;
+  const after = await (await call("GET", "/v1/openrouter/models")).json();
+  assertEquals(after.sync.syncing, false);
+  assertEquals(after.models.length, 3);
+
+  // One that never said it ended stops counting after a few minutes: its process may be gone.
+  const state = (await store.getOpenRouterSync())!;
+  await store.markOpenRouterSyncStarted(new Date(NOW.getTime() + 1_000).toISOString());
+  const begun = await store.getOpenRouterSync();
+  assertEquals(syncRunningIn(begun, new Date(NOW.getTime() + 2_000)), true);
+  assertEquals(syncRunningIn(begun, new Date(NOW.getTime() + 1_000 + SYNC_RUNNING_FOR_MS)), false);
+  assertEquals(syncRunningIn({ ...state, startedAt: null }, NOW), false);
+});
+
+test("a store that fails the sync's first read is a recorded failure, never a throw", async () => {
+  const store = memoryKeyStore();
+  await store.putOpenRouterSync({
+    syncedAt: "2026-11-26T12:00:00.000Z",
+    attemptedAt: "2026-11-26T12:00:00.000Z",
+    error: null,
+    errorCode: null,
+  });
+  let failReads = 1;
+  const blipping: KeyStore = {
+    ...store,
+    getOpenRouterSync: () => {
+      if (failReads-- > 0) return Promise.reject(new Error("connection reset: select ..."));
+      return store.getOpenRouterSync();
+    },
+  };
+  const { call } = makeApi({ store: blipping });
+  const res = await call("POST", "/v1/openrouter/sync");
+  assertEquals(res.status, 502);
+  const body = await res.json();
+  assertEquals(body.error, "could not sync OpenRouter's models: the sync failed");
+  // Recorded like any failure, the last good sync's time kept.
+  const state = await store.getOpenRouterSync();
+  assertEquals(state?.error, "the sync failed");
+  assertEquals(state?.syncedAt, "2026-11-26T12:00:00.000Z");
+  assertEquals(state?.attemptedAt, NOW.toISOString());
+
+  // A store that cannot answer at all: the caller still gets the state, and nothing is written
+  // that would forget the last good sync.
+  const down: KeyStore = {
+    ...store,
+    getOpenRouterSync: () => Promise.reject(new Error("down")),
+  };
+  const catalogue = makeOpenRouterCatalogue({
+    store: down,
+    api: fakeOpenRouter(),
+    now: () => new Date(NOW.getTime() + 1_000),
+    diag: quiet,
+  });
+  const failed = await catalogue.sync();
+  assertEquals(failed.error, "the sync failed");
+  assertEquals((await store.getOpenRouterSync())?.syncedAt, "2026-11-26T12:00:00.000Z");
+  assertEquals((await store.getOpenRouterSync())?.attemptedAt, NOW.toISOString());
 });
 
 test("saving the enabled set and a sync that writes tell the proxy's cache", async () => {

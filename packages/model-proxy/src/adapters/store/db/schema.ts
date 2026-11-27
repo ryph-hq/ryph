@@ -131,6 +131,9 @@ export const openrouterSync = pgTable("openrouter_sync", {
   error: text("error"),
   // A code beside the error, for the one failure the admin can act on: OPENROUTER_SYNC_SHRUNK.
   errorCode: text("error_code"),
+  // When the latest sync began, in whichever replica: later than `attempted_at` while it runs,
+  // which is how a replica that is not running it can say one is.
+  startedAt: text("started_at"),
 });
 
 export const virtualKeys = pgTable("virtual_keys", {

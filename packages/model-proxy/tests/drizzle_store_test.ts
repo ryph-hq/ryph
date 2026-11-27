@@ -327,10 +327,15 @@ test("the OpenRouter catalogue round-trips through both stores identically", asy
         errorCode: "openrouter_sync_shrunk",
       };
       await store.putOpenRouterSync(state);
-      assertEquals(await store.getOpenRouterSync(), state, name);
+      assertEquals(await store.getOpenRouterSync(), { ...state, startedAt: null }, name);
       await store.putOpenRouterSync({ ...state, error: null, errorCode: null });
       assertEquals((await store.getOpenRouterSync())?.error, null, name);
       assertEquals((await store.getOpenRouterSync())?.errorCode, null, name);
+
+      // A sync's start is stamped on its own, and the end of an earlier one leaves it standing.
+      await store.markOpenRouterSyncStarted(T2);
+      await store.putOpenRouterSync({ ...state, attemptedAt: T1 });
+      assertEquals(await store.getOpenRouterSync(), { ...state, startedAt: T2 }, name);
     }
   } finally {
     await stores.drizzle.close();
