@@ -174,7 +174,7 @@ export type EditedModelPolicyCheck = { problem: string | null; warning: string |
 
 /**
  * The edit flow's check of the model fields. The server checks a policy only when it moves, so
- * one sent back as stored saves as it is, even after an admin disabled its default model. That
+ * one sent back as stored saves as it is, even after an admin disabled a model it names. That
  * case gets a warning, so the rest of the agent can still be saved.
  */
 export function editedModelPolicyCheck(
@@ -188,19 +188,33 @@ export function editedModelPolicyCheck(
   openRouter: OpenRouterChoices | null,
 ): EditedModelPolicyCheck {
   if (stored !== null && sameModelPolicy(composed, stored)) {
-    const enabled = openRouter?.enabled ?? null;
-    const stale = enabled !== null &&
-      (stored.defaultModel === null || !enabled.includes(stored.defaultModel));
-    return {
-      problem: null,
-      warning: stale ? "This agent's default model isn't enabled any more" : null,
-    };
+    return { problem: null, warning: storedModelsWarning(stored, openRouter?.enabled ?? null) };
   }
   const { providerKeyId, allowedModels, defaultModel } = fields;
   return {
     problem: modelPolicyProblem(providerKeyId, allowedModels, defaultModel, openRouter),
     warning: null,
   };
+}
+
+/**
+ * The warning for a stored policy that names models no longer enabled on OpenRouter: the default
+ * and each allowlisted model, named. Null while the enabled list is unknown or all are enabled.
+ */
+export function storedModelsWarning(
+  stored: ModelPolicy,
+  enabled: readonly string[] | null,
+): string | null {
+  if (enabled === null) return null;
+  if (stored.defaultModel === null) return "This agent has no default model.";
+  const named = [
+    stored.defaultModel,
+    ...(stored.allowedModels === "*" ? [] : stored.allowedModels),
+  ];
+  const off = [...new Set(named)].filter((model) => !enabled.includes(model));
+  if (off.length === 0) return null;
+  if (off.length === 1) return `This agent's model ${off[0]} isn't enabled any more.`;
+  return `Some of this agent's models aren't enabled any more: ${off.join(", ")}.`;
 }
 
 function sameIds(a: readonly string[], b: readonly string[]): boolean {

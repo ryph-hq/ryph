@@ -9,6 +9,7 @@ import {
   openRouterChoices,
   policyToFields,
   sameModelPolicy,
+  storedModelsWarning,
   usableProviderKeys,
 } from "./model-policy";
 
@@ -297,13 +298,20 @@ describe("OpenRouter model fields", () => {
     it("saves an unchanged policy whose default was disabled, with a warning", () => {
       expect(editedModelPolicyCheck(stored, compose(), fields, now)).toEqual({
         problem: null,
-        warning: "This agent's default model isn't enabled any more",
+        warning: "This agent's model a/x isn't enabled any more.",
       });
     });
 
-    it("warns about nothing while the default is still enabled or the models aren't known", () => {
+    it("warns about a disabled allowlisted model too", () => {
+      expect(editedModelPolicyCheck(stored, compose(), fields, { enabled: ["a/x"] })).toEqual({
+        problem: null,
+        warning: "This agent's model b/y isn't enabled any more.",
+      });
+    });
+
+    it("warns about nothing while every model is still enabled or the models aren't known", () => {
       const fine = { problem: null, warning: null };
-      expect(editedModelPolicyCheck(stored, compose(), fields, { enabled: ["a/x"] }))
+      expect(editedModelPolicyCheck(stored, compose(), fields, { enabled: ["a/x", "b/y"] }))
         .toEqual(fine);
       expect(editedModelPolicyCheck(stored, compose(), fields, { enabled: null })).toEqual(fine);
     });
@@ -327,5 +335,46 @@ describe("OpenRouter model fields", () => {
       expect(editedModelPolicyCheck(null, composed, fresh, now).problem)
         .toBe("Pick a default model.");
     });
+  });
+});
+
+describe("storedModelsWarning", () => {
+  const stored = {
+    providerKeyId: "or-1",
+    provider: "openrouter",
+    allowedModels: ["a/x", "b/y", "c/z"],
+    defaultModel: "a/x",
+    defaultThinking: null,
+  };
+
+  it("names every model the policy names that isn't enabled, the default first and each once", () => {
+    expect(storedModelsWarning(stored, ["b/y"])).toBe(
+      "Some of this agent's models aren't enabled any more: a/x, c/z.",
+    );
+    expect(storedModelsWarning(stored, [])).toBe(
+      "Some of this agent's models aren't enabled any more: a/x, b/y, c/z.",
+    );
+  });
+
+  it("names a single model on its own", () => {
+    expect(storedModelsWarning(stored, ["a/x", "b/y"])).toBe(
+      "This agent's model c/z isn't enabled any more.",
+    );
+  });
+
+  it("checks only the default when every model is allowed", () => {
+    const open = { ...stored, allowedModels: "*" as const };
+    expect(storedModelsWarning(open, ["a/x"])).toBeNull();
+    expect(storedModelsWarning(open, ["b/y"])).toBe(
+      "This agent's model a/x isn't enabled any more.",
+    );
+  });
+
+  it("flags a missing default, and says nothing while the enabled list is unknown", () => {
+    expect(storedModelsWarning({ ...stored, defaultModel: null }, ["a/x", "b/y", "c/z"])).toBe(
+      "This agent has no default model.",
+    );
+    expect(storedModelsWarning(stored, null)).toBeNull();
+    expect(storedModelsWarning(stored, ["a/x", "b/y", "c/z"])).toBeNull();
   });
 });

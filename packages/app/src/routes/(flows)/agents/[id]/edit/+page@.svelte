@@ -119,7 +119,7 @@ const composedPolicy = $derived(
   composeModelPolicy(providerKeyId, allowedModels, defaultModel, data.providerKeys, sentThinking),
 );
 // The OpenRouter rules hold only once the model fields move: the server saves a policy sent back
-// as stored without checking it, so a disabled default warns here and blocks nothing else.
+// as stored without checking it, so a disabled model warns here and blocks nothing else.
 const modelCheck = $derived(
   data.modelAccessEnabled
     ? editedModelPolicyCheck(
@@ -396,12 +396,12 @@ async function handleArchive() {
           <Alert.Title>{modelCheck.warning}</Alert.Title>
           <Alert.Description class="flex flex-col items-start gap-2">
             <span>
-              Pick an enabled default on the Model step, or turn this one back on under
+              Pick enabled models on the Model step, or turn them back on under
               <a href="/model-keys" class="underline underline-offset-4">Model keys</a>.
             </span>
             {#if shown !== "model"}
               <Button type="button" variant="outline" size="sm" onclick={() => go("model")}>
-                Pick a default model
+                Pick models
               </Button>
             {/if}
           </Alert.Description>
