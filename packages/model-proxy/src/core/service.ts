@@ -110,7 +110,10 @@ export async function listProviderSpecs(
           ? openRouter
           : spec
       ),
-    ...custom.map(customProviderSpec),
+    // A custom row registered under an id that later became a built-in (a hand-made `openrouter`
+    // endpoint from before the built-in shipped) can never be reached: `resolveProvider` answers
+    // the built-in first. Listed beside it, the app would show two providers with one id.
+    ...custom.filter((row) => !Object.hasOwn(BUILTIN_PROVIDERS, row.id)).map(customProviderSpec),
   ];
 }
 

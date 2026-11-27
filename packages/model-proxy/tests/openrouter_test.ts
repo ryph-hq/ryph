@@ -1430,3 +1430,30 @@ test("rotating an OpenRouter key's secret checks the new one", async () => {
   );
   assertEquals(api.calls.keys.length, asked);
 });
+
+test("a custom endpoint made before the built-in, under its id, is not listed beside it", async () => {
+  // A deployment that registered OpenRouter by hand as a custom `openrouter` endpoint keeps that
+  // row (archived, since rows are never deleted). The built-in answers every lookup for the id,
+  // so the row is unreachable, and listing it would give the app two providers named the same.
+  const store = memoryKeyStore();
+  const at = "2026-11-27T00:00:00.000Z";
+  for (const id of [OPENROUTER, "groq"]) {
+    await store.createCustomProvider({
+      id,
+      label: id,
+      baseUrl: "https://example.test/v1",
+      authHeader: "authorization",
+      authScheme: "Bearer",
+      extraHeaders: {},
+      models: [{ id: "m", label: "M" }],
+      archivedAt: at,
+      createdAt: at,
+      updatedAt: at,
+    });
+  }
+  const specs = await listProviderSpecs(store, { planOn: false });
+  const openrouter = specs.filter((s) => s.id === OPENROUTER);
+  assertEquals(openrouter.length, 1);
+  assertEquals(openrouter[0].builtin, true);
+  assertEquals(specs.filter((s) => s.id === "groq").length, 1);
+});
